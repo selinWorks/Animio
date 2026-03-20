@@ -33,21 +33,23 @@ type OptionButtonProps = {
   onPress: () => void;
 };
 
-const OptionButton = ({ label, selected, onPress }: OptionButtonProps) => (
-  <TouchableOpacity
-    style={[styles.optionButton, selected && styles.optionButtonSelected]}
-    onPress={onPress}
-  >
-    <Text
-      style={[
-        styles.optionButtonText,
-        selected && styles.optionButtonTextSelected,
-      ]}
+const OptionButton = ({ label, selected, onPress }: OptionButtonProps) => {
+  return (
+    <TouchableOpacity
+      style={[styles.optionButton, selected && styles.optionButtonSelected]}
+      onPress={onPress}
     >
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
+      <Text
+        style={[
+          styles.optionButtonText,
+          selected && styles.optionButtonTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
 
 const AssistantScreen = () => {
   const tabBarHeight = useBottomTabBarHeight();
@@ -57,6 +59,7 @@ const AssistantScreen = () => {
   const [duration, setDuration] = useState<DurationType>('');
   const [urgency, setUrgency] = useState<UrgencyType>('');
   const [result, setResult] = useState<RiskResult | null>(null);
+  const [aiMessage, setAiMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const canContinueStep2 = petType !== '';
@@ -128,6 +131,7 @@ const AssistantScreen = () => {
     try {
       setLoading(true);
       setResult(null);
+      setAiMessage('');
 
       const response = await fetch('http://10.0.2.2:5000/assistant/evaluate', {
         method: 'POST',
@@ -143,7 +147,9 @@ const AssistantScreen = () => {
       });
 
       const data = await response.json();
+
       setResult(data.risk);
+      setAiMessage(data.aiMessage || '');
     } catch (error) {
       console.log('API HATA:', error);
     } finally {
@@ -157,6 +163,7 @@ const AssistantScreen = () => {
     setDuration('');
     setUrgency('');
     setResult(null);
+    setAiMessage('');
     setLoading(false);
   };
 
@@ -181,7 +188,6 @@ const AssistantScreen = () => {
         >
           <View style={styles.card}>
             <Text style={styles.stepTitle}>1. Hayvan türü</Text>
-
             <View style={styles.optionsWrap}>
               {['Kedi', 'Köpek', 'Kuş', 'Diğer'].map(item => (
                 <OptionButton
@@ -191,6 +197,7 @@ const AssistantScreen = () => {
                   onPress={() => {
                     setPetType(item as PetType);
                     setResult(null);
+                    setAiMessage('');
                   }}
                 />
               ))}
@@ -200,7 +207,6 @@ const AssistantScreen = () => {
           {canContinueStep2 && (
             <View style={styles.card}>
               <Text style={styles.stepTitle}>2. Problem</Text>
-
               <View style={styles.optionsWrap}>
                 {[
                   'İştahsızlık',
@@ -217,6 +223,7 @@ const AssistantScreen = () => {
                     onPress={() => {
                       setProblemType(item as ProblemType);
                       setResult(null);
+                      setAiMessage('');
                     }}
                   />
                 ))}
@@ -227,7 +234,6 @@ const AssistantScreen = () => {
           {canContinueStep3 && (
             <View style={styles.card}>
               <Text style={styles.stepTitle}>3. Süre</Text>
-
               <View style={styles.optionsWrap}>
                 <OptionButton
                   label="Bugün başladı"
@@ -235,6 +241,7 @@ const AssistantScreen = () => {
                   onPress={() => {
                     setDuration('bugun');
                     setResult(null);
+                    setAiMessage('');
                   }}
                 />
                 <OptionButton
@@ -243,6 +250,7 @@ const AssistantScreen = () => {
                   onPress={() => {
                     setDuration('1-2_gundur');
                     setResult(null);
+                    setAiMessage('');
                   }}
                 />
                 <OptionButton
@@ -251,6 +259,7 @@ const AssistantScreen = () => {
                   onPress={() => {
                     setDuration('1_hafta');
                     setResult(null);
+                    setAiMessage('');
                   }}
                 />
                 <OptionButton
@@ -259,6 +268,7 @@ const AssistantScreen = () => {
                   onPress={() => {
                     setDuration('uzun');
                     setResult(null);
+                    setAiMessage('');
                   }}
                 />
               </View>
@@ -268,7 +278,6 @@ const AssistantScreen = () => {
           {canContinueStep4 && (
             <View style={styles.card}>
               <Text style={styles.stepTitle}>4. Aciliyet</Text>
-
               <View style={styles.optionsWrap}>
                 {['Evet', 'Hayır', 'Emin değilim'].map(item => (
                   <OptionButton
@@ -278,6 +287,7 @@ const AssistantScreen = () => {
                     onPress={() => {
                       setUrgency(item as UrgencyType);
                       setResult(null);
+                      setAiMessage('');
                     }}
                   />
                 ))}
@@ -331,6 +341,13 @@ const AssistantScreen = () => {
                   AI katkılı risk analizi hazır
                 </Text>
               </View>
+
+              {aiMessage ? (
+                <View style={styles.aiBox}>
+                  <Text style={styles.aiTitle}>AI Yorumu</Text>
+                  <Text style={styles.aiText}>{aiMessage}</Text>
+                </View>
+              ) : null}
 
               <Text style={styles.disclaimerText}>
                 Bu sonuç yalnızca ön değerlendirmedir. Veteriner hekim
@@ -540,6 +557,25 @@ const styles = StyleSheet.create({
   },
   resultBadgeTextUrgent: {
     color: '#B42318',
+  },
+  aiBox: {
+    marginTop: 16,
+    backgroundColor: '#F4F0FF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E7DFFF',
+  },
+  aiTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#5B4E9D',
+    marginBottom: 8,
+  },
+  aiText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#5E6475',
   },
   disclaimerText: {
     marginTop: 14,
