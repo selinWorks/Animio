@@ -1,13 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 
 type PetType = 'Kedi' | 'Köpek' | 'Kuş' | 'Diğer' | '';
 type ProblemType =
@@ -33,22 +33,28 @@ type OptionButtonProps = {
   onPress: () => void;
 };
 
-const OptionButton = ({ label, selected, onPress }: OptionButtonProps) => {
+const OptionButton = ({label, selected, onPress}: OptionButtonProps) => {
   return (
     <TouchableOpacity
       style={[styles.optionButton, selected && styles.optionButtonSelected]}
-      onPress={onPress}
-    >
+      onPress={onPress}>
       <Text
         style={[
           styles.optionButtonText,
           selected && styles.optionButtonTextSelected,
-        ]}
-      >
+        ]}>
         {label}
       </Text>
     </TouchableOpacity>
   );
+};
+
+const durationLabelMap: Record<DurationType, string> = {
+  '': '',
+  bugun: 'Bugün başladı',
+  '1-2_gundur': '1-2 gündür',
+  '1_hafta': '1 haftadır',
+  uzun: 'Uzun süredir',
 };
 
 const AssistantScreen = () => {
@@ -71,21 +77,15 @@ const AssistantScreen = () => {
     duration !== '' &&
     urgency !== '';
 
-  const durationLabelMap: Record<DurationType, string> = {
-    '': '',
-    bugun: 'Bugün başladı',
-    '1-2_gundur': '1-2 gündür',
-    '1_hafta': '1 haftadır',
-    uzun: 'Uzun süredir',
-  };
-
   const summaryText = useMemo(() => {
-    if (!canShowSummary) return '';
+    if (!canShowSummary) {
+      return '';
+    }
 
     return `${petType} için "${problemType}" problemi seçildi.\n\nSüre: ${
       durationLabelMap[duration]
     }\nAciliyet: ${urgency}`;
-  }, [petType, problemType, duration, urgency, canShowSummary]);
+  }, [canShowSummary, petType, problemType, duration, urgency]);
 
   const getRiskStyles = (riskLevel?: string) => {
     switch (riskLevel) {
@@ -170,7 +170,7 @@ const AssistantScreen = () => {
   const riskStyles = getRiskStyles(result?.riskLevel);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>PetCare Assistant</Text>
@@ -182,10 +182,9 @@ const AssistantScreen = () => {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: tabBarHeight + 24 },
+            {paddingBottom: tabBarHeight + 24},
           ]}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
             <Text style={styles.stepTitle}>1. Hayvan türü</Text>
             <View style={styles.optionsWrap}>
@@ -300,10 +299,7 @@ const AssistantScreen = () => {
               <Text style={styles.summaryTitle}>Durum Özeti</Text>
               <Text style={styles.summaryText}>{summaryText}</Text>
 
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={fetchRisk}
-              >
+              <TouchableOpacity style={styles.primaryButton} onPress={fetchRisk}>
                 <Text style={styles.primaryButtonText}>
                   AI Değerlendirme Al
                 </Text>
@@ -311,8 +307,7 @@ const AssistantScreen = () => {
 
               <TouchableOpacity
                 style={styles.secondaryButton}
-                onPress={resetForm}
-              >
+                onPress={resetForm}>
                 <Text style={styles.secondaryButtonText}>Baştan Başla</Text>
               </TouchableOpacity>
             </View>
