@@ -18,39 +18,36 @@ type ProblemType =
   | 'Beslenme'
   | 'Diğer'
   | '';
-type DurationType =
-  | 'Bugün başladı'
-  | '1-2 gündür'
-  | '1 haftadır'
-  | 'Uzun süredir'
-  | '';
+type DurationType = 'bugun' | '1-2_gundur' | '1_hafta' | 'uzun' | '';
 type UrgencyType = 'Evet' | 'Hayır' | 'Emin değilim' | '';
 
-const OptionButton = ({
-  label,
-  selected,
-  onPress,
-}: {
+type RiskResult = {
+  riskScore: number;
+  riskLevel: string;
+  action: string;
+};
+
+type OptionButtonProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
-}) => {
-  return (
-    <TouchableOpacity
-      style={[styles.optionButton, selected && styles.optionButtonSelected]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.optionButtonText,
-          selected && styles.optionButtonTextSelected,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
 };
+
+const OptionButton = ({ label, selected, onPress }: OptionButtonProps) => (
+  <TouchableOpacity
+    style={[styles.optionButton, selected && styles.optionButtonSelected]}
+    onPress={onPress}
+  >
+    <Text
+      style={[
+        styles.optionButtonText,
+        selected && styles.optionButtonTextSelected,
+      ]}
+    >
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 const AssistantScreen = () => {
   const tabBarHeight = useBottomTabBarHeight();
@@ -59,27 +56,111 @@ const AssistantScreen = () => {
   const [problemType, setProblemType] = useState<ProblemType>('');
   const [duration, setDuration] = useState<DurationType>('');
   const [urgency, setUrgency] = useState<UrgencyType>('');
-  const [showSummary, setShowSummary] = useState(false);
+  const [result, setResult] = useState<RiskResult | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const canContinueStep2 = petType !== '';
   const canContinueStep3 = problemType !== '';
   const canContinueStep4 = duration !== '';
   const canShowSummary =
-    petType !== '' && problemType !== '' && duration !== '' && urgency !== '';
+    petType !== '' &&
+    problemType !== '' &&
+    duration !== '' &&
+    urgency !== '';
+
+  const durationLabelMap: Record<DurationType, string> = {
+    '': '',
+    bugun: 'Bugün başladı',
+    '1-2_gundur': '1-2 gündür',
+    '1_hafta': '1 haftadır',
+    uzun: 'Uzun süredir',
+  };
 
   const summaryText = useMemo(() => {
     if (!canShowSummary) return '';
 
-    return `${petType} için "${problemType}" problemi seçildi. Sorun süresi: ${duration}. Aciliyet durumu: ${urgency}.`;
+    return `${petType} için "${problemType}" problemi seçildi.\n\nSüre: ${
+      durationLabelMap[duration]
+    }\nAciliyet: ${urgency}`;
   }, [petType, problemType, duration, urgency, canShowSummary]);
+
+  const getRiskStyles = (riskLevel?: string) => {
+    switch (riskLevel) {
+      case 'Düşük':
+        return {
+          card: styles.resultCardLow,
+          badge: styles.resultBadgeLow,
+          badgeText: styles.resultBadgeTextLow,
+          title: styles.resultTitleLow,
+        };
+      case 'Orta':
+        return {
+          card: styles.resultCardMedium,
+          badge: styles.resultBadgeMedium,
+          badgeText: styles.resultBadgeTextMedium,
+          title: styles.resultTitleMedium,
+        };
+      case 'Yüksek':
+        return {
+          card: styles.resultCardHigh,
+          badge: styles.resultBadgeHigh,
+          badgeText: styles.resultBadgeTextHigh,
+          title: styles.resultTitleHigh,
+        };
+      case 'Acil':
+        return {
+          card: styles.resultCardUrgent,
+          badge: styles.resultBadgeUrgent,
+          badgeText: styles.resultBadgeTextUrgent,
+          title: styles.resultTitleUrgent,
+        };
+      default:
+        return {
+          card: styles.resultCard,
+          badge: styles.resultBadge,
+          badgeText: styles.resultBadgeText,
+          title: styles.resultTitle,
+        };
+    }
+  };
+
+  const fetchRisk = async () => {
+    try {
+      setLoading(true);
+      setResult(null);
+
+      const response = await fetch('http://10.0.2.2:5000/assistant/evaluate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          petType,
+          problemType,
+          duration,
+          urgency,
+        }),
+      });
+
+      const data = await response.json();
+      setResult(data.risk);
+    } catch (error) {
+      console.log('API HATA:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setPetType('');
     setProblemType('');
     setDuration('');
     setUrgency('');
-    setShowSummary(false);
+    setResult(null);
+    setLoading(false);
   };
+
+  const riskStyles = getRiskStyles(result?.riskLevel);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -87,12 +168,8 @@ const AssistantScreen = () => {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>PetCare Assistant</Text>
           <Text style={styles.headerSubtitle}>
-            Birkaç adımda evcil hayvanındaki durumu öğrenelim
+            Evcil hayvanını analiz edelim 🐾
           </Text>
-
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>● Online</Text>
-          </View>
         </View>
 
         <ScrollView
@@ -103,142 +180,85 @@ const AssistantScreen = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.card}>
-            <Text style={styles.stepTitle}>
-              1. Hangi hayvan için yardım istiyorsun?
-            </Text>
+            <Text style={styles.stepTitle}>1. Hayvan türü</Text>
 
             <View style={styles.optionsWrap}>
-              <OptionButton
-                label="Kedi"
-                selected={petType === 'Kedi'}
-                onPress={() => {
-                  setPetType('Kedi');
-                  setShowSummary(false);
-                }}
-              />
-              <OptionButton
-                label="Köpek"
-                selected={petType === 'Köpek'}
-                onPress={() => {
-                  setPetType('Köpek');
-                  setShowSummary(false);
-                }}
-              />
-              <OptionButton
-                label="Kuş"
-                selected={petType === 'Kuş'}
-                onPress={() => {
-                  setPetType('Kuş');
-                  setShowSummary(false);
-                }}
-              />
-              <OptionButton
-                label="Diğer"
-                selected={petType === 'Diğer'}
-                onPress={() => {
-                  setPetType('Diğer');
-                  setShowSummary(false);
-                }}
-              />
+              {['Kedi', 'Köpek', 'Kuş', 'Diğer'].map(item => (
+                <OptionButton
+                  key={item}
+                  label={item}
+                  selected={petType === item}
+                  onPress={() => {
+                    setPetType(item as PetType);
+                    setResult(null);
+                  }}
+                />
+              ))}
             </View>
           </View>
 
           {canContinueStep2 && (
             <View style={styles.card}>
-              <Text style={styles.stepTitle}>
-                2. Sorun türü hangisine daha yakın?
-              </Text>
+              <Text style={styles.stepTitle}>2. Problem</Text>
 
               <View style={styles.optionsWrap}>
-                <OptionButton
-                  label="İştahsızlık"
-                  selected={problemType === 'İştahsızlık'}
-                  onPress={() => {
-                    setProblemType('İştahsızlık');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Kusma"
-                  selected={problemType === 'Kusma'}
-                  onPress={() => {
-                    setProblemType('Kusma');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Halsizlik"
-                  selected={problemType === 'Halsizlik'}
-                  onPress={() => {
-                    setProblemType('Halsizlik');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Aşı / Bakım"
-                  selected={problemType === 'Aşı / Bakım'}
-                  onPress={() => {
-                    setProblemType('Aşı / Bakım');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Beslenme"
-                  selected={problemType === 'Beslenme'}
-                  onPress={() => {
-                    setProblemType('Beslenme');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Diğer"
-                  selected={problemType === 'Diğer'}
-                  onPress={() => {
-                    setProblemType('Diğer');
-                    setShowSummary(false);
-                  }}
-                />
+                {[
+                  'İştahsızlık',
+                  'Kusma',
+                  'Halsizlik',
+                  'Aşı / Bakım',
+                  'Beslenme',
+                  'Diğer',
+                ].map(item => (
+                  <OptionButton
+                    key={item}
+                    label={item}
+                    selected={problemType === item}
+                    onPress={() => {
+                      setProblemType(item as ProblemType);
+                      setResult(null);
+                    }}
+                  />
+                ))}
               </View>
             </View>
           )}
 
           {canContinueStep3 && (
             <View style={styles.card}>
-              <Text style={styles.stepTitle}>
-                3. Bu durum ne kadar süredir var?
-              </Text>
+              <Text style={styles.stepTitle}>3. Süre</Text>
 
               <View style={styles.optionsWrap}>
                 <OptionButton
                   label="Bugün başladı"
-                  selected={duration === 'Bugün başladı'}
+                  selected={duration === 'bugun'}
                   onPress={() => {
-                    setDuration('Bugün başladı');
-                    setShowSummary(false);
+                    setDuration('bugun');
+                    setResult(null);
                   }}
                 />
                 <OptionButton
                   label="1-2 gündür"
-                  selected={duration === '1-2 gündür'}
+                  selected={duration === '1-2_gundur'}
                   onPress={() => {
-                    setDuration('1-2 gündür');
-                    setShowSummary(false);
+                    setDuration('1-2_gundur');
+                    setResult(null);
                   }}
                 />
                 <OptionButton
                   label="1 haftadır"
-                  selected={duration === '1 haftadır'}
+                  selected={duration === '1_hafta'}
                   onPress={() => {
-                    setDuration('1 haftadır');
-                    setShowSummary(false);
+                    setDuration('1_hafta');
+                    setResult(null);
                   }}
                 />
                 <OptionButton
                   label="Uzun süredir"
-                  selected={duration === 'Uzun süredir'}
+                  selected={duration === 'uzun'}
                   onPress={() => {
-                    setDuration('Uzun süredir');
-                    setShowSummary(false);
+                    setDuration('uzun');
+                    setResult(null);
                   }}
                 />
               </View>
@@ -247,35 +267,20 @@ const AssistantScreen = () => {
 
           {canContinueStep4 && (
             <View style={styles.card}>
-              <Text style={styles.stepTitle}>
-                4. Acil bir durum olduğunu düşünüyor musun?
-              </Text>
+              <Text style={styles.stepTitle}>4. Aciliyet</Text>
 
               <View style={styles.optionsWrap}>
-                <OptionButton
-                  label="Evet"
-                  selected={urgency === 'Evet'}
-                  onPress={() => {
-                    setUrgency('Evet');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Hayır"
-                  selected={urgency === 'Hayır'}
-                  onPress={() => {
-                    setUrgency('Hayır');
-                    setShowSummary(false);
-                  }}
-                />
-                <OptionButton
-                  label="Emin değilim"
-                  selected={urgency === 'Emin değilim'}
-                  onPress={() => {
-                    setUrgency('Emin değilim');
-                    setShowSummary(false);
-                  }}
-                />
+                {['Evet', 'Hayır', 'Emin değilim'].map(item => (
+                  <OptionButton
+                    key={item}
+                    label={item}
+                    selected={urgency === item}
+                    onPress={() => {
+                      setUrgency(item as UrgencyType);
+                      setResult(null);
+                    }}
+                  />
+                ))}
               </View>
             </View>
           )}
@@ -287,10 +292,10 @@ const AssistantScreen = () => {
 
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => setShowSummary(true)}
+                onPress={fetchRisk}
               >
                 <Text style={styles.primaryButtonText}>
-                  Değerlendirme Oluştur
+                  AI Değerlendirme Al
                 </Text>
               </TouchableOpacity>
 
@@ -303,20 +308,34 @@ const AssistantScreen = () => {
             </View>
           )}
 
-          {showSummary && (
+          {loading && (
             <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>Ön Değerlendirme</Text>
+              <Text style={styles.resultTitle}>Analiz hazırlanıyor...</Text>
               <Text style={styles.resultText}>
-                Seçtiğin bilgilere göre bu ekran, bir sonraki adımda backend’e
-                istek atıp AI değerlendirmesi oluşturacak. Şimdilik burada
-                seçimlerin başarıyla toplandı.
+                Seçimlerin değerlendiriliyor.
+              </Text>
+            </View>
+          )}
+
+          {!loading && result && (
+            <View style={[styles.resultCard, riskStyles.card]}>
+              <Text style={[styles.resultTitle, riskStyles.title]}>
+                Risk: {result.riskLevel}
               </Text>
 
-              <View style={styles.resultBadge}>
-                <Text style={styles.resultBadgeText}>
-                  Backend bağlantısına hazır
+              <Text style={styles.resultText}>Skor: {result.riskScore}</Text>
+              <Text style={styles.resultText}>{result.action}</Text>
+
+              <View style={[styles.resultBadge, riskStyles.badge]}>
+                <Text style={[styles.resultBadgeText, riskStyles.badgeText]}>
+                  AI katkılı risk analizi hazır
                 </Text>
               </View>
+
+              <Text style={styles.disclaimerText}>
+                Bu sonuç yalnızca ön değerlendirmedir. Veteriner hekim
+                muayenesinin yerini tutmaz.
+              </Text>
             </View>
           )}
         </ScrollView>
@@ -353,19 +372,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#73788C',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#D8F1E1',
-    borderRadius: 999,
-  },
-  statusBadgeText: {
-    color: '#328A5B',
-    fontWeight: '700',
-    fontSize: 12,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -461,11 +467,39 @@ const styles = StyleSheet.create({
     borderColor: '#ECECF3',
     marginBottom: 14,
   },
+  resultCardLow: {
+    borderColor: '#D8F1E1',
+    backgroundColor: '#F6FFF9',
+  },
+  resultCardMedium: {
+    borderColor: '#F4D9A6',
+    backgroundColor: '#FFF9EE',
+  },
+  resultCardHigh: {
+    borderColor: '#F3C2B8',
+    backgroundColor: '#FFF6F4',
+  },
+  resultCardUrgent: {
+    borderColor: '#E7A6A6',
+    backgroundColor: '#FFF1F1',
+  },
   resultTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#202332',
     marginBottom: 10,
+  },
+  resultTitleLow: {
+    color: '#2F8A59',
+  },
+  resultTitleMedium: {
+    color: '#9A6A00',
+  },
+  resultTitleHigh: {
+    color: '#B94A32',
+  },
+  resultTitleUrgent: {
+    color: '#B42318',
   },
   resultText: {
     fontSize: 15,
@@ -475,14 +509,42 @@ const styles = StyleSheet.create({
   resultBadge: {
     alignSelf: 'flex-start',
     marginTop: 14,
-    backgroundColor: '#D8F1E1',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
+  resultBadgeLow: {
+    backgroundColor: '#D8F1E1',
+  },
+  resultBadgeMedium: {
+    backgroundColor: '#FCE7B2',
+  },
+  resultBadgeHigh: {
+    backgroundColor: '#F8D4CC',
+  },
+  resultBadgeUrgent: {
+    backgroundColor: '#F3C7C7',
+  },
   resultBadgeText: {
-    color: '#2F8A59',
     fontWeight: '800',
     fontSize: 12,
+  },
+  resultBadgeTextLow: {
+    color: '#2F8A59',
+  },
+  resultBadgeTextMedium: {
+    color: '#9A6A00',
+  },
+  resultBadgeTextHigh: {
+    color: '#B94A32',
+  },
+  resultBadgeTextUrgent: {
+    color: '#B42318',
+  },
+  disclaimerText: {
+    marginTop: 14,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#8A8FA1',
   },
 });
