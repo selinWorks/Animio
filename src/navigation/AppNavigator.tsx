@@ -31,6 +31,7 @@ export type RootStackParamList = {
   PetDetail: {pet: Pet};
   EditPet: {pet: Pet};
   Calendar: undefined;
+  FirestoreTest: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -117,6 +118,7 @@ function TabNavigator() {
 export default function AppNavigator() {
   return (
     <Stack.Navigator
+      initialRouteName="MainTabs"
       screenOptions={{
         headerStyle: {
           backgroundColor: '#FFFFFF',

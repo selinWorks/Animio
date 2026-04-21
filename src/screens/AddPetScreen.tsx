@@ -10,12 +10,18 @@ import {
 } from 'react-native';
 import {usePets} from '../data/PetContext';
 import {Pet} from '../types/Pet';
+import {addPetToFirestore} from '../services/firestore';
+
+const PET_TYPES = ['Kedi', 'Köpek', 'Kuş', 'Balık', 'Küçük Hayvan', 'Diğer'];
+const SMALL_PET_TYPES = ['Hamster', 'Tavşan', 'Kaplumbağa'];
 
 export default function AddPetScreen() {
   const {addPet} = usePets();
 
   const [name, setName] = useState('');
   const [type, setType] = useState('');
+  const [smallPetType, setSmallPetType] = useState('');
+  const [customType, setCustomType] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
   const [weight, setWeight] = useState('');
@@ -24,14 +30,51 @@ export default function AddPetScreen() {
   const [notes, setNotes] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
-  const handleAdd = () => {
+  const resetForm = () => {
+    setName('');
+    setType('');
+    setSmallPetType('');
+    setCustomType('');
+    setAge('');
+    setGender('');
+    setWeight('');
+    setVaccines('');
+    setLastVetVisit('');
+    setNotes('');
+  };
+
+  const getFinalType = () => {
+    if (type === 'Küçük Hayvan') {
+      return smallPetType.trim();
+    }
+
+    if (type === 'Diğer') {
+      return customType.trim();
+    }
+
+    return type.trim();
+  };
+
+  const handleAdd = async () => {
+    const finalType = getFinalType();
+
     if (!name.trim()) {
       Alert.alert('Hata', 'Pet adı girmeniz gerekiyor.');
       return;
     }
 
     if (!type.trim()) {
-      Alert.alert('Hata', 'Pet türü girmeniz gerekiyor.');
+      Alert.alert('Hata', 'Pet türü seçmeniz gerekiyor.');
+      return;
+    }
+
+    if (type === 'Küçük Hayvan' && !smallPetType.trim()) {
+      Alert.alert('Hata', 'Küçük hayvan türünü seçmeniz gerekiyor.');
+      return;
+    }
+
+    if (type === 'Diğer' && !customType.trim()) {
+      Alert.alert('Hata', 'Lütfen hayvan türünü yazın.');
       return;
     }
 
@@ -40,34 +83,36 @@ export default function AddPetScreen() {
       return;
     }
 
-    const newPet: Pet = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      type: type.trim(),
-      age: Number(age),
-      gender: gender.trim(),
-      weight: weight.trim(),
-      vaccines: vaccines.trim(),
-      lastVetVisit: lastVetVisit.trim(),
-      notes: notes.trim(),
-    };
+    try {
+      const petData = {
+        name: name.trim(),
+        type: finalType,
+        age: Number(age),
+        gender: gender.trim(),
+        weight: weight.trim(),
+        vaccines: vaccines.trim(),
+        lastVetVisit: lastVetVisit.trim(),
+        notes: notes.trim(),
+      };
 
-    addPet(newPet);
+      const firestoreId = await addPetToFirestore(petData);
 
-    setName('');
-    setType('');
-    setAge('');
-    setGender('');
-    setWeight('');
-    setVaccines('');
-    setLastVetVisit('');
-    setNotes('');
+      const newPet: Pet = {
+        id: firestoreId,
+        ...petData,
+      };
 
-    setToastVisible(true);
+      addPet(newPet);
+      resetForm();
 
-    setTimeout(() => {
-      setToastVisible(false);
-    }, 2500);
+      setToastVisible(true);
+      setTimeout(() => {
+        setToastVisible(false);
+      }, 2500);
+    } catch (error) {
+      console.log('Pet eklenirken hata:', error);
+      Alert.alert('Hata', 'Pet Firestore’a kaydedilemedi.');
+    }
   };
 
   return (
@@ -97,14 +142,18 @@ export default function AddPetScreen() {
 
           <Text style={styles.label}>Tür</Text>
           <View style={styles.optionRow}>
-            {['Kedi', 'Köpek', 'Kuş', 'Diğer'].map(option => (
+            {PET_TYPES.map(option => (
               <Pressable
                 key={option}
                 style={[
                   styles.optionButton,
                   type === option && styles.optionButtonActive,
                 ]}
-                onPress={() => setType(option)}>
+                onPress={() => {
+                  setType(option);
+                  setSmallPetType('');
+                  setCustomType('');
+                }}>
                 <Text
                   style={[
                     styles.optionText,
@@ -115,6 +164,45 @@ export default function AddPetScreen() {
               </Pressable>
             ))}
           </View>
+
+          {type === 'Küçük Hayvan' ? (
+            <>
+              <Text style={styles.subLabel}>Küçük hayvan türü</Text>
+              <View style={styles.subOptionRow}>
+                {SMALL_PET_TYPES.map(option => (
+                  <Pressable
+                    key={option}
+                    style={[
+                      styles.subOptionButton,
+                      smallPetType === option && styles.subOptionButtonActive,
+                    ]}
+                    onPress={() => setSmallPetType(option)}>
+                    <Text
+                      style={[
+                        styles.subOptionText,
+                        smallPetType === option &&
+                        styles.subOptionTextActive,
+                      ]}>
+                      {option}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {type === 'Diğer' ? (
+            <>
+              <Text style={styles.subLabel}>Türü yaz</Text>
+              <TextInput
+                placeholder="Örn. İguana"
+                placeholderTextColor="#9CA3AF"
+                value={customType}
+                onChangeText={setCustomType}
+                style={styles.input}
+              />
+            </>
+          ) : null}
 
           <Text style={styles.label}>Yaş</Text>
           <View style={styles.stepperContainer}>
@@ -284,6 +372,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
+  subLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#818CF8',
+    marginBottom: 8,
+    marginTop: -2,
+  },
   input: {
     backgroundColor: '#F8FAFC',
     borderRadius: 14,
@@ -332,6 +427,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   optionTextActive: {
+    color: '#FFFFFF',
+  },
+  subOptionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  subOptionButton: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 999,
+  },
+  subOptionButtonActive: {
+    backgroundColor: '#6366F1',
+  },
+  subOptionText: {
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  subOptionTextActive: {
     color: '#FFFFFF',
   },
   stepperContainer: {

@@ -1,5 +1,6 @@
-import React, {createContext, useContext, useState} from 'react';
+import React, {createContext, useContext, useEffect, useState} from 'react';
 import {Pet} from '../types/Pet';
+import {getPetsFromFirestore, deletePetFromFirestore} from '../services/firestore';
 
 type PetContextType = {
   pets: Pet[];
@@ -15,16 +16,38 @@ export const PetProvider: React.FC<{children: React.ReactNode}> = ({
                                                                    }) => {
   const [pets, setPets] = useState<Pet[]>([]);
 
+  // 🔥 FIRESTORE'DAN YÜKLE
+  const loadPets = async () => {
+    try {
+      const data = await getPetsFromFirestore();
+      setPets(data);
+    } catch (error) {
+      console.log('Petler yüklenemedi:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadPets();
+  }, []);
+
   const addPet = (pet: Pet) => {
     setPets(prev => [...prev, pet]);
   };
 
-  const removePet = (id: string) => {
-    setPets(prev => prev.filter(p => p.id !== id));
+  // 🔥 FIRESTORE'DAN DA SİL
+  const removePet = async (id: string) => {
+    try {
+      await deletePetFromFirestore(id);
+      setPets(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.log('Silme hatası:', error);
+    }
   };
 
   const updatePet = (updatedPet: Pet) => {
-    setPets(prev => prev.map(p => (p.id === updatedPet.id ? updatedPet : p)));
+    setPets(prev =>
+      prev.map(p => (p.id === updatedPet.id ? updatedPet : p)),
+    );
   };
 
   return (
