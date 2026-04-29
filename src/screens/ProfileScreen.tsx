@@ -1,85 +1,41 @@
 import React from 'react';
 import {View, Text, StyleSheet, ScrollView, Pressable} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+
 import {
   Bell,
   ChevronRight,
   CircleHelp,
   HeartPulse,
   Lock,
+  LogOut,
   Mail,
   PawPrint,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react-native';
-import {usePets} from '../data/PetContext';
 
-type PetLike = {
-  name?: string;
-  type?: string;
-  animal?: string;
-  species?: string;
-  age?: string | number;
-  vaccines?: string;
-};
+import {useAuth} from '../data/AuthContext';
+import type {RootStackParamList} from '../navigation/AppNavigator';
+type ProfileNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
-  const {pets} = usePets();
-
-  const petList = (pets || []) as PetLike[];
-  const lastPet = petList.length > 0 ? petList[petList.length - 1] : null;
-
-  const getPetTypeLabel = (pet: PetLike | null) => {
-    if (!pet) return 'Pet';
-    return pet.type || pet.animal || pet.species || 'Pet';
-  };
-
-  const getPetEmoji = (petType?: string) => {
-    const key = (petType || '').toLowerCase().trim();
-
-    if (
-      key.includes('dog') ||
-      key.includes('köpek') ||
-      key.includes('kopek')
-    ) {
-      return '🐶';
-    }
-    if (key.includes('cat') || key.includes('kedi')) {
-      return '🐱';
-    }
-    if (
-      key.includes('rabbit') ||
-      key.includes('tavşan') ||
-      key.includes('tavsan')
-    ) {
-      return '🐰';
-    }
-    if (key.includes('bird') || key.includes('kuş') || key.includes('kus')) {
-      return '🐦';
-    }
-    if (key.includes('fish') || key.includes('balık') || key.includes('balik')) {
-      return '🐠';
-    }
-    if (key.includes('hamster')) {
-      return '🐹';
-    }
-    if (
-      key.includes('turtle') ||
-      key.includes('kaplumbağa') ||
-      key.includes('kaplumbaga')
-    ) {
-      return '🐢';
-    }
-
-    return '🐾';
-  };
-
+  const {user, logout} = useAuth();
+  const navigation = useNavigation<ProfileNavigationProp>();
   const renderMenuItem = (
     icon: React.ReactNode,
     iconBg: string,
     title: string,
     subtitle?: string,
+    onPress?: () => void,
   ) => (
-    <Pressable style={styles.menuItem}>
+    <Pressable
+      style={({pressed}) => [
+        styles.menuItem,
+        pressed && styles.menuItemPressed,
+      ]}
+      onPress={onPress}>
       <View style={styles.menuLeft}>
         <View style={[styles.menuIconBox, {backgroundColor: iconBg}]}>
           {icon}
@@ -108,14 +64,16 @@ export default function ProfileScreen() {
 
         <View style={styles.profileTextArea}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>Pet Lover</Text>
+            <Text style={styles.badgeText}>Dost Sever</Text>
           </View>
 
           <Text style={styles.name}>PetCare User</Text>
 
           <View style={styles.emailRow}>
             <Mail size={14} color="#6D5CE7" strokeWidth={2.2} />
-            <Text style={styles.email}>user@petcare.app</Text>
+            <Text style={styles.email}>
+              {user?.email || 'user@petcare.app'}
+            </Text>
           </View>
 
           <Text style={styles.profileDescription}>
@@ -156,7 +114,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <View style={[styles.menuSection, styles.lastMenuSection]}>
+      <View style={styles.menuSection}>
         <Text style={styles.sectionTitle}>Uygulama</Text>
 
         {renderMenuItem(
@@ -164,6 +122,7 @@ export default function ProfileScreen() {
           '#E7FAF2',
           'PetCare Hakkında',
           'Uygulama bilgileri',
+          () => navigation.navigate('AboutApp'),
         )}
 
         {renderMenuItem(
@@ -171,8 +130,25 @@ export default function ProfileScreen() {
           '#F1ECFF',
           'Yakında Gelecek Özellikler',
           'Yeni eklenecek geliştirmeler',
+          () => navigation.navigate('UpcomingFeatures'),
         )}
       </View>
+
+      <Pressable
+        style={({pressed}) => [
+          styles.logoutButton,
+          pressed && styles.menuItemPressed,
+        ]}
+        onPress={logout}>
+        <View style={styles.logoutIconBox}>
+          <LogOut size={19} color="#DC2626" strokeWidth={2.4} />
+        </View>
+
+        <View style={styles.logoutTextWrap}>
+          <Text style={styles.logoutTitle}>Çıkış Yap</Text>
+          <Text style={styles.logoutSubtitle}>Hesabından güvenli şekilde çık</Text>
+        </View>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -259,70 +235,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  section: {
-    marginBottom: 18,
-  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#18181B',
     marginBottom: 12,
     letterSpacing: -0.3,
-  },
-
-  lastPetCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 16,
-    elevation: 1,
-    shadowColor: '#111827',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: {width: 0, height: 4},
-    borderWidth: 1,
-    borderColor: '#F0F2F7',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  lastPetLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  lastPetAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: '#EEF9F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  lastPetEmoji: {
-    fontSize: 26,
-  },
-  lastPetTextWrap: {
-    flex: 1,
-  },
-  lastPetTopLabel: {
-    fontSize: 12,
-    color: '#8B92A3',
-    fontWeight: '700',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  lastPetName: {
-    fontSize: 18,
-    color: '#18181B',
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  lastPetMeta: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
   },
 
   menuSection: {
@@ -338,14 +256,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0F2F7',
   },
-  lastMenuSection: {
-    marginBottom: 0,
-  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
+  },
+  menuItemPressed: {
+    opacity: 0.65,
+    transform: [{scale: 0.99}],
   },
   menuLeft: {
     flexDirection: 'row',
@@ -374,5 +293,38 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 3,
     lineHeight: 18,
+  },
+
+  logoutButton: {
+    backgroundColor: '#FFF1F2',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  logoutTextWrap: {
+    flex: 1,
+  },
+  logoutTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  logoutSubtitle: {
+    fontSize: 13,
+    color: '#991B1B',
+    marginTop: 3,
+    fontWeight: '500',
   },
 });

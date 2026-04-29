@@ -1,12 +1,20 @@
-import React, {createContext, useContext, useEffect, useState} from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import {Pet} from '../types/Pet';
 import {getPetsFromFirestore, deletePetFromFirestore} from '../services/firestore';
+import {useAuth} from './AuthContext';
 
 type PetContextType = {
   pets: Pet[];
   addPet: (pet: Pet) => void;
   removePet: (id: string) => void;
   updatePet: (updatedPet: Pet) => void;
+  reloadPets: () => Promise<void>;
 };
 
 const PetContext = createContext<PetContextType | undefined>(undefined);
@@ -14,30 +22,36 @@ const PetContext = createContext<PetContextType | undefined>(undefined);
 export const PetProvider: React.FC<{children: React.ReactNode}> = ({
                                                                      children,
                                                                    }) => {
+  const {user} = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
 
-  // 🔥 FIRESTORE'DAN YÜKLE
-  const loadPets = async () => {
+  const loadPets = useCallback(async () => {
     try {
-      const data = await getPetsFromFirestore();
+      if (!user?.uid) {
+        setPets([]);
+        return;
+      }
+
+      const data = await getPetsFromFirestore(user.uid);
       setPets(data);
     } catch (error) {
       console.log('Petler yüklenemedi:', error);
     }
-  };
+  }, [user?.uid]);
 
   useEffect(() => {
     loadPets();
-  }, []);
+  }, [loadPets]);
 
   const addPet = (pet: Pet) => {
     setPets(prev => [...prev, pet]);
   };
 
-  // 🔥 FIRESTORE'DAN DA SİL
   const removePet = async (id: string) => {
     try {
-      await deletePetFromFirestore(id);
+      if (!user?.uid) return;
+
+      await deletePetFromFirestore(id, user.uid);
       setPets(prev => prev.filter(p => p.id !== id));
     } catch (error) {
       console.log('Silme hatası:', error);
@@ -51,7 +65,14 @@ export const PetProvider: React.FC<{children: React.ReactNode}> = ({
   };
 
   return (
-    <PetContext.Provider value={{pets, addPet, removePet, updatePet}}>
+    <PetContext.Provider
+      value={{
+        pets,
+        addPet,
+        removePet,
+        updatePet,
+        reloadPets: loadPets,
+      }}>
       {children}
     </PetContext.Provider>
   );
@@ -59,8 +80,10 @@ export const PetProvider: React.FC<{children: React.ReactNode}> = ({
 
 export const usePets = () => {
   const ctx = useContext(PetContext);
+
   if (!ctx) {
     throw new Error('usePets must be used within PetProvider');
   }
+
   return ctx;
 };

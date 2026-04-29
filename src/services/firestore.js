@@ -1,7 +1,8 @@
 import firestore from '@react-native-firebase/firestore';
 
-export const addPetToFirestore = async pet => {
+export const addPetToFirestore = async (pet, uid) => {
   const docRef = await firestore().collection('pets').add({
+    ownerId: uid,
     name: pet.name,
     type: pet.type,
     age: pet.age,
@@ -16,9 +17,10 @@ export const addPetToFirestore = async pet => {
   return docRef.id;
 };
 
-export const getPetsFromFirestore = async () => {
+export const getPetsFromFirestore = async uid => {
   const snapshot = await firestore()
     .collection('pets')
+    .where('ownerId', '==', uid)
     .orderBy('createdAt', 'desc')
     .get();
 
@@ -43,9 +45,10 @@ export const deletePetFromFirestore = async id => {
   await firestore().collection('pets').doc(id).delete();
 };
 
-export const getCareEventsFromFirestore = async () => {
+export const getCareEventsFromFirestore = async uid => {
   const snapshot = await firestore()
     .collection('careEvents')
+    .where('ownerId', '==', uid)
     .orderBy('date', 'asc')
     .get();
 
@@ -55,8 +58,9 @@ export const getCareEventsFromFirestore = async () => {
   }));
 };
 
-export const addCareEventToFirestore = async event => {
+export const addCareEventToFirestore = async (event, uid) => {
   const docRef = await firestore().collection('careEvents').add({
+    ownerId: uid,
     title: event.title,
     date: event.date,
     type: event.type || 'Custom',

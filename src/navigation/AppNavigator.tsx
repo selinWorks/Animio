@@ -1,6 +1,8 @@
 import React from 'react';
+import {ActivityIndicator, View} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+
 import HomeScreen from '../screens/HomeScreen';
 import PetsScreen from '../screens/PetsScreen';
 import AddPetScreen from '../screens/AddPetScreen';
@@ -8,15 +10,22 @@ import AssistantScreen from '../screens/AssistantScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PetDetailScreen from '../screens/PetDetailScreen';
 import EditPetScreen from '../screens/EditPetScreen';
-import {Pet} from '../types/Pet';
 import CalendarScreen from '../screens/CalendarScreen';
+import AboutAppScreen from '../screens/AboutAppScreen';
+import UpcomingFeaturesScreen from '../screens/UpcomingFeaturesScreen';
+
+import AuthNavigator from './AuthNavigator';
+import {useAuth} from '../data/AuthContext';
+
+import {Pet} from '../types/Pet';
+
 import {
   Home,
   PawPrint,
   PlusCircle,
   Bot,
-  User
-} from "lucide-react-native";
+  User,
+} from 'lucide-react-native';
 
 export type TabParamList = {
   Home: undefined;
@@ -31,6 +40,8 @@ export type RootStackParamList = {
   PetDetail: {pet: Pet};
   EditPet: {pet: Pet};
   Calendar: undefined;
+  AboutApp: undefined;
+  UpcomingFeatures: undefined;
   FirestoreTest: undefined;
 };
 
@@ -63,59 +74,25 @@ function TabNavigator() {
           paddingBottom: 8,
         },
         tabBarIcon: ({color, size}) => {
-          if (route.name === "Home") {
-            return <Home color={color} size={size} />;
-          }
-
-          if (route.name === "Pets") {
-            return <PawPrint color={color} size={size} />;
-          }
-
-          if (route.name === "AddPet") {
-            return <PlusCircle color={color} size={size} />;
-          }
-
-          if (route.name === "Assistant") {
-            return <Bot color={color} size={size} />;
-          }
-
-          if (route.name === "Profile") {
-            return <User color={color} size={size} />;
-          }
+          if (route.name === 'Home') return <Home color={color} size={size} />;
+          if (route.name === 'Pets') return <PawPrint color={color} size={size} />;
+          if (route.name === 'AddPet') return <PlusCircle color={color} size={size} />;
+          if (route.name === 'Assistant') return <Bot color={color} size={size} />;
+          if (route.name === 'Profile') return <User color={color} size={size} />;
 
           return null;
         },
       })}>
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{tabBarLabel: 'Home'}}
-      />
-      <Tab.Screen
-        name="Pets"
-        component={PetsScreen}
-        options={{tabBarLabel: 'Pets'}}
-      />
-      <Tab.Screen
-        name="AddPet"
-        component={AddPetScreen}
-        options={{tabBarLabel: 'Add'}}
-      />
-      <Tab.Screen
-        name="Assistant"
-        component={AssistantScreen}
-        options={{tabBarLabel: 'AI'}}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{tabBarLabel: 'Profile'}}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{tabBarLabel: 'Home'}} />
+      <Tab.Screen name="Pets" component={PetsScreen} options={{tabBarLabel: 'Pets'}} />
+      <Tab.Screen name="AddPet" component={AddPetScreen} options={{tabBarLabel: 'Add'}} />
+      <Tab.Screen name="Assistant" component={AssistantScreen} options={{tabBarLabel: 'AI'}} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{tabBarLabel: 'Profile'}} />
     </Tab.Navigator>
   );
 }
 
-export default function AppNavigator() {
+function MainAppNavigator() {
   return (
     <Stack.Navigator
       initialRouteName="MainTabs"
@@ -136,20 +113,56 @@ export default function AppNavigator() {
         component={TabNavigator}
         options={{headerShown: false}}
       />
+
       <Stack.Screen
         name="PetDetail"
         component={PetDetailScreen}
-        options={{title: 'Pet Details'}}
+        options={{title: 'Dost Detayı'}}
       />
+
       <Stack.Screen
         name="EditPet"
         component={EditPetScreen}
-        options={{title: 'Edit Pet'}}
+        options={{title: 'Dostu Düzenle'}}
       />
+
       <Stack.Screen
         name="Calendar"
         component={CalendarScreen}
+        options={{title: 'Takvim'}}
+      />
+
+      <Stack.Screen
+        name="AboutApp"
+        component={AboutAppScreen}
+        options={{title: 'PetCare Hakkında'}}
+      />
+
+      <Stack.Screen
+        name="UpcomingFeatures"
+        component={UpcomingFeaturesScreen}
+        options={{title: 'Yakında'}}
       />
     </Stack.Navigator>
   );
+}
+
+export default function AppNavigator() {
+  const {user, loading} = useAuth();
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#F7F8FC',
+        }}>
+        <ActivityIndicator size="large" color="#6D5CE7" />
+      </View>
+    );
+  }
+
+  return user ? <MainAppNavigator /> : <AuthNavigator />;
 }
