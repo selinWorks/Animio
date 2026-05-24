@@ -1,7 +1,6 @@
 function calculateRisk(data) {
   let score = 0;
 
-  // ✅ PROBLEM (zaten düzgün)
   const problemScores = {
     'Kusma': 30,
     'Halsizlik': 25,
@@ -11,7 +10,6 @@ function calculateRisk(data) {
     'Diğer': 15,
   };
 
-  // 🔥 TAM DÜZELTİLDİ
   const durationScores = {
     'bugun': 10,
     '1-2_gundur': 20,
@@ -29,6 +27,8 @@ function calculateRisk(data) {
     'Kedi': 5,
     'Köpek': 5,
     'Kuş': 10,
+    'Balık': 10,
+    'Küçük Hayvan': 10,
     'Diğer': 5,
   };
 

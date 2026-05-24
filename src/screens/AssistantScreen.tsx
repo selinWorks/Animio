@@ -1,15 +1,34 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Modal,
+  Pressable,
+  Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
+import {Menu, X, Trash2} from 'lucide-react-native';
 
-type PetType = 'Kedi' | 'Köpek' | 'Kuş' | 'Diğer' | '';
+import {useAuth} from '../data/AuthContext';
+import {
+  addAssistantChatToFirestore,
+  getAssistantChatsFromFirestore,
+  deleteAssistantChatFromFirestore,
+} from '../services/firestore';
+
+type PetType =
+  | 'Kedi'
+  | 'Köpek'
+  | 'Kuş'
+  | 'Balık'
+  | 'Küçük Hayvan'
+  | 'Diğer'
+  | '';
+
 type ProblemType =
   | 'İştahsızlık'
   | 'Kusma'
@@ -18,6 +37,7 @@ type ProblemType =
   | 'Beslenme'
   | 'Diğer'
   | '';
+
 type DurationType = 'bugun' | '1-2_gundur' | '1_hafta' | 'uzun' | '';
 type UrgencyType = 'Evet' | 'Hayır' | 'Emin değilim' | '';
 
@@ -25,6 +45,18 @@ type RiskResult = {
   riskScore: number;
   riskLevel: string;
   action: string;
+};
+
+type AssistantChat = {
+  id?: string;
+  petType: PetType;
+  problemType: ProblemType;
+  duration: DurationType;
+  urgency: UrgencyType;
+  result: RiskResult;
+  aiMessage: string;
+  title?: string;
+  createdAt?: any;
 };
 
 type OptionButtonProps = {
@@ -59,6 +91,7 @@ const durationLabelMap: Record<DurationType, string> = {
 
 const AssistantScreen = () => {
   const tabBarHeight = useBottomTabBarHeight();
+  const {user} = useAuth();
 
   const [petType, setPetType] = useState<PetType>('');
   const [problemType, setProblemType] = useState<ProblemType>('');
@@ -68,6 +101,9 @@ const AssistantScreen = () => {
   const [aiMessage, setAiMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [chatHistory, setChatHistory] = useState<AssistantChat[]>([]);
+
   const canContinueStep2 = petType !== '';
   const canContinueStep3 = problemType !== '';
   const canContinueStep4 = duration !== '';
@@ -76,6 +112,21 @@ const AssistantScreen = () => {
     problemType !== '' &&
     duration !== '' &&
     urgency !== '';
+
+  const loadChatHistory = async () => {
+    try {
+      if (!user?.uid) return;
+
+      const chats = await getAssistantChatsFromFirestore(user.uid);
+      setChatHistory(chats);
+    } catch (error) {
+      console.log('Sohbet geçmişi yüklenemedi:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadChatHistory();
+  }, [user?.uid]);
 
   const summaryText = useMemo(() => {
     if (!canShowSummary) {
@@ -150,8 +201,26 @@ const AssistantScreen = () => {
 
       setResult(data.risk);
       setAiMessage(data.aiMessage || '');
+
+      if (user?.uid && data.risk) {
+        await addAssistantChatToFirestore(
+          {
+            petType,
+            problemType,
+            duration,
+            urgency,
+            result: data.risk,
+            aiMessage: data.aiMessage || '',
+          },
+          user.uid,
+          user.email || '',
+        );
+
+        await loadChatHistory();
+      }
     } catch (error) {
       console.log('API HATA:', error);
+      Alert.alert('Hata', 'AI değerlendirmesi alınamadı.');
     } finally {
       setLoading(false);
     }
@@ -167,11 +236,42 @@ const AssistantScreen = () => {
     setLoading(false);
   };
 
+  const openChatFromHistory = (chat: AssistantChat) => {
+    setPetType(chat.petType);
+    setProblemType(chat.problemType);
+    setDuration(chat.duration);
+    setUrgency(chat.urgency);
+    setResult(chat.result);
+    setAiMessage(chat.aiMessage || '');
+    setLoading(false);
+    setHistoryVisible(false);
+  };
+
+  const deleteChatFromHistory = async (chatId?: string) => {
+    try {
+      if (!chatId) return;
+
+      await deleteAssistantChatFromFirestore(chatId);
+      await loadChatHistory();
+    } catch (error) {
+      console.log('Sohbet silinemedi:', error);
+      Alert.alert('Hata', 'Sohbet silinemedi.');
+    }
+  };
+
   const riskStyles = getRiskStyles(result?.riskLevel);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => setHistoryVisible(true)}>
+            <Menu size={22} color="#5B4E9D" strokeWidth={2.4} />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.header}>
           <Text style={styles.headerTitle}>PetCare Assistant</Text>
           <Text style={styles.headerSubtitle}>
@@ -188,18 +288,20 @@ const AssistantScreen = () => {
           <View style={styles.card}>
             <Text style={styles.stepTitle}>1. Hayvan türü</Text>
             <View style={styles.optionsWrap}>
-              {['Kedi', 'Köpek', 'Kuş', 'Diğer'].map(item => (
-                <OptionButton
-                  key={item}
-                  label={item}
-                  selected={petType === item}
-                  onPress={() => {
-                    setPetType(item as PetType);
-                    setResult(null);
-                    setAiMessage('');
-                  }}
-                />
-              ))}
+              {['Kedi', 'Köpek', 'Kuş', 'Balık', 'Küçük Hayvan', 'Diğer'].map(
+                item => (
+                  <OptionButton
+                    key={item}
+                    label={item}
+                    selected={petType === item}
+                    onPress={() => {
+                      setPetType(item as PetType);
+                      setResult(null);
+                      setAiMessage('');
+                    }}
+                  />
+                ),
+              )}
             </View>
           </View>
 
@@ -351,6 +453,61 @@ const AssistantScreen = () => {
             </View>
           )}
         </ScrollView>
+
+        <Modal
+          visible={historyVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setHistoryVisible(false)}>
+          <View style={styles.drawerOverlay}>
+            <View style={styles.drawer}>
+              <View style={styles.drawerHeader}>
+                <Text style={styles.drawerTitle}>Sohbet Geçmişi</Text>
+
+                <Pressable
+                  style={styles.drawerCloseButton}
+                  onPress={() => setHistoryVisible(false)}>
+                  <X size={20} color="#6B7280" />
+                </Pressable>
+              </View>
+
+              {chatHistory.length === 0 ? (
+                <Text style={styles.emptyHistoryText}>
+                  Henüz kaydedilmiş sohbet yok.
+                </Text>
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {chatHistory.map(chat => (
+                    <Pressable
+                      key={chat.id}
+                      style={styles.historyItem}
+                      onPress={() => openChatFromHistory(chat)}>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.historyTitle}>
+                          {chat.petType} - {chat.problemType}
+                        </Text>
+
+                        <Text style={styles.historySubtitle}>
+                          Risk: {chat.result?.riskLevel || '-'} • Skor:{' '}
+                          {chat.result?.riskScore ?? '-'}
+                        </Text>
+                      </View>
+
+                      <Pressable onPress={() => deleteChatFromHistory(chat.id)}>
+                        <Trash2 size={18} color="#DC2626" />
+                      </Pressable>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            <Pressable
+              style={styles.drawerBackdrop}
+              onPress={() => setHistoryVisible(false)}
+            />
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -367,8 +524,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F7FB',
   },
+  headerRow: {
+    marginTop: 14,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  historyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ECECF3',
+    marginBottom: 10,
+  },
   header: {
-    marginTop: 18,
     marginHorizontal: 16,
     padding: 18,
     backgroundColor: '#EAE3F8',
@@ -577,5 +750,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#8A8FA1',
+  },
+  drawerOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(24, 24, 27, 0.35)',
+  },
+  drawer: {
+    width: '78%',
+    backgroundColor: '#F7F7FB',
+    paddingTop: 54,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    borderTopRightRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  drawerBackdrop: {
+    flex: 1,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  drawerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#202332',
+  },
+  drawerCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHistoryText: {
+    fontSize: 14,
+    color: '#73788C',
+    lineHeight: 21,
+  },
+  historyItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ECECF3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  historyTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#202332',
+  },
+  historySubtitle: {
+    fontSize: 13,
+    color: '#73788C',
+    marginTop: 5,
   },
 });

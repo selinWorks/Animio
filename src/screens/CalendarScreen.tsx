@@ -16,6 +16,8 @@ import {
   getCareEventsFromFirestore,
   deleteCareEventFromFirestore,
 } from '../services/firestore';
+import notifee, {AndroidImportance, TriggerType} from '@notifee/react-native';
+import {useAuth} from '../data/AuthContext';
 
 type CareEventType =
   | 'Vaccination'
@@ -70,27 +72,36 @@ export default function CalendarScreen() {
   const toastTranslateX = useRef(new Animated.Value(140)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {user} = useAuth();
 
   const loadEvents = async () => {
-    try {
-      setLoading(true);
-      const firestoreEvents = await getCareEventsFromFirestore();
-      setEvents(firestoreEvents as CareEvent[]);
-    } catch (error) {
-      console.log('Takvim verileri alınamadı:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        setLoading(true);
 
-  useEffect(() => {
-    loadEvents();
+        if (!user?.uid) {
+          setEvents([]);
+          return;
+        }
 
-    return () => {
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current);
+        const firestoreEvents = await getCareEventsFromFirestore(user.uid);
+        setEvents(firestoreEvents as CareEvent[]);
+      } catch (error: any) {
+        console.log('Takvim verileri alınamadı:', error);
+        Alert.alert('Hata', error?.message || 'Takvim verileri alınamadı.');
+      } finally {
+        setLoading(false);
       }
     };
+
+  useEffect(() => {
+      requestNotificationPermission();
+      loadEvents();
+
+      return () => {
+        if (toastTimeoutRef.current) {
+          clearTimeout(toastTimeoutRef.current);
+        }
+      };
   }, []);
 
   const showToast = (titleText: string, descriptionText: string) => {
@@ -135,6 +146,58 @@ export default function CalendarScreen() {
     }, 3200);
   };
 
+  const requestNotificationPermission = async () => {
+  await notifee.requestPermission();
+
+  await notifee.createChannel({
+    id: 'care-reminders',
+    name: 'Care Reminders',
+    importance: AndroidImportance.HIGH,
+  });
+};
+
+const getNotificationDate = (dateString: string) => {
+  const notificationDate = new Date(`${dateString}T09:00:00`);
+
+  if (notificationDate.getTime() <= Date.now()) {
+    notificationDate.setMinutes(notificationDate.getMinutes() + 1);
+  }
+
+  return notificationDate;
+};
+
+const scheduleCareNotification = async (
+  eventId: string,
+  eventTitle: string,
+  petNameText: string,
+  dateString: string,
+) => {
+  await requestNotificationPermission();
+
+  const notificationDate = getNotificationDate(dateString);
+      await notifee.createTriggerNotification(
+        {
+          id: `care-${eventId}`,
+          title: 'PetCare Hatırlatma',
+          body: `${petNameText} için ${eventTitle} zamanı geldi.`,
+          android: {
+            channelId: 'care-reminders',
+            pressAction: {
+              id: 'default',
+            },
+          },
+        },
+        {
+          type: TriggerType.TIMESTAMP,
+          timestamp: notificationDate.getTime(),
+        },
+      );
+    };
+
+    const cancelCareNotification = async (eventId: string) => {
+      await notifee.cancelNotification(`care-${eventId}`);
+    };
+
   const resetForm = () => {
     setTitle('');
     setPetName('');
@@ -153,25 +216,47 @@ export default function CalendarScreen() {
       return;
     }
 
+    if (!user?.uid) {
+      Alert.alert('Hata', 'Görev eklemek için giriş yapmalısın.');
+      return;
+    }
+
     try {
       setSaving(true);
 
-      await addCareEventToFirestore({
-        title: title.trim(),
+    const eventTitle = title.trim();
+    const eventPetName = petName.trim();
+
+    const eventId = await addCareEventToFirestore(
+      {
+        title: eventTitle,
         date: selectedDate,
         type: 'Custom',
-        petName: petName.trim(),
+        petName: eventPetName,
         note: note.trim(),
         color: selectedColor,
-      });
+      },
+      user.uid,
+    );
+
+    try {
+      await scheduleCareNotification(
+        eventId,
+        eventTitle,
+        eventPetName,
+        selectedDate,
+      );
+    } catch (notificationError) {
+      console.log('Bildirim planlanamadı:', notificationError);
+    }
 
       resetForm();
       setModalVisible(false);
       await loadEvents();
       showToast('Başarılı', 'Bakım görevi takvime eklendi ✨');
-    } catch (error) {
+    } catch (error: any) {
       console.log('Görev eklenemedi:', error);
-      Alert.alert('Hata', 'Görev kaydedilemedi.');
+      Alert.alert('Hata', error?.message || 'Görev kaydedilemedi.');
     } finally {
       setSaving(false);
     }
@@ -190,6 +275,7 @@ export default function CalendarScreen() {
     try {
       setDeleting(true);
       await deleteCareEventFromFirestore(selectedEventId);
+      await cancelCareNotification(selectedEventId);
       setDeleteModalVisible(false);
       setSelectedEventId(null);
       await loadEvents();

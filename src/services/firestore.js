@@ -76,3 +76,71 @@ export const addCareEventToFirestore = async (event, uid) => {
 export const deleteCareEventFromFirestore = async eventId => {
   await firestore().collection('careEvents').doc(eventId).delete();
 };
+
+export const addFeedbackToFirestore = async (feedback, uid, email) => {
+  const docRef = await firestore().collection('feedbacks').add({
+    ownerId: uid,
+    email,
+    message: feedback,
+    createdAt: firestore.FieldValue.serverTimestamp(),
+  });
+
+  return docRef.id;
+};
+
+export const saveUserSettingsToFirestore = async (uid, settings) => {
+  await firestore()
+    .collection('userSettings')
+    .doc(uid)
+    .set(
+      {
+        ...settings,
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+      },
+      {merge: true},
+    );
+};
+
+export const getUserSettingsFromFirestore = async uid => {
+  const doc = await firestore().collection('userSettings').doc(uid).get();
+
+  if (!doc.exists) {
+    return null;
+  }
+
+  return doc.data();
+};
+
+export const addAssistantChatToFirestore = async (chat, uid, email) => {
+  const docRef = await firestore().collection('assistantChats').add({
+    ownerId: uid,
+    email,
+    petType: chat.petType,
+    problemType: chat.problemType,
+    duration: chat.duration,
+    urgency: chat.urgency,
+    result: chat.result,
+    aiMessage: chat.aiMessage,
+    title: `${chat.petType} - ${chat.problemType}`,
+    createdAt: firestore.FieldValue.serverTimestamp(),
+  });
+
+  return docRef.id;
+};
+
+export const getAssistantChatsFromFirestore = async uid => {
+  const snapshot = await firestore()
+    .collection('assistantChats')
+    .where('ownerId', '==', uid)
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+};
+
+export const deleteAssistantChatFromFirestore = async chatId => {
+  await firestore().collection('assistantChats').doc(chatId).delete();
+};
