@@ -1,97 +1,268 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 🐾 PetCare
 
-# Getting Started
+**PetCare** is a mobile application designed to help pet owners manage their pets' daily care, health information, and important activities from one place.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Built with **React Native and TypeScript**, PetCare combines pet management features with Firebase services and an AI-powered assistant that provides guidance based on information entered by the user.
 
-## Step 1: Start Metro
+---
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## ✨ Features
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### 🐶 Pet Management
 
-```sh
-# Using npm
+Users can create and manage individual profiles for their pets.
+
+Pet profiles can contain information such as:
+
+* Name
+* Animal type
+* Age
+* Weight
+* Vaccination information
+* Last veterinary visit
+* Health and care notes
+
+Pet information can be viewed and updated directly from the mobile application.
+
+### 📅 Care & Activity Tracking
+
+PetCare helps users organize important activities related to their pets.
+
+Users can manage care-related events and keep track of upcoming activities through the application's calendar system.
+
+### 🤖 AI Pet Care Assistant
+
+PetCare includes an AI-powered assistant designed to provide general guidance based on the information provided by the user.
+
+The assistant evaluates information such as:
+
+* Pet type
+* Type of problem
+* Duration
+* Urgency
+
+Before generating an AI response, the backend uses its own **risk scoring system** to classify the situation into different risk levels:
+
+* 🟢 Low
+* 🟡 Medium
+* 🟠 High
+* 🔴 Urgent
+
+After the initial risk assessment, the backend communicates with the AI service to generate an appropriate response.
+
+> **Note:** The AI Assistant is designed to provide general informational guidance and is not a replacement for professional veterinary diagnosis or treatment.
+
+### 🔐 Authentication
+
+PetCare uses **Firebase Authentication** to manage user authentication securely.
+
+Users can create an account and sign in to access their personal pet information.
+
+### ☁️ Cloud Data Storage
+
+Application data is stored using **Cloud Firestore**.
+
+Firestore is used to manage data such as:
+
+* User information
+* Pet profiles
+* Care activities
+* AI Assistant conversations
+* Feedback
+
+### 💬 Feedback
+
+Users can provide feedback directly through the application, helping improve the overall PetCare experience.
+
+---
+
+## 🛠️ Tech Stack
+
+### Mobile Application
+
+* **React Native**
+* **TypeScript**
+* **React Native CLI**
+
+### Backend
+
+* **Node.js**
+* **Express.js**
+
+### Database & Authentication
+
+* **Firebase Authentication**
+* **Cloud Firestore**
+
+### AI
+
+* **OpenAI API**
+* Custom risk scoring system
+
+---
+
+## 🏗️ Architecture
+
+PetCare consists of a React Native mobile application connected to Firebase services and a separate Node.js backend.
+
+```text
+                     ┌─────────────────────┐
+                     │      PetCare        │
+                     │ React Native + TS   │
+                     └──────────┬──────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │                             │
+                 ▼                             ▼
+       ┌──────────────────┐          ┌──────────────────┐
+       │     Firebase     │          │ Node.js Backend  │
+       │                  │          │    Express.js    │
+       │ Authentication   │          └────────┬─────────┘
+       │ Cloud Firestore  │                   │
+       └──────────────────┘                   ▼
+                                      ┌──────────────────┐
+                                      │   Risk Scoring   │
+                                      │      System      │
+                                      └────────┬─────────┘
+                                               │
+                                               ▼
+                                      ┌──────────────────┐
+                                      │    OpenAI API    │
+                                      └──────────────────┘
+```
+
+The mobile application handles the user interface and pet management experience, while Firebase provides authentication and cloud data storage.
+
+AI Assistant requests are processed through the Node.js backend, where the application's risk scoring logic evaluates the provided information before interacting with the OpenAI API.
+
+---
+
+## 📱 Screenshots
+
+Application screenshots will be added here.
+
+<!--
+Example:
+
+<p align="center">
+  <img src="screenshots/home.png" width="220" />
+  <img src="screenshots/pet-details.png" width="220" />
+  <img src="screenshots/ai-assistant.png" width="220" />
+</p>
+-->
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Before running the project, make sure you have the following installed:
+
+* Node.js
+* npm
+* React Native development environment
+* Android Studio for Android development
+* Xcode for iOS development on macOS
+
+You will also need the required Firebase configuration and environment variables for services used by the project.
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone <repository-url>
+```
+
+Navigate to the project:
+
+```bash
+cd PetCare
+```
+
+Install the dependencies:
+
+```bash
+npm install
+```
+
+### Start Metro
+
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+### Run on Android
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+Open another terminal and run:
 
-### Android
-
-```sh
-# Using npm
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+### Run on iOS
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+```bash
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+> iOS development requires macOS and Xcode.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+---
 
-## Step 3: Modify your app
+## 🔒 Environment Variables
 
-Now that you have successfully run the app, let's make changes!
+Sensitive information such as API keys should **not** be committed to the repository.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Create the required environment configuration locally and provide the necessary credentials for services such as the OpenAI API.
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+Example:
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+```env
+OPENAI_API_KEY=your_api_key
+```
 
-## Congratulations! :tada:
+Make sure files containing private credentials are included in `.gitignore`.
 
-You've successfully run and modified your React Native App. :partying_face:
+---
 
-### Now what?
+## 🎯 Project Purpose
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+PetCare was developed to create a practical mobile solution for everyday pet care while gaining hands-on experience with modern mobile and backend technologies.
 
-# Troubleshooting
+The project brings together:
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+* Cross-platform mobile development
+* User authentication
+* Cloud database management
+* REST API communication
+* Backend development
+* AI API integration
+* Rule-based risk assessment
+* Mobile UI/UX development
 
-# Learn More
+---
 
-To learn more about React Native, take a look at the following resources:
+## 🔮 Future Improvements
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+PetCare can be expanded with features such as:
+
+* Push notifications for upcoming care activities
+* More detailed vaccination tracking
+* Veterinary appointment reminders
+* Improved pet health history
+* Enhanced AI Assistant capabilities
+* Additional personalization options
+
+---
+
+## 👩‍💻 Developer
+
+Developed with **React Native, TypeScript, Firebase, Node.js and Express.js**.
+
+---
+
+<p align="center">
+  🐾 <b>Making everyday pet care easier.</b>
+</p>
