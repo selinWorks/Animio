@@ -1,5 +1,13 @@
-import React from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import 'react-native-gesture-handler';
+import React, {useEffect, useRef} from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
@@ -48,6 +56,125 @@ export type RootStackParamList = {
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/* =========================================================
+   PETCARE LOADING
+   ========================================================= */
+
+function PetCareLoading() {
+  const rotateAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const rotateLoop = Animated.loop(
+      Animated.timing(rotateAnimation, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnimation, {
+          toValue: 0,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    rotateLoop.start();
+    pulseLoop.start();
+
+    return () => {
+      rotateLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [rotateAnimation, pulseAnimation]);
+
+  const rotation = rotateAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const pawScale = pulseAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
+
+  const pawOpacity = pulseAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.78, 1],
+  });
+
+  return (
+    <View style={loadingStyles.container}>
+      {/* Arka plan dekorları */}
+      <View style={loadingStyles.glowTop} />
+      <View style={loadingStyles.glowBottom} />
+
+      <View style={loadingStyles.content}>
+        {/* Loader */}
+        <View style={loadingStyles.loaderWrapper}>
+          {/* Dönen dış halka */}
+          <Animated.View
+            style={[
+              loadingStyles.rotatingRing,
+              {
+                transform: [{rotate: rotation}],
+              },
+            ]}>
+            <View style={loadingStyles.ringAccent} />
+          </Animated.View>
+
+          {/* Beyaz merkez */}
+          <View style={loadingStyles.pawCircle}>
+            <Animated.View
+              style={{
+                opacity: pawOpacity,
+                transform: [{scale: pawScale}],
+              }}>
+              <PawPrint
+                size={42}
+                color="#7457E8"
+                strokeWidth={2.2}
+              />
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Yazılar */}
+        <Text style={loadingStyles.brand}>
+          PetCare
+        </Text>
+
+        <Text style={loadingStyles.loadingText}>
+          PetCare hazırlanıyor...
+        </Text>
+
+        {/* Mini loading noktaları */}
+        <View style={loadingStyles.dots}>
+          <View style={loadingStyles.dot} />
+          <View style={loadingStyles.dotMiddle} />
+          <View style={loadingStyles.dot} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* =========================================================
+   BOTTOM TAB NAVIGATOR
+   ========================================================= */
+
 function TabNavigator() {
   return (
     <Tab.Navigator
@@ -59,14 +186,10 @@ function TabNavigator() {
 
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontFamily: 'Quicksand-SemiBold',
           marginTop: 1,
         },
 
-        /*
-         * Floating navbar kaldırıldı.
-         * Bar artık ekranın tabanına tamamen oturuyor.
-         */
         tabBarStyle: {
           position: 'absolute',
 
@@ -78,10 +201,6 @@ function TabNavigator() {
 
           backgroundColor: '#FFFFFF',
 
-          /*
-           * Sadece üst köşeler yuvarlak.
-           * Alt taraf telefonun tabanına yapışıyor.
-           */
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
 
@@ -169,7 +288,6 @@ function TabNavigator() {
           return null;
         },
       })}>
-
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -213,6 +331,10 @@ function TabNavigator() {
   );
 }
 
+/* =========================================================
+   MAIN STACK
+   ========================================================= */
+
 function MainAppNavigator() {
   return (
     <Stack.Navigator
@@ -225,14 +347,13 @@ function MainAppNavigator() {
         headerShadowVisible: false,
 
         headerTitleStyle: {
-          fontWeight: '700',
+          fontFamily: 'Quicksand-Bold',
           fontSize: 18,
           color: '#111827',
         },
 
         headerTintColor: '#6366F1',
       }}>
-
       <Stack.Screen
         name="MainTabs"
         component={TabNavigator}
@@ -284,25 +405,160 @@ function MainAppNavigator() {
   );
 }
 
+/* =========================================================
+   ROOT NAVIGATOR
+   ========================================================= */
+
 export default function AppNavigator() {
   const {user, loading} = useAuth();
 
   if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: '#F7F8FC',
-        }}>
-        <ActivityIndicator
-          size="large"
-          color="#6D5CE7"
-        />
-      </View>
-    );
+    return <PetCareLoading />;
   }
 
   return user ? <MainAppNavigator /> : <AuthNavigator />;
 }
+
+/* =========================================================
+   LOADING STYLES
+   ========================================================= */
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  glowTop: {
+    position: 'absolute',
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    backgroundColor: '#EEE9FF',
+    top: -150,
+    right: -120,
+  },
+
+  glowBottom: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: '#F0ECFF',
+    bottom: -160,
+    left: -130,
+  },
+
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loaderWrapper: {
+    width: 116,
+    height: 116,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+
+  rotatingRing: {
+    position: 'absolute',
+
+    width: 112,
+    height: 112,
+
+    borderRadius: 56,
+
+    borderWidth: 3,
+    borderColor: '#E4DEFF',
+
+    borderTopColor: '#7457E8',
+    borderRightColor: '#A58FF3',
+  },
+
+  ringAccent: {
+    position: 'absolute',
+
+    width: 10,
+    height: 10,
+
+    borderRadius: 5,
+
+    backgroundColor: '#7457E8',
+
+    top: 5,
+    right: 18,
+  },
+
+  pawCircle: {
+    width: 84,
+    height: 84,
+
+    borderRadius: 42,
+
+    backgroundColor: '#FFFFFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 1,
+    borderColor: '#EEEAFE',
+
+    elevation: 7,
+
+    shadowColor: '#7560D9',
+    shadowOffset: {
+      width: 0,
+      height: 7,
+    },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+  },
+
+  brand: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 25,
+    color: '#17183F',
+    letterSpacing: -0.5,
+  },
+
+  loadingText: {
+    marginTop: 6,
+
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 13,
+
+    color: '#7A819B',
+  },
+
+  dots: {
+    marginTop: 15,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    gap: 6,
+  },
+
+  dot: {
+    width: 5,
+    height: 5,
+
+    borderRadius: 3,
+
+    backgroundColor: '#C8BDF7',
+  },
+
+  dotMiddle: {
+    width: 7,
+    height: 7,
+
+    borderRadius: 4,
+
+    backgroundColor: '#8068E9',
+  },
+});
