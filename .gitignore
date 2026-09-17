@@ -73,3 +73,17 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Environment variables / Secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Crash / JVM logs
+*.log
+hs_err_pid*
+replay_pid*
+
+# React Native generated asset manifests
+**/link-assets-manifest.json

@@ -1,767 +1,1363 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
-  FlatList,
-  Pressable,
   StyleSheet,
-  Animated,
-  Easing,
+  ScrollView,
+  Pressable,
+  Image,
+  StatusBar,
 } from 'react-native';
+
+import {
+  PawPrint,
+  Cat,
+  Dog,
+  Bird,
+  Rabbit,
+  Plus,
+  Heart,
+  CalendarDays,
+  Images,
+  ChevronRight,
+} from 'lucide-react-native';
+
 import {
   CompositeNavigationProp,
   useNavigation,
 } from '@react-navigation/native';
+
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+
 import {
   RootStackParamList,
   TabParamList,
 } from '../navigation/AppNavigator';
+
 import {usePets} from '../data/PetContext';
 import {Pet} from '../types/Pet';
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
 
 type NavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>,
   BottomTabNavigationProp<TabParamList>
 >;
 
-type StatusConfig = {
-  label: string;
-  shortLabel: string;
-  backgroundColor: string;
-  textColor: string;
-  ringColor: string;
-  cardTint: string;
+/* =========================================================
+   FONTS
+========================================================= */
+
+const F = {
+  light: 'Quicksand-Light',
+  regular: 'Quicksand-Regular',
+  medium: 'Quicksand-Medium',
+  semiBold: 'Quicksand-SemiBold',
+  bold: 'Quicksand-Bold',
 };
 
-function getPetEmoji(type: string) {
-  const lowerType = (type || '').toLowerCase().trim();
+/* =========================================================
+   COLORS
+========================================================= */
 
-  if (lowerType.includes('kedi')) return '🐱';
-  if (lowerType.includes('köpek') || lowerType.includes('kopek')) return '🐶';
-  if (lowerType.includes('kuş') || lowerType.includes('kus')) return '🐦';
-  if (lowerType.includes('balık') || lowerType.includes('balik')) return '🐠';
-  if (lowerType.includes('hamster')) return '🐹';
-  if (lowerType.includes('tavşan') || lowerType.includes('tavsan')) return '🐰';
-  if (lowerType.includes('kaplumbağa') || lowerType.includes('kaplumbaga')) {
+const C = {
+  bg: '#FAF9FF',
+  white: '#FFFFFF',
+
+  text: '#181642',
+  secondary: '#737C9A',
+  muted: '#9AA1B7',
+
+  purple: '#7157F4',
+  purpleDark: '#5943DF',
+  purpleSoft: '#F2EEFF',
+  purpleSoft2: '#E9E1FF',
+
+  pinkSoft: '#FFF0F4',
+  pink: '#FF4F74',
+
+  greenSoft: '#E4F9F2',
+  green: '#24C9A0',
+
+  border: '#EEEBF6',
+};
+
+/* =========================================================
+   FILTERS
+========================================================= */
+
+type FilterType =
+  | 'all'
+  | 'cat'
+  | 'dog'
+  | 'bird'
+  | 'other';
+
+const FILTERS: {
+  key: FilterType;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    key: 'all',
+    label: 'Tümü',
+    icon: <PawPrint size={20} />,
+  },
+  {
+    key: 'cat',
+    label: 'Kediler',
+    icon: <Cat size={20} />,
+  },
+  {
+    key: 'dog',
+    label: 'Köpekler',
+    icon: <Dog size={20} />,
+  },
+  {
+    key: 'bird',
+    label: 'Kuşlar',
+    icon: <Bird size={20} />,
+  },
+  {
+    key: 'other',
+    label: 'Diğer',
+    icon: <Rabbit size={20} />,
+  },
+];
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function normalizeType(type?: string) {
+  return (type || '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+}
+
+function getPetCategory(type?: string): FilterType {
+  const value = normalizeType(type);
+
+  if (
+    value.includes('kedi') ||
+    value.includes('cat')
+  ) {
+    return 'cat';
+  }
+
+  if (
+    value.includes('köpek') ||
+    value.includes('kopek') ||
+    value.includes('dog')
+  ) {
+    return 'dog';
+  }
+
+  if (
+    value.includes('kuş') ||
+    value.includes('kus') ||
+    value.includes('bird')
+  ) {
+    return 'bird';
+  }
+
+  return 'other';
+}
+
+function getPetEmoji(type?: string) {
+  const value = normalizeType(type);
+
+  if (
+    value.includes('kedi') ||
+    value.includes('cat')
+  ) {
+    return '🐱';
+  }
+
+  if (
+    value.includes('köpek') ||
+    value.includes('kopek') ||
+    value.includes('dog')
+  ) {
+    return '🐶';
+  }
+
+  if (
+    value.includes('kuş') ||
+    value.includes('kus') ||
+    value.includes('bird')
+  ) {
+    return '🐦';
+  }
+
+  if (
+    value.includes('tavşan') ||
+    value.includes('tavsan') ||
+    value.includes('rabbit')
+  ) {
+    return '🐰';
+  }
+
+  if (
+    value.includes('balık') ||
+    value.includes('balik') ||
+    value.includes('fish')
+  ) {
+    return '🐠';
+  }
+
+  if (value.includes('hamster')) {
+    return '🐹';
+  }
+
+  if (
+    value.includes('kaplumbağa') ||
+    value.includes('kaplumbaga') ||
+    value.includes('turtle')
+  ) {
     return '🐢';
   }
 
   return '🐾';
 }
 
-function getPetAvatarColor(type: string) {
-  const lowerType = (type || '').toLowerCase().trim();
-
-  if (lowerType.includes('kedi')) return '#FCE7F3';
-  if (lowerType.includes('köpek') || lowerType.includes('kopek')) return '#DBEAFE';
-  if (lowerType.includes('kuş') || lowerType.includes('kus')) return '#FEF3C7';
-  if (lowerType.includes('balık') || lowerType.includes('balik')) return '#DCFCE7';
-  if (lowerType.includes('hamster')) return '#FDE68A';
-  if (lowerType.includes('tavşan') || lowerType.includes('tavsan')) return '#EDE9FE';
-  if (lowerType.includes('kaplumbağa') || lowerType.includes('kaplumbaga')) {
-    return '#D1FAE5';
-  }
-
-  return '#EEF2FF';
-}
-
-function getStatusConfig(pet: Pet): StatusConfig {
-  const hasWeight = !!pet.weight;
-  const hasVetVisit = !!pet.lastVetVisit;
-  const hasVaccines = !!pet.vaccines;
-
-  if (hasWeight && hasVetVisit && hasVaccines) {
-    return {
-      label: 'Her şey yolunda',
-      shortLabel: 'İyi durumda',
-      backgroundColor: '#DCFCE7',
-      textColor: '#166534',
-      ringColor: '#22C55E',
-      cardTint: '#F8FEFA',
-    };
-  }
-
-  if ((hasVaccines && !hasWeight) || (hasVetVisit && !hasWeight)) {
-    return {
-      label: 'Biraz ilgi istiyor',
-      shortLabel: 'Takip gerekli',
-      backgroundColor: '#FEF3C7',
-      textColor: '#92400E',
-      ringColor: '#F59E0B',
-      cardTint: '#FFFCF5',
-    };
-  }
-
-  return {
-    label: 'Bilgi eksik',
-    shortLabel: 'Eksik bilgi',
-    backgroundColor: '#FEE2E2',
-    textColor: '#B91C1C',
-    ringColor: '#EF4444',
-    cardTint: '#FFF8F8',
-  };
-}
-
-function getInsightText(pet: Pet) {
-  if (pet.lastVetVisit) {
-    return `Son veteriner ziyareti ${pet.lastVetVisit} tarihinde kaydedildi.`;
-  }
-
-  if (pet.vaccines) {
-    return 'Aşı kayıtları mevcut, bakım takibi aktif görünüyor.';
-  }
-
-  if (!pet.weight) {
-    return 'Kilo bilgisi henüz eklenmemiş, profil biraz daha tamamlanabilir.';
-  }
-
-  return 'Bakım detayları güncellenirse profil daha güçlü görünür.';
-}
-
-function getSummaryText(pets: Pet[]) {
-  if (pets.length === 0) {
-    return 'İlk dostunu eklediğinde bakım ve sağlık takibini tek yerde düzenli şekilde yönetebilirsin.';
-  }
-
-  let healthyCount = 0;
-  let needsAttentionCount = 0;
-
-  pets.forEach(pet => {
-    const status = getStatusConfig(pet);
-    if (status.shortLabel === 'İyi durumda') {
-      healthyCount += 1;
-    } else {
-      needsAttentionCount += 1;
-    }
-  });
-
-  if (healthyCount === pets.length) {
-    return 'Harika görünüyor. Tüm dostların düzenli şekilde takip ediliyor.';
-  }
-
-  if (healthyCount === 0) {
-    return 'Bazı profiller biraz daha ilgi bekliyor. Küçük güncellemelerle görünüm çok daha güçlü hale gelir.';
-  }
-
-  return `${healthyCount} dost iyi durumda, ${needsAttentionCount} dost için küçük güncellemeler faydalı olabilir.`;
-}
-
-function getHeaderInfoText(pets: Pet[]) {
-  if (pets.length === 0) {
-    return 'Bakım takibi burada başlar';
-  }
-
-  const completeProfiles = pets.filter(pet => {
-    const status = getStatusConfig(pet);
-    return status.shortLabel === 'İyi durumda';
-  }).length;
-
-  if (completeProfiles === pets.length) {
-    return 'Tüm profiller güncel';
-  }
-
-  return `${completeProfiles}/${pets.length} profil güçlü görünüyor`;
-}
-
-function renderInfoChip(label: string, filled = false) {
-  return (
-    <View
-      style={[
-        styles.infoChip,
-        filled ? styles.infoChipFilled : styles.infoChipDefault,
-      ]}>
-      <Text
-        style={[
-          styles.infoChipText,
-          filled ? styles.infoChipTextFilled : styles.infoChipTextDefault,
-        ]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-type PetCardProps = {
-  item: Pet;
-  index: number;
-  onPress: () => void;
-};
-
-function PetCard({item, index, onPress}: PetCardProps) {
-  const status = getStatusConfig(item);
-
-  const entranceOpacity = useRef(new Animated.Value(0)).current;
-  const entranceTranslate = useRef(new Animated.Value(26)).current;
-  const pressScale = useRef(new Animated.Value(1)).current;
-  const ringScale = useRef(new Animated.Value(0.75)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(entranceOpacity, {
-        toValue: 1,
-        duration: 380,
-        delay: 120 + index * 80,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(entranceTranslate, {
-        toValue: 0,
-        duration: 420,
-        delay: 120 + index * 80,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(ringScale, {
-        toValue: 1,
-        delay: 200 + index * 80,
-        friction: 7,
-        tension: 90,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [entranceOpacity, entranceTranslate, ringScale, index]);
-
-  const handlePressIn = () => {
-    Animated.spring(pressScale, {
-      toValue: 0.985,
-      friction: 8,
-      tension: 170,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(pressScale, {
-      toValue: 1,
-      friction: 8,
-      tension: 170,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  return (
-    <Animated.View
-      style={{
-        opacity: entranceOpacity,
-        transform: [{translateY: entranceTranslate}, {scale: pressScale}],
-      }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={[styles.card, {backgroundColor: status.cardTint}]}>
-        <View style={styles.cardTopRow}>
-          <View style={styles.cardTopLeft}>
-            <Animated.View
-              style={[
-                styles.avatarRing,
-                {
-                  borderColor: status.ringColor,
-                  transform: [{scale: ringScale}],
-                },
-              ]}>
-              <View
-                style={[
-                  styles.avatar,
-                  {backgroundColor: getPetAvatarColor(item.type)},
-                ]}>
-                <Text style={styles.avatarText}>{getPetEmoji(item.type)}</Text>
-              </View>
-            </Animated.View>
-
-            <View style={styles.mainInfo}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.typeText}>
-                {item.type} • {item.age} yaş
-              </Text>
-              <Text style={styles.miniInsight}>{status.shortLabel}</Text>
-            </View>
-          </View>
-
-          <View style={styles.cardTopRight}>
-            <View
-              style={[
-                styles.statusBadge,
-                {backgroundColor: status.backgroundColor},
-              ]}>
-              <Text style={[styles.statusText, {color: status.textColor}]}>
-                {status.label}
-              </Text>
-            </View>
-
-            <Text style={styles.chevron}>›</Text>
-          </View>
-        </View>
-
-        <View style={styles.chipsRow}>
-          {renderInfoChip(item.gender ? item.gender : 'Cinsiyet eklenmemiş', true)}
-          {renderInfoChip(item.weight ? item.weight : 'Kilo bilgisi yok')}
-          {renderInfoChip(item.vaccines ? 'Aşı takibi aktif' : 'Aşı bilgisi eksik')}
-        </View>
-
-        <View style={styles.insightBox}>
-          <Text style={styles.insightLabel}>Bugünün özeti</Text>
-          <Text style={styles.insightText}>{getInsightText(item)}</Text>
-        </View>
-      </Pressable>
-    </Animated.View>
-  );
-}
+/* =========================================================
+   PETS SCREEN
+========================================================= */
 
 export default function PetsScreen() {
   const {pets} = usePets();
+
   const navigation = useNavigation<NavigationProp>();
 
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const headerTranslate = useRef(new Animated.Value(20)).current;
+  const [selectedFilter, setSelectedFilter] =
+    useState<FilterType>('all');
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(headerOpacity, {
-        toValue: 1,
-        duration: 450,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(headerTranslate, {
-        toValue: 0,
-        duration: 450,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [headerOpacity, headerTranslate]);
+  const petList: Pet[] = pets || [];
 
-  const summaryText = getSummaryText(pets);
-  const headerInfoText = getHeaderInfoText(pets);
-  const topPreviewPets = pets.slice(0, 3);
+  const filteredPets = useMemo(() => {
+    if (selectedFilter === 'all') {
+      return petList;
+    }
+
+    return petList.filter(
+      pet =>
+        getPetCategory(pet.type) ===
+        selectedFilter,
+    );
+  }, [petList, selectedFilter]);
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.headerBox,
-          {
-            opacity: headerOpacity,
-            transform: [{translateY: headerTranslate}],
-          },
-        ]}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>Dostlarım</Text>
-          </View>
+    <View style={styles.screen}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={C.bg}
+      />
 
-          <View style={styles.headerCountWrap}>
-            <Text style={styles.headerCountNumber}>{pets.length}</Text>
-            <Text style={styles.headerCountLabel}>kayıtlı dost</Text>
-          </View>
-        </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}>
 
-        <Text style={styles.headerTitle}>Dostlarının bugünkü görünümü</Text>
-        <Text style={styles.headerSubtitle}>{summaryText}</Text>
+        {/* =================================================
+            TITLE
+        ================================================= */}
 
-        <View style={styles.headerBottomRow}>
-          <View style={styles.avatarPreviewRow}>
-            {topPreviewPets.length > 0 ? (
-              topPreviewPets.map((pet, index) => {
-                const status = getStatusConfig(pet);
+        <Text style={styles.pageTitle}>
+          Dostlarım
+        </Text>
 
-                return (
-                  <View
+        {/* =================================================
+            FILTERS
+        ================================================= */}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}>
+
+          {FILTERS.map(filter => {
+            const selected =
+              selectedFilter === filter.key;
+
+            return (
+              <Pressable
+                key={filter.key}
+                onPress={() =>
+                  setSelectedFilter(filter.key)
+                }
+                style={({pressed}) => [
+                  styles.filterButton,
+
+                  selected &&
+                    styles.filterButtonSelected,
+
+                  pressed &&
+                    styles.filterButtonPressed,
+                ]}>
+
+                {React.cloneElement(
+                  filter.icon as React.ReactElement<any>,
+                  {
+                    color: selected
+                      ? C.purple
+                      : '#7E879F',
+
+                    strokeWidth: selected
+                      ? 2.3
+                      : 1.8,
+                  },
+                )}
+
+                <Text
+                  style={[
+                    styles.filterText,
+
+                    selected &&
+                      styles.filterTextSelected,
+                  ]}>
+                  {filter.label}
+                </Text>
+
+              </Pressable>
+            );
+          })}
+
+        </ScrollView>
+
+        {/* =================================================
+            EMPTY STATE / PET LIST
+        ================================================= */}
+
+        {petList.length === 0 ? (
+          <>
+            <EmptyState
+              onAdd={() =>
+                navigation.navigate('AddPet')
+              }
+            />
+
+            <WhyAddPet />
+
+            <BottomBanner />
+          </>
+        ) : (
+          <>
+            <View style={styles.petSectionHeader}>
+
+              <View>
+                <Text style={styles.petSectionTitle}>
+                  {selectedFilter === 'all'
+                    ? 'Tüm dostların'
+                    : FILTERS.find(
+                        item =>
+                          item.key === selectedFilter,
+                      )?.label}
+                </Text>
+
+                <Text style={styles.petCount}>
+                  {filteredPets.length} dost
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('AddPet')
+                }
+                style={({pressed}) => [
+                  styles.smallAddButton,
+
+                  pressed &&
+                    styles.smallAddButtonPressed,
+                ]}>
+
+                <Plus
+                  size={18}
+                  color={C.white}
+                  strokeWidth={2.2}
+                />
+
+                <Text style={styles.smallAddText}>
+                  Dost Ekle
+                </Text>
+
+              </Pressable>
+
+            </View>
+
+            {filteredPets.length > 0 ? (
+              <View style={styles.petGrid}>
+
+                {filteredPets.map(pet => (
+                  <PetCard
                     key={pet.id}
-                    style={[
-                      styles.previewAvatarWrap,
-                      {
-                        marginLeft: index === 0 ? 0 : -10,
-                        borderColor: status.ringColor,
-                      },
-                    ]}>
-                    <Text style={styles.previewAvatarText}>
-                      {getPetEmoji(pet.type)}
-                    </Text>
-                  </View>
-                );
-              })
+                    pet={pet}
+                    onPress={() =>
+                      navigation.navigate(
+                        'PetDetail',
+                        {pet},
+                      )
+                    }
+                  />
+                ))}
+
+              </View>
             ) : (
-              <View style={styles.previewAvatarWrapEmpty}>
-                <Text style={styles.previewAvatarText}>🐾</Text>
+              <View style={styles.filterEmpty}>
+
+                <View style={styles.filterEmptyIcon}>
+                  <PawPrint
+                    size={31}
+                    color={C.purple}
+                  />
+                </View>
+
+                <Text style={styles.filterEmptyTitle}>
+                  Bu kategoride dost yok
+                </Text>
+
+                <Text style={styles.filterEmptyText}>
+                  Başka bir kategori seçebilir veya
+                  yeni bir dost ekleyebilirsin.
+                </Text>
+
               </View>
             )}
-          </View>
+          </>
+        )}
 
-          <View style={styles.headerInfoPill}>
-            <Text style={styles.headerInfoPillText}>{headerInfoText}</Text>
-          </View>
-        </View>
-      </Animated.View>
-
-      {pets.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <View style={styles.emptyEmojiWrap}>
-            <Text style={styles.emptyEmoji}>🐾</Text>
-          </View>
-
-          <Text style={styles.emptyTitle}>Henüz dost eklenmedi</Text>
-
-          <Text style={styles.emptyText}>
-            İlk dostunu eklediğinde bakım bilgileri, sağlık notları ve günlük
-            takip akışı tek yerde toplanır.
-          </Text>
-
-          <View style={styles.emptyTipsRow}>
-            <View style={styles.emptyTipChip}>
-              <Text style={styles.emptyTipText}>🩺 Vet takibi</Text>
-            </View>
-
-            <View style={styles.emptyTipChip}>
-              <Text style={styles.emptyTipText}>💉 Aşı düzeni</Text>
-            </View>
-
-            <View style={styles.emptyTipChip}>
-              <Text style={styles.emptyTipText}>📌 Günlük bakım</Text>
-            </View>
-          </View>
-        </View>
-      ) : (
-        <FlatList
-          data={pets}
-          keyExtractor={item => item.id}
-          renderItem={({item, index}) => (
-            <PetCard
-              item={item}
-              index={index}
-              onPress={() => navigation.navigate('PetDetail', {pet: item})}
-            />
-          )}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.list}
-        />
-      )}
+      </ScrollView>
     </View>
   );
 }
 
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+function EmptyState({
+  onAdd,
+}: {
+  onAdd: () => void;
+}) {
+  return (
+    <View style={styles.emptyCard}>
+
+      {/* BACKGROUND BLOBS */}
+
+      <View style={styles.blobOne} />
+      <View style={styles.blobTwo} />
+      <View style={styles.blobThree} />
+
+      {/* HERO IMAGE */}
+
+      <View style={styles.heroImageContainer}>
+        <Image
+          source={require(
+            '../assets/images/pets/pets-empty-hero.png'
+          )}
+          style={styles.heroImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* TITLE */}
+
+      <Text style={styles.emptyTitle}>
+        Henüz bir dost eklemedin
+      </Text>
+
+      {/* DESCRIPTION */}
+
+      <Text style={styles.emptyDescription}>
+        Dostunu ekleyerek onun bakım bilgilerini,
+        sağlık kayıtlarını ve en özel anlarını tek
+        yerde saklayabilirsin.
+      </Text>
+
+      {/* ADD BUTTON */}
+
+      <Pressable
+        onPress={onAdd}
+        android_ripple={{
+          color: 'rgba(255,255,255,0.15)',
+        }}
+        style={({pressed}) => [
+          styles.addButton,
+
+          pressed &&
+            styles.addButtonPressed,
+        ]}>
+
+        <View style={styles.addButtonIcon}>
+          <Plus
+            size={24}
+            color={C.white}
+            strokeWidth={1.8}
+          />
+        </View>
+
+        <Text style={styles.addButtonText}>
+          İlk Dostunu Ekle
+        </Text>
+
+      </Pressable>
+
+    </View>
+  );
+}
+
+/* =========================================================
+   WHY ADD PET
+========================================================= */
+
+function WhyAddPet() {
+  return (
+    <View style={styles.whySection}>
+
+      <Text style={styles.whyTitle}>
+        Neden dost eklemelisin?
+      </Text>
+
+      <View style={styles.benefitRow}>
+
+        <BenefitCard
+          icon={
+            <Heart
+              size={27}
+              color={C.pink}
+              strokeWidth={2}
+            />
+          }
+          iconBackground={C.pinkSoft}
+          title="Her an yanında"
+          description={
+            'Tüm önemli bilgiler\ntek yerde.'
+          }
+        />
+
+        <BenefitCard
+          icon={
+            <CalendarDays
+              size={27}
+              color={C.green}
+              strokeWidth={2}
+            />
+          }
+          iconBackground={C.greenSoft}
+          title="Rutinleri kaçırma"
+          description={
+            'Aşı, mama ve bakım\ntakibini kolayca yap.'
+          }
+        />
+
+        <BenefitCard
+          icon={
+            <Images
+              size={27}
+              color={C.purple}
+              strokeWidth={2}
+            />
+          }
+          iconBackground={C.purpleSoft}
+          title="Anıları biriktir"
+          description={
+            'Fotoğraflarını sakla,\nbüyüme yolculuğunu izle.'
+          }
+        />
+
+      </View>
+
+    </View>
+  );
+}
+
+/* =========================================================
+   BENEFIT CARD
+========================================================= */
+
+function BenefitCard({
+  icon,
+  iconBackground,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  iconBackground: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View style={styles.benefitCard}>
+
+      <View
+        style={[
+          styles.benefitIcon,
+          {
+            backgroundColor:
+              iconBackground,
+          },
+        ]}>
+
+        {icon}
+
+      </View>
+
+      <Text style={styles.benefitTitle}>
+        {title}
+      </Text>
+
+      <Text style={styles.benefitDescription}>
+        {description}
+      </Text>
+
+    </View>
+  );
+}
+
+/* =========================================================
+   BOTTOM BANNER
+========================================================= */
+
+function BottomBanner() {
+  return (
+    <View style={styles.bottomBannerContainer}>
+
+      <Image
+        source={require(
+          '../assets/images/pets/pets-bottom-banner.png'
+        )}
+        style={styles.bottomBannerImage}
+        resizeMode="contain"
+      />
+
+    </View>
+  );
+}
+
+/* =========================================================
+   PET CARD
+========================================================= */
+
+function PetCard({
+  pet,
+  onPress,
+}: {
+  pet: Pet;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.petCard,
+
+        pressed &&
+          styles.petCardPressed,
+      ]}>
+
+      <View style={styles.petAvatar}>
+
+        <View style={styles.petAvatarBlob} />
+
+        <Text style={styles.petEmoji}>
+          {getPetEmoji(pet.type)}
+        </Text>
+
+      </View>
+
+      <View style={styles.petInfo}>
+
+        <Text
+          numberOfLines={1}
+          style={styles.petName}>
+          {pet.name}
+        </Text>
+
+        <Text
+          numberOfLines={1}
+          style={styles.petMeta}>
+          {pet.type}
+          {pet.age
+            ? ` • ${pet.age} yaş`
+            : ''}
+        </Text>
+
+      </View>
+
+      <View style={styles.petArrow}>
+
+        <ChevronRight
+          size={19}
+          color={C.purple}
+          strokeWidth={2}
+        />
+
+      </View>
+
+    </Pressable>
+  );
+}
+
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = StyleSheet.create({
-  container: {
+
+  /* =====================================================
+     SCREEN
+  ===================================================== */
+
+  screen: {
     flex: 1,
-    backgroundColor: '#F7F8FC',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    backgroundColor: C.bg,
   },
 
-  headerBox: {
-    backgroundColor: '#FCFBFF',
-    borderRadius: 30,
-    paddingVertical: 20,
+  content: {
     paddingHorizontal: 18,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: '#ECE7F8',
-    shadowColor: '#140F2D',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.05,
-    shadowRadius: 18,
-    elevation: 3,
+    paddingTop: 25,
+    paddingBottom: 125,
   },
-  headerTopRow: {
+
+  /* =====================================================
+     TITLE
+  ===================================================== */
+
+  pageTitle: {
+    fontSize: 34,
+    lineHeight: 41,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    letterSpacing: -1.2,
+
+    marginBottom: 21,
+  },
+
+  /* =====================================================
+     FILTERS
+  ===================================================== */
+
+  filters: {
+    gap: 8,
+
+    paddingRight: 8,
+
+    marginBottom: 23,
+  },
+
+  filterButton: {
+    height: 48,
+
+    paddingHorizontal: 15,
+
+    borderRadius: 24,
+
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBadge: {
-    backgroundColor: '#F2EDFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
-  },
-  headerBadgeText: {
-    fontSize: 12,
-    color: '#6D5BD0',
-    fontWeight: '800',
-  },
-  headerCountWrap: {
-    alignItems: 'flex-end',
-  },
-  headerCountNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1F2937',
-    lineHeight: 24,
-  },
-  headerCountLabel: {
-    fontSize: 12,
-    color: '#8A8FA3',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginTop: 16,
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#667085',
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  headerBottomRow: {
-    marginTop: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  avatarPreviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  previewAvatarWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 2,
-    backgroundColor: '#FFFFFF',
+
     alignItems: 'center',
     justifyContent: 'center',
+
+    gap: 7,
+
+    backgroundColor: '#F8F7FC',
   },
-  previewAvatarWrapEmpty: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  filterButtonSelected: {
+    backgroundColor: C.purpleSoft,
   },
-  previewAvatarText: {
-    fontSize: 20,
+
+  filterButtonPressed: {
+    opacity: 0.75,
+
+    transform: [
+      {
+        scale: 0.96,
+      },
+    ],
   },
-  headerInfoPill: {
-    backgroundColor: '#F4F4F5',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ECEEF3',
-  },
-  headerInfoPillText: {
-    color: '#344054',
+
+  filterText: {
     fontSize: 13,
-    fontWeight: '700',
+
+    fontFamily: F.semiBold,
+
+    color: '#7E879F',
   },
 
-  list: {
-    paddingBottom: 90,
+  filterTextSelected: {
+    color: C.purple,
   },
 
-  card: {
-    borderRadius: 26,
-    padding: 16,
-    marginBottom: 14,
+  /* =====================================================
+     EMPTY CARD
+  ===================================================== */
+
+  emptyCard: {
+    width: '100%',
+
+    minHeight: 555,
+
+    borderRadius: 27,
+
+    backgroundColor: '#FCFBFF',
+
     borderWidth: 1,
-    borderColor: '#ECEEF3',
-    shadowColor: '#101828',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
+    borderColor: '#EEE9FB',
+
+    alignItems: 'center',
+
+    overflow: 'hidden',
+
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 27,
+
+    shadowColor: '#453886',
+
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+
     elevation: 3,
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardTopLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 12,
-  },
-  cardTopRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    minHeight: 56,
+
+  blobOne: {
+    position: 'absolute',
+
+    width: 220,
+    height: 160,
+
+    borderRadius: 100,
+
+    backgroundColor: '#F0EBFF',
+
+    top: 18,
+    left: 75,
+
+    transform: [
+      {
+        rotate: '-10deg',
+      },
+    ],
   },
 
-  avatarRing: {
+  blobTwo: {
+    position: 'absolute',
+
+    width: 180,
+    height: 140,
+
+    borderRadius: 90,
+
+    backgroundColor: '#F5F1FF',
+
+    top: 45,
+    right: -55,
+  },
+
+  blobThree: {
+    position: 'absolute',
+
+    width: 190,
+    height: 130,
+
+    borderRadius: 90,
+
+    backgroundColor: '#F7F4FF',
+
+    top: 95,
+    left: -70,
+  },
+
+  /* =====================================================
+     HERO IMAGE
+  ===================================================== */
+
+  heroImageContainer: {
+    width: '113%',
+    height: 300,
+
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+
+    zIndex: 3,
+
+    marginBottom: -2,
+  },
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  /* =====================================================
+     EMPTY TEXT
+  ===================================================== */
+
+  emptyTitle: {
+    fontSize: 23,
+    lineHeight: 29,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    textAlign: 'center',
+
+    letterSpacing: -0.5,
+
+    zIndex: 4,
+  },
+
+  emptyDescription: {
+    fontSize: 13.5,
+    lineHeight: 20,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    textAlign: 'center',
+
+    maxWidth: 315,
+
+    marginTop: 7,
+
+    zIndex: 4,
+  },
+
+  /* =====================================================
+     MAIN ADD BUTTON
+  ===================================================== */
+
+  addButton: {
+    width: '68%',
+    minWidth: 240,
+
+    height: 58,
+
+    borderRadius: 29,
+
+    backgroundColor: C.purple,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    gap: 13,
+
+    marginTop: 23,
+
+    overflow: 'hidden',
+
+    shadowColor: C.purple,
+
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+
+    shadowOpacity: 0.22,
+    shadowRadius: 15,
+
+    elevation: 6,
+  },
+
+  addButtonPressed: {
+    backgroundColor: C.purpleDark,
+
+    opacity: 0.92,
+
+    transform: [
+      {
+        scale: 0.97,
+      },
+    ],
+
+    shadowOpacity: 0.12,
+    shadowRadius: 7,
+
+    elevation: 3,
+  },
+
+  addButtonIcon: {
+    width: 30,
+    height: 30,
+
+    borderRadius: 15,
+
+    borderWidth: 1.6,
+    borderColor: C.white,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addButtonText: {
+    fontSize: 17,
+
+    fontFamily: F.medium,
+
+    color: C.white,
+  },
+
+  /* =====================================================
+     WHY SECTION
+  ===================================================== */
+
+  whySection: {
+    marginTop: 50,
+  },
+
+  whyTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    letterSpacing: -0.5,
+
+    marginBottom: 13,
+  },
+
+  benefitRow: {
+    flexDirection: 'row',
+    gap: 9,
+  },
+
+  /* =====================================================
+     BENEFIT CARDS
+  ===================================================== */
+
+  benefitCard: {
+    flex: 1,
+
+    minHeight: 180,
+
+    borderRadius: 22,
+
+    backgroundColor: C.white,
+
+    paddingHorizontal: 12,
+    paddingVertical: 15,
+
+    borderWidth: 1,
+    borderColor: '#F0EDF6',
+
+    shadowColor: '#272047',
+
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+
+    elevation: 2,
+  },
+
+  benefitIcon: {
+    width: 52,
+    height: 52,
+
+    borderRadius: 16,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginBottom: 14,
+  },
+
+  benefitTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    marginBottom: 6,
+  },
+
+  benefitDescription: {
+    fontSize: 11.5,
+    lineHeight: 16,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+  },
+
+  /* =====================================================
+     BOTTOM BANNER IMAGE
+  ===================================================== */
+
+  bottomBannerContainer: {
+    width: '105%',
+    marginLeft:-10,
+
+    marginTop: 10,
+    marginBottom: -55,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  bottomBannerImage: {
+    width: '100%',
+    height: 170,
+  },
+
+  /* =====================================================
+     PET LIST HEADER
+  ===================================================== */
+
+  petSectionHeader: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+    justifyContent: 'space-between',
+
+    marginBottom: 17,
+  },
+
+  petSectionTitle: {
+    fontSize: 22,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+  },
+
+  petCount: {
+    fontSize: 12,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    marginTop: 3,
+  },
+
+  smallAddButton: {
+    height: 43,
+
+    paddingHorizontal: 14,
+
+    borderRadius: 22,
+
+    backgroundColor: C.purple,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 6,
+  },
+
+  smallAddButtonPressed: {
+    backgroundColor: C.purpleDark,
+
+    opacity: 0.9,
+
+    transform: [
+      {
+        scale: 0.96,
+      },
+    ],
+  },
+
+  smallAddText: {
+    fontSize: 12.5,
+
+    fontFamily: F.semiBold,
+
+    color: C.white,
+  },
+
+  /* =====================================================
+     PET CARDS
+  ===================================================== */
+
+  petGrid: {
+    gap: 12,
+  },
+
+  petCard: {
+    minHeight: 96,
+
+    borderRadius: 22,
+
+    backgroundColor: C.white,
+
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: C.border,
+
+    shadowColor: '#322760',
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+
+    elevation: 2,
+  },
+
+  petCardPressed: {
+    opacity: 0.84,
+
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
+  },
+
+  petAvatar: {
     width: 68,
     height: 68,
-    borderRadius: 34,
-    borderWidth: 2.5,
+
+    borderRadius: 22,
+
+    backgroundColor: C.purpleSoft,
+
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 26,
+
+    overflow: 'hidden',
+
+    marginRight: 13,
   },
 
-  mainInfo: {
+  petAvatarBlob: {
+    position: 'absolute',
+
+    width: 55,
+    height: 55,
+
+    borderRadius: 30,
+
+    backgroundColor: '#E2D8FF',
+
+    right: -15,
+    bottom: -15,
+  },
+
+  petEmoji: {
+    fontSize: 40,
+  },
+
+  petInfo: {
     flex: 1,
+  },
+
+  petName: {
+    fontSize: 17,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+  },
+
+  petMeta: {
+    fontSize: 12,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    marginTop: 4,
+  },
+
+  petArrow: {
+    width: 34,
+    height: 34,
+
+    borderRadius: 17,
+
+    backgroundColor: C.purpleSoft,
+
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  name: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 3,
-    letterSpacing: -0.3,
-  },
-  typeText: {
-    fontSize: 14,
-    color: '#667085',
-    fontWeight: '600',
-  },
-  miniInsight: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#7B8193',
-    fontWeight: '700',
-  },
 
-  statusBadge: {
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  chevron: {
-    fontSize: 24,
-    color: '#B2B8C5',
-    fontWeight: '400',
-    marginTop: 8,
-    marginRight: 2,
-  },
+  /* =====================================================
+     FILTER EMPTY
+  ===================================================== */
 
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 16,
-    marginBottom: 14,
-  },
-  infoChip: {
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  infoChipFilled: {
-    backgroundColor: '#EEF2FF',
-  },
-  infoChipDefault: {
-    backgroundColor: '#FFFFFF',
+  filterEmpty: {
+    minHeight: 300,
+
+    borderRadius: 26,
+
+    backgroundColor: C.white,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    paddingHorizontal: 25,
+
     borderWidth: 1,
-    borderColor: '#EAECEF',
-  },
-  infoChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  infoChipTextFilled: {
-    color: '#5B5BD6',
-  },
-  infoChipTextDefault: {
-    color: '#475467',
+    borderColor: C.border,
   },
 
-  insightBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 13,
-    borderWidth: 1,
-    borderColor: '#EEF2F6',
+  filterEmptyIcon: {
+    width: 70,
+    height: 70,
+
+    borderRadius: 35,
+
+    backgroundColor: C.purpleSoft,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginBottom: 15,
   },
-  insightLabel: {
-    fontSize: 11,
-    color: '#98A2B3',
-    fontWeight: '700',
-    marginBottom: 5,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+
+  filterEmptyTitle: {
+    fontSize: 18,
+
+    fontFamily: F.bold,
+
+    color: C.text,
   },
-  insightText: {
+
+  filterEmptyText: {
     fontSize: 13,
-    color: '#344054',
-    fontWeight: '600',
-    lineHeight: 20,
-  },
+    lineHeight: 19,
 
-  emptyBox: {
-    marginTop: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingVertical: 34,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ECEEF3',
-    shadowColor: '#101828',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  emptyEmojiWrap: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#F2EDFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyEmoji: {
-    fontSize: 36,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 10,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  emptyTipsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  emptyTipChip: {
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#EDF0F5',
-  },
-  emptyTipText: {
-    fontSize: 13,
-    color: '#4B5563',
-    fontWeight: '600',
+
+    marginTop: 7,
+
+    maxWidth: 260,
   },
 });

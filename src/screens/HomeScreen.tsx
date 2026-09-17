@@ -1,76 +1,115 @@
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView, Pressable} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  StatusBar,
+  Image,
+} from 'react-native';
+
 import {
   PawPrint,
-  Syringe,
   Plus,
-  Calendar,
-  List,
+  CalendarDays,
+  Bot,
   ChevronRight,
+  Heart,
+  Bell,
+  Stethoscope,
+  Utensils,
+  Lightbulb,
 } from 'lucide-react-native';
+
 import {useNavigation} from '@react-navigation/native';
 import {usePets} from '../data/PetContext';
+import {Pet} from '../types/Pet';
 
-type PetLike = {
-  name?: string;
-  type?: string;
-  animal?: string;
-  species?: string;
-  age?: string | number;
-  gender?: string;
-  vaccines?: string;
-  weight?: string | number;
+/* =========================================================
+   FONTS
+========================================================= */
+
+const F = {
+  light: 'Quicksand-Light',
+  regular: 'Quicksand-Regular',
+  medium: 'Quicksand-Medium',
+  semiBold: 'Quicksand-SemiBold',
+  bold: 'Quicksand-Bold',
+};
+
+/* =========================================================
+   COLORS
+========================================================= */
+
+const C = {
+  bg: '#FAF9FF',
+  white: '#FFFFFF',
+
+  text: '#18162B',
+  secondary: '#66647A',
+  muted: '#9693A7',
+
+  purple: '#7457E8',
+  purpleDark: '#5D42CF',
+  purpleSoft: '#F1EDFF',
+
+  pink: '#FFF0F4',
+  pinkText: '#EF557A',
+
+  orange: '#FFF2E5',
+  orangeText: '#F28A32',
+
+  blue: '#EEF3FF',
+  blueText: '#536FE8',
+
+  green: '#EAF9F4',
+  greenText: '#2FA77D',
+
+  border: '#ECE9F4',
 };
 
 export default function HomeScreen() {
   const {pets} = usePets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
 
-  const petList = (pets || []) as PetLike[];
+  const petList: Pet[] = pets || [];
   const totalPets = petList.length;
-  const lastPet = totalPets > 0 ? petList[petList.length - 1] : null;
+
   const petsWithVaccines = petList.filter(
-    pet => pet.vaccines && pet.vaccines.trim(),
+    pet => pet.vaccines?.trim(),
   ).length;
 
-  const getPetTypeLabel = (pet?: PetLike | null) => {
-    if (!pet) return 'Pet';
-    return pet.type || pet.animal || pet.species || 'Pet';
-  };
+  const getPetEmoji = (type?: string) => {
+    const value = (type || '').toLowerCase();
 
-  const getPetEmoji = (pet?: PetLike | null) => {
-    const key = getPetTypeLabel(pet).toLowerCase().trim();
-
-    if (
-      key.includes('dog') ||
-      key.includes('köpek') ||
-      key.includes('kopek')
-    ) {
+    if (value.includes('köpek') || value.includes('dog')) {
       return '🐶';
     }
-    if (key.includes('cat') || key.includes('kedi')) {
+
+    if (value.includes('kedi') || value.includes('cat')) {
       return '🐱';
     }
-    if (
-      key.includes('rabbit') ||
-      key.includes('tavşan') ||
-      key.includes('tavsan')
-    ) {
+
+    if (value.includes('tavşan') || value.includes('rabbit')) {
       return '🐰';
     }
-    if (key.includes('bird') || key.includes('kuş') || key.includes('kus')) {
+
+    if (value.includes('kuş') || value.includes('bird')) {
       return '🐦';
     }
-    if (key.includes('fish') || key.includes('balık') || key.includes('balik')) {
+
+    if (value.includes('balık') || value.includes('fish')) {
       return '🐠';
     }
-    if (key.includes('hamster')) {
+
+    if (value.includes('hamster')) {
       return '🐹';
     }
+
     if (
-      key.includes('turtle') ||
-      key.includes('kaplumbağa') ||
-      key.includes('kaplumbaga')
+      value.includes('kaplumbağa') ||
+      value.includes('turtle')
     ) {
       return '🐢';
     }
@@ -78,435 +117,1084 @@ export default function HomeScreen() {
     return '🐾';
   };
 
-  const getGenderLabel = (pet?: PetLike | null) => {
-    if (!pet?.gender) return 'Cinsiyet yok';
-    return pet.gender;
-  };
-
-  const getWeightLabel = (pet?: PetLike | null) => {
-    if (!pet?.weight) return 'Kilo bilgisi yok';
-    return `${pet.weight} kg`;
-  };
-
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroGlowLarge} />
-        <View style={styles.heroGlowSmall} />
+    <View style={styles.screen}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={C.bg}
+      />
 
-        <Text style={styles.heroEyebrow}>PetCare Dashboard</Text>
-        <Text style={styles.heroTitle}>Dostlarının bakımını tek yerden takip et</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}>
 
-        <Text style={styles.heroSubtitle}>
-          Bakım planlarını, aşı kayıtlarını ve günlük takibi sade bir panelden
-          yönet.
-        </Text>
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
 
-        <View style={styles.heroInfoRow}>
-          <View style={styles.heroChipPrimary}>
-            <PawPrint size={14} color="#6658E8" strokeWidth={2.2} />
-            <Text style={styles.heroChipPrimaryText}>{totalPets} aktif dostun</Text>
-          </View>
+        <View style={styles.header}>
+          <View style={styles.brandArea}>
 
-          <View style={styles.heroChipSecondary}>
-            <Text style={styles.heroChipSecondaryText}>
-              {petsWithVaccines} aşı kaydı
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={[styles.statCard, styles.statCardBlue]}>
-          <View style={[styles.statIconWrap, styles.statIconWrapBlue]}>
-            <PawPrint size={18} color="#4F6FEA" strokeWidth={2.3} />
-          </View>
-
-          <Text style={styles.statLabel}>Toplam Dost Sayısı</Text>
-          <Text style={styles.statValue}>{totalPets}</Text>
-          <Text style={styles.statFootnote}>Tüm kayıtlı dostların</Text>
-        </View>
-
-        <View style={[styles.statCard, styles.statCardMint]}>
-          <View style={[styles.statIconWrap, styles.statIconWrapMint]}>
-            <Syringe size={18} color="#199473" strokeWidth={2.3} />
-          </View>
-
-          <Text style={styles.statLabel}>Aşı Kaydı</Text>
-          <Text style={styles.statValue}>{petsWithVaccines}</Text>
-          <Text style={styles.statFootnote}>Takip edilen sağlık verileri</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
-
-        <View style={styles.actionsGrid}>
-          <Pressable style={styles.actionCard}>
-            <View style={[styles.actionIconWrap, styles.actionIconWrapPurple]}>
-              <Plus size={20} color="#6658E8" strokeWidth={2.4} />
+            <View style={styles.logo}>
+              <PawPrint
+                size={24}
+                color={C.purple}
+                strokeWidth={2.3}
+              />
             </View>
-            <Text style={styles.actionTitle}>Aramıza Hoşgeldin!</Text>
-            <Text style={styles.actionSubtitle}>Yeni dost ekle</Text>
-          </Pressable>
 
-          <Pressable style={styles.actionCard}>
-            <View style={[styles.actionIconWrap, styles.actionIconWrapBlueSoft]}>
-              <List size={20} color="#2563EB" strokeWidth={2.4} />
+            <View>
+              <Text style={styles.brand}>
+                PetCare
+              </Text>
+
+              <Text style={styles.tagline}>
+                Happy Pets, Happier Lives
+              </Text>
             </View>
-            <Text style={styles.actionTitle}>Dostlarım</Text>
-            <Text style={styles.actionSubtitle}>Tüm kayıtları gör</Text>
-          </Pressable>
+
+          </View>
 
           <Pressable
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Calendar' as never)}>
-            <View style={[styles.actionIconWrap, styles.actionIconWrapAmber]}>
-              <Calendar size={20} color="#D97706" strokeWidth={2.4} />
-            </View>
-            <Text style={styles.actionTitle}>Takvim</Text>
-            <Text style={styles.actionSubtitle}>Planlarını incele</Text>
-          </Pressable>
+            style={({pressed}) => [
+              styles.notification,
+              pressed && styles.pressed,
+            ]}>
 
-          <Pressable style={styles.actionCard}>
-            <View style={[styles.actionIconWrap, styles.actionIconWrapGreen]}>
-              <Syringe size={20} color="#199473" strokeWidth={2.4} />
-            </View>
-            <Text style={styles.actionTitle}>Aşılar</Text>
-            <Text style={styles.actionSubtitle}>Sağlık takibini aç</Text>
+            <Bell
+              size={21}
+              color={C.text}
+              strokeWidth={1.9}
+            />
+
+            <View style={styles.notificationDot} />
+
           </Pressable>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Son Eklenen Arkadaşımız</Text>
+        {/* =====================================================
+            HERO
+        ===================================================== */}
 
-        <Pressable style={styles.lastPetCard}>
-          <View style={styles.lastPetLeft}>
-            <View style={styles.petAvatar}>
-              <Text style={styles.petAvatarEmoji}>{getPetEmoji(lastPet)}</Text>
+        <View style={styles.hero}>
+          <Image
+            source={require(
+              '../assets/images/hero/petcare-home-hero.png'
+            )}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* =====================================================
+            STATS
+        ===================================================== */}
+
+        <View style={styles.stats}>
+
+          {/* KAYITLI DOST */}
+
+          <Pressable
+            onPress={() => navigation.navigate('Pets')}
+            style={({pressed}) => [
+              styles.statCard,
+              pressed && styles.pressed,
+            ]}>
+
+            <View style={styles.statIconPurple}>
+              <PawPrint
+                size={22}
+                color={C.purple}
+                strokeWidth={2}
+              />
             </View>
 
-            <View style={styles.petContent}>
-              <Text style={styles.petName}>
-                {lastPet?.name || 'Henüz pet eklenmedi'}
+            <View style={styles.statContent}>
+              <Text style={styles.statNumber}>
+                {totalPets}
               </Text>
 
-              <View style={styles.petMetaRow}>
-                <Text style={styles.petTypeBadge}>
-                  {getPetTypeLabel(lastPet)}
-                </Text>
-                {lastPet?.age ? (
-                  <Text style={styles.petMetaText}>{lastPet.age} yaş</Text>
-                ) : null}
-              </View>
-
-              <Text style={styles.petSub}>
-                {lastPet
-                  ? `${getGenderLabel(lastPet)} • ${getWeightLabel(lastPet)}`
-                  : 'İlk dostunu ekleyerek bakım takibini başlat'}
+              <Text style={styles.statLabel}>
+                Kayıtlı dost
               </Text>
             </View>
+
+            <ChevronRight
+              size={17}
+              color="#B4AFC0"
+            />
+
+          </Pressable>
+
+          {/* AŞI KAYDI */}
+
+          <View style={styles.statCard}>
+
+            <View style={styles.statIconPink}>
+              <Heart
+                size={21}
+                color={C.pinkText}
+                strokeWidth={2}
+              />
+            </View>
+
+            <View style={styles.statContent}>
+              <Text style={styles.statNumber}>
+                {petsWithVaccines}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Aşı kaydı
+              </Text>
+            </View>
+
           </View>
 
-          <ChevronRight size={18} color="#A1A1AA" strokeWidth={2.4} />
-        </Pressable>
-      </View>
-    </ScrollView>
+        </View>
+
+        {/* =====================================================
+            HIZLI İŞLEMLER
+        ===================================================== */}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Hızlı İşlemler
+          </Text>
+        </View>
+
+        <View style={styles.quickGrid}>
+
+          {/* 1. SATIR */}
+
+          <View style={styles.quickRow}>
+
+            <QuickAction
+              title="Aşı Takvimi"
+              description="Yaklaşan aşıları takip et"
+              background={C.orange}
+              iconBackground="#FFE7CD"
+              onPress={() =>
+                navigation.navigate('Calendar')
+              }
+              icon={
+                <CalendarDays
+                  size={24}
+                  color={C.orangeText}
+                  strokeWidth={1.9}
+                />
+              }
+            />
+
+            <QuickAction
+              title="Sağlık Kaydı"
+              description="Sağlık bilgilerini görüntüle"
+              background={C.blue}
+              iconBackground="#DDE7FF"
+              onPress={() =>
+                navigation.navigate('Pets')
+              }
+              icon={
+                <Stethoscope
+                  size={24}
+                  color={C.blueText}
+                  strokeWidth={1.9}
+                />
+              }
+            />
+
+          </View>
+
+          {/* 2. SATIR */}
+
+          <View style={styles.quickRow}>
+
+            <QuickAction
+              title="Mama Rehberi"
+              description="Beslenme hakkında bilgi al"
+              background={C.green}
+              iconBackground="#D8F2E8"
+              onPress={() =>
+                navigation.navigate('Assistant')
+              }
+              icon={
+                <Utensils
+                  size={23}
+                  color={C.greenText}
+                  strokeWidth={1.9}
+                />
+              }
+            />
+
+            <QuickAction
+              title="Uzmanına Sor"
+              description="PetCare asistana danış"
+              background={C.purpleSoft}
+              iconBackground="#E2DAFF"
+              onPress={() =>
+                navigation.navigate('Assistant')
+              }
+              icon={
+                <Bot
+                  size={24}
+                  color={C.purple}
+                  strokeWidth={1.9}
+                />
+              }
+            />
+
+          </View>
+
+        </View>
+
+        {/* =====================================================
+            DOSTLARIN
+        ===================================================== */}
+
+        <View style={styles.sectionHeader}>
+
+          <Text style={styles.sectionTitle}>
+            Dostların
+          </Text>
+
+          {totalPets > 0 && (
+            <Pressable
+              onPress={() =>
+                navigation.navigate('Pets')
+              }>
+
+              <Text style={styles.seeAll}>
+                Tümünü Gör
+              </Text>
+
+            </Pressable>
+          )}
+
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.petProfiles}>
+
+          {/* KAYITLI DOSTLAR */}
+
+          {petList.map(pet => (
+            <PetProfile
+              key={pet.id}
+              pet={pet}
+              emoji={getPetEmoji(pet.type)}
+              onPress={() =>
+                navigation.navigate(
+                  'PetDetail',
+                  {pet},
+                )
+              }
+            />
+          ))}
+
+          {/* DOST EKLE */}
+
+          <Pressable
+            onPress={() =>
+              navigation.navigate('AddPet')
+            }
+            style={({pressed}) => [
+              styles.addPetProfile,
+              pressed && styles.pressed,
+            ]}>
+
+            <View style={styles.addPetCircle}>
+              <Plus
+                size={27}
+                color={C.purple}
+                strokeWidth={1.8}
+              />
+            </View>
+
+            <Text style={styles.addPetText}>
+              Dost Ekle
+            </Text>
+
+          </Pressable>
+
+        </ScrollView>
+
+        {/* =====================================================
+            BUGÜNÜN ÖNERİSİ
+        ===================================================== */}
+
+        <View style={styles.tipCard}>
+
+          {/* Arka plan dekorları */}
+
+          <View style={styles.tipCircleTop} />
+          <View style={styles.tipCircleRight} />
+          <View style={styles.tipCircleBottom} />
+
+          {/* Ampul */}
+
+          <View style={styles.tipIcon}>
+            <Lightbulb
+              size={28}
+              color="#F2A900"
+              strokeWidth={1.9}
+            />
+          </View>
+
+          {/* Yazılar */}
+
+          <View style={styles.tipContent}>
+
+            <Text style={styles.tipTitle}>
+              Bugünün Önerisi
+            </Text>
+
+            <Text style={styles.tipDescription}>
+              Dostlarının su tüketimini{'\n'}
+              kontrol etmeyi unutma!
+            </Text>
+
+          </View>
+
+          {/* KEDİ PNG */}
+
+          <View style={styles.tipCatArea}>
+            <Image
+              source={require(
+                '../assets/images/home/tip-cat.png'
+              )}
+              style={styles.tipCatImage}
+              resizeMode="contain"
+            />
+          </View>
+
+        </View>
+
+      </ScrollView>
+    </View>
   );
 }
 
+/* =========================================================
+   QUICK ACTION COMPONENT
+========================================================= */
+
+function QuickAction({
+  icon,
+  title,
+  description,
+  background,
+  iconBackground,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  background: string;
+  iconBackground: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.quickCard,
+        {backgroundColor: background},
+        pressed && styles.pressed,
+      ]}>
+
+      <View
+        style={[
+          styles.quickIcon,
+          {backgroundColor: iconBackground},
+        ]}>
+        {icon}
+      </View>
+
+      <Text style={styles.quickTitle}>
+        {title}
+      </Text>
+
+      <Text style={styles.quickDescription}>
+        {description}
+      </Text>
+
+      <View style={styles.quickArrow}>
+        <ChevronRight
+          size={15}
+          color={C.secondary}
+          strokeWidth={2}
+        />
+      </View>
+
+    </Pressable>
+  );
+}
+
+/* =========================================================
+   PET PROFILE COMPONENT
+========================================================= */
+
+function PetProfile({
+  pet,
+  emoji,
+  onPress,
+}: {
+  pet: Pet;
+  emoji: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.petProfile,
+        pressed && styles.pressed,
+      ]}>
+
+      <View style={styles.petProfileCircle}>
+
+        <View style={styles.petProfileBlob} />
+
+        <Text style={styles.petProfileEmoji}>
+          {emoji}
+        </Text>
+
+      </View>
+
+      <Text
+        numberOfLines={1}
+        style={styles.petProfileName}>
+        {pet.name}
+      </Text>
+
+      <Text
+        numberOfLines={1}
+        style={styles.petProfileType}>
+        {pet.type}
+      </Text>
+
+    </Pressable>
+  );
+}
+
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    paddingBottom: 120,
-    backgroundColor: '#F7F8FC',
-  },
 
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#ECE7FF',
-    borderRadius: 30,
-    padding: 22,
-    marginBottom: 22,
-    elevation: 1,
-    shadowColor: '#6D5CE7',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: {width: 0, height: 6},
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.34)',
-  },
-  heroGlowLarge: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    backgroundColor: '#DDD2FF',
-    borderRadius: 999,
-    top: -82,
-    right: -28,
-    opacity: 0.9,
-  },
-  heroGlowSmall: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    backgroundColor: '#F5F2FF',
-    borderRadius: 999,
-    bottom: -36,
-    left: -30,
-    opacity: 1,
-  },
-  heroEyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6658E8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.9,
-    marginBottom: 10,
-  },
-  heroTitle: {
-    fontSize: 31,
-    lineHeight: 37,
-    fontWeight: '800',
-    color: '#18181B',
-    letterSpacing: -0.8,
-    marginBottom: 10,
-    maxWidth: '84%',
-  },
-  heroSubtitle: {
-    fontSize: 15,
-    lineHeight: 23,
-    color: '#616777',
-    maxWidth: '88%',
-    marginBottom: 16,
-    fontWeight: '500',
-  },
-  heroInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  heroChipPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  heroChipPrimaryText: {
-    fontSize: 13,
-    color: '#5B4BCF',
-    fontWeight: '700',
-  },
-  heroChipSecondary: {
-    backgroundColor: 'rgba(255,255,255,0.52)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  heroChipSecondaryText: {
-    fontSize: 13,
-    color: '#5B5F6B',
-    fontWeight: '700',
-  },
+  /* =====================================================
+     SCREEN
+  ===================================================== */
 
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
+  screen: {
     flex: 1,
-    borderRadius: 26,
-    padding: 18,
-    elevation: 0,
-    shadowOpacity: 0,
-    borderWidth: 1,
-  },
-  statCardBlue: {
-    backgroundColor: '#E8F0FF',
-    borderColor: '#D8E5FF',
-  },
-  statCardMint: {
-    backgroundColor: '#DDF4E8',
-    borderColor: '#CFEADB',
-  },
-  statIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  statIconWrapBlue: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  statIconWrapMint: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#616777',
-    marginBottom: 10,
-    fontWeight: '600',
-  },
-  statValue: {
-    fontSize: 35,
-    lineHeight: 38,
-    fontWeight: '800',
-    color: '#18181B',
-    letterSpacing: -0.9,
-    marginBottom: 6,
-  },
-  statFootnote: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-    lineHeight: 17,
+    backgroundColor: C.bg,
   },
 
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 14,
-    color: '#18181B',
-    letterSpacing: -0.3,
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 125,
   },
 
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionCard: {
-    width: '47%',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    borderRadius: 22,
-    alignItems: 'center',
-    elevation: 1,
-    shadowColor: '#111827',
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: {width: 0, height: 3},
-    borderWidth: 1,
-    borderColor: '#EEF1F6',
-  },
-  actionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  actionIconWrapPurple: {
-    backgroundColor: '#F3EEFF',
-  },
-  actionIconWrapBlueSoft: {
-    backgroundColor: '#EAF2FF',
-  },
-  actionIconWrapAmber: {
-    backgroundColor: '#FFF4D6',
-  },
-  actionIconWrapGreen: {
-    backgroundColor: '#E7FAF2',
-  },
-  actionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 4,
-    textAlign:'center',
-  },
-  actionSubtitle: {
-    fontSize: 12,
-    color: '#8A91A1',
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 17,
+  pressed: {
+    opacity: 0.82,
+    transform: [{scale: 0.985}],
   },
 
-  lastPetCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
+  /* =====================================================
+     HEADER
+  ===================================================== */
+
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 1,
-    shadowColor: '#111827',
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: {width: 0, height: 3},
-    borderWidth: 1,
-    borderColor: '#EEF1F6',
+
+    marginBottom: 17,
   },
-  lastPetLeft: {
+
+  brandArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    paddingRight: 10,
   },
-  petAvatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-    backgroundColor: '#DDF4E8',
+
+  logo: {
+    width: 46,
+    height: 46,
+
+    borderRadius: 15,
+
+    backgroundColor: C.white,
+
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+
+    marginRight: 11,
+
+    borderWidth: 1,
+    borderColor: '#EFECF6',
+
+    shadowColor: '#44366C',
+    shadowOpacity: 0.07,
+    shadowRadius: 11,
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
+    elevation: 2,
   },
-  petAvatarEmoji: {
-    fontSize: 28,
+
+  brand: {
+    fontSize: 22,
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    letterSpacing: -0.7,
   },
-  petContent: {
+
+  tagline: {
+    fontSize: 9.5,
+    fontFamily: F.regular,
+
+    color: C.muted,
+
+    marginTop: 1,
+  },
+
+  notification: {
+    width: 45,
+    height: 45,
+
+    borderRadius: 23,
+
+    backgroundColor: C.white,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: '#EFECF6',
+
+    shadowColor: '#44366C',
+    shadowOpacity: 0.07,
+    shadowRadius: 11,
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
+    elevation: 2,
+  },
+
+  notificationDot: {
+    position: 'absolute',
+
+    width: 9,
+    height: 9,
+
+    borderRadius: 5,
+
+    backgroundColor: '#F0525E',
+
+    right: 8,
+    top: 7,
+
+    borderWidth: 2,
+    borderColor: C.white,
+  },
+
+  /* =====================================================
+     HERO
+  ===================================================== */
+
+  hero: {
+    width: '100%',
+    height: 250,
+
+    borderRadius: 28,
+
+    overflow: 'hidden',
+
+    backgroundColor: '#EEE9FF',
+
+    marginBottom: 14,
+
+    shadowColor: '#513B92',
+    shadowOpacity: 0.09,
+    shadowRadius: 15,
+
+    shadowOffset: {
+      width: 0,
+      height: 7,
+    },
+
+    elevation: 3,
+  },
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  /* =====================================================
+     STATS
+  ===================================================== */
+
+  stats: {
+    flexDirection: 'row',
+
+    gap: 11,
+
+    marginBottom: 30,
+  },
+
+  statCard: {
     flex: 1,
-  },
-  petName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#18181B',
-    marginBottom: 5,
-    letterSpacing: -0.3,
-  },
-  petMetaRow: {
+
+    height: 88,
+
+    borderRadius: 20,
+
+    backgroundColor: C.white,
+
+    paddingHorizontal: 13,
+
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 5,
-    flexWrap: 'wrap',
+
+    borderWidth: 1,
+    borderColor: '#EEEAF4',
+
+    shadowColor: '#392D65',
+    shadowOpacity: 0.06,
+    shadowRadius: 11,
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
+    elevation: 2,
   },
-  petTypeBadge: {
-    fontSize: 12,
-    color: '#199473',
-    fontWeight: '700',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
+
+  statIconPurple: {
+    width: 43,
+    height: 43,
+
+    borderRadius: 14,
+
+    backgroundColor: C.purpleSoft,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: 10,
   },
-  petMetaText: {
+
+  statIconPink: {
+    width: 43,
+    height: 43,
+
+    borderRadius: 14,
+
+    backgroundColor: C.pink,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: 10,
+  },
+
+  statContent: {
+    flex: 1,
+  },
+
+  statNumber: {
+    fontSize: 21,
+    fontFamily: F.bold,
+
+    color: C.text,
+  },
+
+  statLabel: {
+    fontSize: 10.5,
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    marginTop: 1,
+  },
+
+  /* =====================================================
+     SECTION
+  ===================================================== */
+
+  sectionHeader: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+    alignItems: 'center',
+
+    marginBottom: 14,
+  },
+
+  sectionTitle: {
+    fontSize: 19,
+    fontFamily: F.bold,
+
+    letterSpacing: -0.35,
+
+    color: C.text,
+  },
+
+  seeAll: {
+    fontSize: 11.5,
+    fontFamily: F.semiBold,
+
+    color: C.purple,
+  },
+
+  /* =====================================================
+     QUICK ACTIONS
+  ===================================================== */
+
+  quickGrid: {
+    gap: 10,
+
+    marginBottom: 31,
+  },
+
+  quickRow: {
+    flexDirection: 'row',
+
+    gap: 10,
+  },
+
+  quickCard: {
+    flex: 1,
+
+    height: 122,
+
+    borderRadius: 22,
+
+    padding: 14,
+
+    position: 'relative',
+
+    overflow: 'hidden',
+  },
+
+  quickIcon: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 13,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginBottom: 9,
+  },
+
+  quickTitle: {
     fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
+    fontFamily: F.bold,
+
+    color: C.text,
   },
-  petSub: {
-    fontSize: 13,
-    color: '#8A91A1',
-    lineHeight: 18,
-    fontWeight: '500',
+
+  quickDescription: {
+    fontSize: 9.5,
+    lineHeight: 13,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    marginTop: 3,
+
+    maxWidth: '78%',
+  },
+
+  quickArrow: {
+    position: 'absolute',
+
+    right: 12,
+    bottom: 12,
+
+    width: 27,
+    height: 27,
+
+    borderRadius: 14,
+
+    backgroundColor: 'rgba(255,255,255,0.65)',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* =====================================================
+     PETS
+  ===================================================== */
+
+  petProfiles: {
+    paddingBottom: 4,
+    paddingRight: 10,
+
+    gap: 15,
+
+    marginBottom: 29,
+  },
+
+  petProfile: {
+    width: 78,
+
+    alignItems: 'center',
+  },
+
+  petProfileCircle: {
+    width: 74,
+    height: 74,
+
+    borderRadius: 37,
+
+    backgroundColor: '#EEE9FF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    overflow: 'hidden',
+
+    marginBottom: 7,
+  },
+
+  petProfileBlob: {
+    position: 'absolute',
+
+    width: 65,
+    height: 65,
+
+    borderRadius: 33,
+
+    backgroundColor: '#DDD3FF',
+
+    right: -16,
+    bottom: -18,
+  },
+
+  petProfileEmoji: {
+    fontSize: 48,
+  },
+
+  petProfileName: {
+    fontSize: 12.5,
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    maxWidth: 75,
+  },
+
+  petProfileType: {
+    fontSize: 10,
+    fontFamily: F.regular,
+
+    color: C.muted,
+
+    marginTop: 2,
+
+    maxWidth: 75,
+  },
+
+  /* =====================================================
+     ADD PET
+  ===================================================== */
+
+  addPetProfile: {
+    width: 78,
+
+    alignItems: 'center',
+  },
+
+  addPetCircle: {
+    width: 74,
+    height: 74,
+
+    borderRadius: 37,
+
+    backgroundColor: C.purpleSoft,
+
+    borderWidth: 1.5,
+    borderColor: '#DED5FF',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginBottom: 7,
+  },
+
+  addPetText: {
+    fontSize: 11,
+    fontFamily: F.semiBold,
+
+    color: C.purple,
+  },
+
+  /* =====================================================
+     BUGÜNÜN ÖNERİSİ
+  ===================================================== */
+
+  tipCard: {
+    width: '100%',
+    height: 132,
+
+    borderRadius: 25,
+
+    backgroundColor: '#EEE9FF',
+
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    paddingLeft: 17,
+    paddingRight: 12,
+
+    overflow: 'hidden',
+
+    position: 'relative',
+
+    marginTop: 2,
+
+    borderWidth: 1,
+    borderColor: '#E9E3FC',
+  },
+
+  tipCircleTop: {
+    position: 'absolute',
+
+    width: 100,
+    height: 100,
+
+    borderRadius: 50,
+
+    backgroundColor: '#F8F6FF',
+
+    left: -45,
+    top: -55,
+  },
+
+  tipCircleRight: {
+    position: 'absolute',
+
+    width: 120,
+    height: 120,
+
+    borderRadius: 60,
+
+    backgroundColor: '#E5DCFF',
+
+    right: -55,
+    top: -65,
+  },
+
+  tipCircleBottom: {
+    position: 'absolute',
+
+    width: 150,
+    height: 150,
+
+    borderRadius: 75,
+
+    backgroundColor: '#DCD1FF',
+
+    right: -65,
+    bottom: -95,
+  },
+
+  tipIcon: {
+    width: 59,
+    height: 68,
+
+    borderRadius: 18,
+
+    backgroundColor: '#FFF3C9',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: 14,
+
+    zIndex: 3,
+
+    shadowColor: '#E5B13B',
+    shadowOpacity: 0.05,
+    shadowRadius: 7,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    elevation: 1,
+  },
+
+  tipContent: {
+    flex: 1,
+
+    zIndex: 3,
+
+    paddingRight: 63,
+  },
+
+  tipTitle: {
+    fontSize: 15.5,
+    lineHeight: 20,
+
+    fontFamily: F.bold,
+
+    color: C.text,
+
+    letterSpacing: -0.2,
+  },
+
+  tipDescription: {
+    fontSize: 11,
+    lineHeight: 16,
+
+    fontFamily: F.regular,
+
+    color: C.secondary,
+
+    marginTop: 6,
+  },
+
+  /* =====================================================
+     TIP CAT PNG
+  ===================================================== */
+
+  tipCatArea: {
+    position: 'absolute',
+
+    right: 0,
+    bottom: -25,
+
+    width: 125,
+    height: 120,
+
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+
+    zIndex: 4,
+  },
+
+  tipCatImage: {
+    width: 200,
+    height: 150,
   },
 });

@@ -8,4 +8,5 @@ export type Pet = {
   vaccines?: string;
   lastVetVisit?: string;
   notes?: string;
+  photoUrl?: string;
 };
