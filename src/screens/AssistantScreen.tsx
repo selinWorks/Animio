@@ -57,6 +57,8 @@ import {
 
 const aiOrb = require('../assets/images/assistant/ai-orb.png');
 const aiAssistant = require('../assets/images/assistant/ai-assistant.png');
+const hospitalErrorIcon = require('../assets/popup-icons/hospital-icon.png');
+const petcareWarningGroup = require('../assets/popup-icons/my-custom-icon.png');
 
 /* =========================================================
    TYPES
@@ -185,6 +187,7 @@ const AssistantScreen = () => {
   const [chatHistory, setChatHistory] = useState<AssistantChat[]>([]);
   const drawerAnimation = useRef(new Animated.Value(0)).current;
   const [connectionErrorVisible, setConnectionErrorVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const canShowSummary =
     petType !== '' &&
@@ -219,12 +222,9 @@ const AssistantScreen = () => {
 
   const fetchRisk = async () => {
     if (!canShowSummary) {
-      Alert.alert(
-        'Eksik seçim',
-        'Lütfen değerlendirmeyi başlatmadan önce tüm alanları seç.',
-      );
-      return;
-    }
+          setConnectionErrorVisible(true);
+          return;
+        }
 
     try {
       setLoading(true);
@@ -553,6 +553,7 @@ const AssistantScreen = () => {
                 ================================================= */}
 
             <ScrollView
+              ref={scrollViewRef}
               style={styles.scroll}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
@@ -1320,29 +1321,57 @@ const AssistantScreen = () => {
           onRequestClose={() => setConnectionErrorVisible(false)}>
 
           <View style={styles.modalOverlay}>
-            <Pressable
-              style={StyleSheet.absoluteFillObject}
-              onPress={() => setConnectionErrorVisible(false)}
-            />
+                    <Pressable
+                      style={StyleSheet.absoluteFillObject}
+                      onPress={() => setIsValidationModalVisible(false)}
+                    />
 
-            <View style={styles.modalContent}>
-              <View style={styles.iconCircle}>
-                <Hospital size={40} color="#991B27" strokeWidth={2.2} />
-              </View>
+                    <View style={styles.modalContent}>
 
-              <Text style={styles.modalTitle}>Bağlantı Kurulamadı</Text>
-              <Text style={styles.modalMessage}>
-                Yapay zeka asistanı sunucusuna şu anda erişilemiyor. Lütfen sunucunuzu başlatın ve internet bağlantınızı kontrol edin.
-              </Text>
+                      {/* --- YENİ GÜNCELLENEN İKON BÖLÜMÜ (Hayvan Grubu) --- */}
+                      <View style={{ alignItems: 'center', marginBottom: 15, marginTop: -10 }}>
+                        <Image
+                          source={petcareWarningGroup}
+                          style={{
+                            width: 160,   // Görseline göre boyutlandır
+                            height: 130,  // Görseline göre boyutlandır
+                            resizeMode: 'contain',
+                            // tintColor: '#991B27', // Kendi görselini kullanıyorsan bu satırı SİL
+                          }}
+                        />
+                      </View>
+                      {/* ------------------------------------------------- */}
 
-              <TouchableOpacity
-                style={styles.modalButton}
-                activeOpacity={0.8}
-                onPress={() => setConnectionErrorVisible(false)}>
-                <Text style={styles.modalButtonText}>Tamam</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                      <Text style={styles.modalTitle}>Dikkat!</Text>
+                      <Text style={styles.modalMessage}>
+                        Evcil hayvan türü ve semptom etiketleri eksik. Değerlendirmeyi başlatmak için lütfen bu alanları doldurun.
+                      </Text>
+
+                      {/* --- GÜNCELLENEN TEK BUTON ("Doldur") --- */}
+                      <TouchableOpacity
+                        style={[
+                          styles.modalButton,
+                          {
+                            width: '80%',
+                            alignSelf: 'center',
+                            marginTop: 15,
+                            backgroundColor: '#9B86FF' // İstediğin pastel mor
+                          }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          // 1. Pop-up'ı kapatıyoruz
+                          setConnectionErrorVisible(false);
+
+                          // 2. Sayfayı akıcı bir şekilde en üste kaydırıyoruz
+                          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                        }}>
+                        <Text style={styles.modalButtonText}>Doldur</Text>
+                      </TouchableOpacity>
+                      {/* ---------------------------------------- */}
+
+                    </View>
+                  </View>
         </Modal>
       </>
     );
