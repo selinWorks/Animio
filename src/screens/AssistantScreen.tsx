@@ -41,6 +41,7 @@ import {
   ArrowRight,
   Frown,
   Moon,
+  Hospital,
 } from 'lucide-react-native';
 
 import {useAuth} from '../data/AuthContext';
@@ -183,6 +184,7 @@ const AssistantScreen = () => {
   const [historyVisible, setHistoryVisible] = useState(false);
   const [chatHistory, setChatHistory] = useState<AssistantChat[]>([]);
   const drawerAnimation = useRef(new Animated.Value(0)).current;
+  const [connectionErrorVisible, setConnectionErrorVisible] = useState(false);
 
   const canShowSummary =
     petType !== '' &&
@@ -251,32 +253,30 @@ const AssistantScreen = () => {
       setAiMessage(data.aiMessage || '');
 
       if (user?.uid && data.risk) {
-        await addAssistantChatToFirestore(
-          {
-            petType,
-            problemType,
-            duration,
-            urgency,
-            result: data.risk,
-            aiMessage: data.aiMessage || '',
-          },
-          user.uid,
-          user.email || '',
-        );
+              await addAssistantChatToFirestore(
+                {
+                  petType,
+                  problemType,
+                  duration,
+                  urgency,
+                  result: data.risk,
+                  aiMessage: data.aiMessage || '',
+                },
+                user.uid,
+                user.email || '',
+              );
 
-        await loadChatHistory();
-      }
-    } catch (error) {
-      console.log('API HATA:', error);
+              await loadChatHistory();
+            }
+          } catch (error: any) {
+                console.log('API HATA:', error);
 
-      Alert.alert(
-        'Hata',
-        'AI değerlendirmesi alınamadı.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+                // Varsayılan uyarı yerine özel modalı açıyoruz:
+                setConnectionErrorVisible(true);
+          } finally {
+            setLoading(false);
+          }
+        };
 
   /* =======================================================
      RESET
@@ -526,788 +526,826 @@ const AssistantScreen = () => {
      ======================================================= */
 
   return (
-    <SafeAreaView
-      style={styles.safeArea}
-      edges={['top']}>
+      <>
+        <SafeAreaView
+          style={styles.safeArea}
+          edges={['top']}>
 
-      <View style={styles.screen}>
+          <View style={styles.screen}>
 
-        {/* =================================================
-            HERO BACKGROUND
-            ================================================= */}
+            {/* =================================================
+                HERO BACKGROUND
+                ================================================= */}
 
-        <View
-          pointerEvents="none"
-          style={styles.heroBackground}>
+            <View
+              pointerEvents="none"
+              style={styles.heroBackground}>
 
-          <View style={styles.heroGlowOne} />
-          <View style={styles.heroGlowTwo} />
-          <View style={styles.heroWaveLeft} />
-          <View style={styles.heroWaveRight} />
-
-        </View>
-
-        {/* =================================================
-            SCROLL CONTENT
-            ================================================= */}
-
-        <ScrollView
-          style={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingBottom: tabBarHeight + 24,
-            },
-          ]}>
-
-          {/* =================================================
-              HERO
-              ================================================= */}
-
-          <View style={styles.hero}>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.menuButton}
-              onPress={openHistory}>
-
-              <Menu
-                size={27}
-                color="#15174D"
-                strokeWidth={2.3}
-              />
-
-            </TouchableOpacity>
-
-            <View style={styles.heroTitleArea}>
-
-              <View style={styles.titleRow}>
-                <Text style={styles.heroTitle}>
-                  PetCare
-                </Text>
-
-                <Text style={styles.heroTitleAI}>
-                  {' '}AI
-                </Text>
-              </View>
-
-              <Text style={styles.heroSubtitle}>
-                Sevimli dostun için
-              </Text>
-
-              <View style={styles.subtitleRow}>
-                <Text style={styles.heroSubtitle}>
-                  her zaman yanındayım
-                </Text>
-
-              </View>
+              <View style={styles.heroGlowOne} />
+              <View style={styles.heroGlowTwo} />
+              <View style={styles.heroWaveLeft} />
+              <View style={styles.heroWaveRight} />
 
             </View>
 
-            <Image
-              source={aiOrb}
-              resizeMode="contain"
-              style={styles.orbImage}
-            />
-
-          </View>
-
-          {/* =================================================
-              PET TYPE
-              ================================================= */}
-
-          <View style={styles.mainCard}>
-
-            <View style={styles.sectionHeading}>
-
-              <View style={styles.sectionHeadingIcon}>
-                <PawPrint
-                  size={25}
-                  color="#B78328"
-                  strokeWidth={2.4}
-                />
-              </View>
-
-              <View style={styles.sectionHeadingTexts}>
-                <Text style={styles.sectionTitle}>
-                  Evcil Hayvan Türü
-                </Text>
-
-                <Text style={styles.sectionSubtitle}>
-                  Danışacağın dostunu seç
-                </Text>
-              </View>
-
-            </View>
+            {/* =================================================
+                SCROLL CONTENT
+                ================================================= */}
 
             <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.petRow}>
+              style={styles.scroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.scrollContent,
+                {
+                  paddingBottom: tabBarHeight + 24,
+                },
+              ]}>
 
-              {PETS.map(item => {
-                const selected = petType === item;
+              {/* =================================================
+                  HERO
+                  ================================================= */}
 
-                return (
-                  <TouchableOpacity
-                    key={item}
-                    activeOpacity={0.86}
-                    onPress={() => {
-                      setPetType(item);
-                      setResult(null);
-                      setAiMessage('');
-                    }}
-                    style={[
-                      styles.petItem,
-                      selected && styles.petItemSelected,
-                    ]}>
+              <View style={styles.hero}>
 
-                    <View style={styles.petIconArea}>
-                      {renderPetIcon(item)}
-                    </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.menuButton}
+                  onPress={openHistory}>
 
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.petText,
-                        selected && styles.petTextSelected,
-                        item === 'Küçük Hayvan' &&
-                          styles.petTextSmall,
-                      ]}>
-                      {item}
+                  <Menu
+                    size={27}
+                    color="#15174D"
+                    strokeWidth={2.3}
+                  />
+
+                </TouchableOpacity>
+
+                <View style={styles.heroTitleArea}>
+
+                  <View style={styles.titleRow}>
+                    <Text style={styles.heroTitle}>
+                      PetCare
                     </Text>
 
-                  </TouchableOpacity>
-                );
-              })}
+                    <Text style={styles.heroTitleAI}>
+                      {' '}AI
+                    </Text>
+                  </View>
 
-            </ScrollView>
+                  <Text style={styles.heroSubtitle}>
+                    Sevimli dostun için
+                  </Text>
 
-          </View>
+                  <View style={styles.subtitleRow}>
+                    <Text style={styles.heroSubtitle}>
+                      her zaman yanındayım
+                    </Text>
 
-          {/* =================================================
-              SYMPTOMS
-              ================================================= */}
+                  </View>
 
-          <View style={styles.mainCard}>
+                </View>
 
-            <View style={styles.sectionHeading}>
-
-              <View style={styles.sectionHeadingIcon}>
-                <Stethoscope
-                  size={27}
-                  color="#68BDAA"
-                  strokeWidth={2.5}
+                <Image
+                  source={aiOrb}
+                  resizeMode="contain"
+                  style={styles.orbImage}
                 />
+
               </View>
 
-              <View style={styles.sectionHeadingTexts}>
-                <Text style={styles.sectionTitle}>
-                  Semptom Etiketleri
-                </Text>
+              {/* =================================================
+                  PET TYPE
+                  ================================================= */}
 
-                <Text style={styles.sectionSubtitle}>
-                  Gözlemlediğin belirtileri seç (birden fazla olabilir)
-                </Text>
-              </View>
+              <View style={styles.mainCard}>
 
-            </View>
+                <View style={styles.sectionHeading}>
 
-            <View style={styles.symptomGrid}>
+                  <View style={styles.sectionHeadingIcon}>
+                    <PawPrint
+                      size={25}
+                      color="#B78328"
+                      strokeWidth={2.4}
+                    />
+                  </View>
 
-              {SYMPTOMS.map(item => {
-                const selected = problemType === item;
+                  <View style={styles.sectionHeadingTexts}>
+                    <Text style={styles.sectionTitle}>
+                      Evcil Hayvan Türü
+                    </Text>
 
-                return (
-                  <TouchableOpacity
-                    key={item}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setProblemType(item);
-                      setResult(null);
-                      setAiMessage('');
-                    }}
-                    style={styles.symptomCell}>
+                    <Text style={styles.sectionSubtitle}>
+                      Danışacağın dostunu seç
+                    </Text>
+                  </View>
 
-                    {selected ? (
-                      <View style={styles.symptomSelected}>
+                </View>
 
-                        <Text style={styles.symptomTextSelected}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.petRow}>
+
+                  {PETS.map(item => {
+                    const selected = petType === item;
+
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        activeOpacity={0.86}
+                        onPress={() => {
+                          setPetType(item);
+                          setResult(null);
+                          setAiMessage('');
+                        }}
+                        style={[
+                          styles.petItem,
+                          selected && styles.petItemSelected,
+                        ]}>
+
+                        <View style={styles.petIconArea}>
+                          {renderPetIcon(item)}
+                        </View>
+
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.petText,
+                            selected && styles.petTextSelected,
+                            item === 'Küçük Hayvan' &&
+                              styles.petTextSmall,
+                          ]}>
                           {item}
                         </Text>
 
-                      </View>
-                    ) : (
-                      <View style={styles.symptomDefault}>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-                        <Text style={styles.symptomText}>
-                          {item}
-                        </Text>
+                </ScrollView>
 
-                      </View>
-                    )}
+              </View>
 
-                  </TouchableOpacity>
-                );
-              })}
+              {/* =================================================
+                  SYMPTOMS
+                  ================================================= */}
 
-            </View>
+              <View style={styles.mainCard}>
 
-          </View>
+                <View style={styles.sectionHeading}>
 
-          {/* =================================================
-              DURATION + URGENCY
-              ================================================= */}
+                  <View style={styles.sectionHeadingIcon}>
+                    <Stethoscope
+                      size={27}
+                      color="#68BDAA"
+                      strokeWidth={2.5}
+                    />
+                  </View>
 
-          <View style={styles.doubleCardRow}>
+                  <View style={styles.sectionHeadingTexts}>
+                    <Text style={styles.sectionTitle}>
+                      Semptom Etiketleri
+                    </Text>
 
-            {/* DURATION */}
+                    <Text style={styles.sectionSubtitle}>
+                      Gözlemlediğin belirtileri seç (birden fazla olabilir)
+                    </Text>
+                  </View>
 
-            <View style={[styles.smallCard, styles.durationCard]}>
+                </View>
 
-              <View style={styles.smallCardHeader}>
+                <View style={styles.symptomGrid}>
 
-                <CalendarDays
-                  size={23}
-                  color={COLORS.purple}
-                  strokeWidth={2.5}
-                />
+                  {SYMPTOMS.map(item => {
+                    const selected = problemType === item;
 
-                <View style={styles.smallHeaderTextBox}>
-                  <Text style={styles.smallCardTitle}>
-                    Süre
-                  </Text>
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setProblemType(item);
+                          setResult(null);
+                          setAiMessage('');
+                        }}
+                        style={styles.symptomCell}>
 
-                  <Text style={styles.smallCardSubtitle}>
-                    Ne zamandır devam ediyor?
-                  </Text>
+                        {selected ? (
+                          <View style={styles.symptomSelected}>
+
+                            <Text style={styles.symptomTextSelected}>
+                              {item}
+                            </Text>
+
+                          </View>
+                        ) : (
+                          <View style={styles.symptomDefault}>
+
+                            <Text style={styles.symptomText}>
+                              {item}
+                            </Text>
+
+                          </View>
+                        )}
+
+                      </TouchableOpacity>
+                    );
+                  })}
+
                 </View>
 
               </View>
 
-              <View style={styles.durationGrid}>
+              {/* =================================================
+                  DURATION + URGENCY
+                  ================================================= */}
 
-                {DURATIONS.map(item => {
-                  const selected = duration === item.key;
+              <View style={styles.doubleCardRow}>
 
-                  return (
-                    <TouchableOpacity
-                      key={item.key}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        setDuration(item.key);
-                        setResult(null);
-                        setAiMessage('');
-                      }}
-                      style={[
-                        styles.durationOption,
-                        selected &&
-                          styles.durationOptionSelected,
-                      ]}>
+                {/* DURATION */}
 
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.durationOptionText,
-                          selected &&
-                            styles.durationOptionTextSelected,
-                        ]}>
-                        {item.label}
+                <View style={[styles.smallCard, styles.durationCard]}>
+
+                  <View style={styles.smallCardHeader}>
+
+                    <CalendarDays
+                      size={23}
+                      color={COLORS.purple}
+                      strokeWidth={2.5}
+                    />
+
+                    <View style={styles.smallHeaderTextBox}>
+                      <Text style={styles.smallCardTitle}>
+                        Süre
                       </Text>
 
-                    </TouchableOpacity>
-                  );
-                })}
+                      <Text style={styles.smallCardSubtitle}>
+                        Ne zamandır devam ediyor?
+                      </Text>
+                    </View>
 
-              </View>
+                  </View>
 
-            </View>
+                  <View style={styles.durationGrid}>
 
-            {/* URGENCY */}
+                    {DURATIONS.map(item => {
+                      const selected = duration === item.key;
 
-            <View style={[styles.smallCard, styles.urgencyCard]}>
-
-              <View style={styles.smallCardHeader}>
-
-                <Siren
-                  size={24}
-                  color={COLORS.red}
-                  strokeWidth={2.4}
-                />
-
-                <View style={styles.smallHeaderTextBox}>
-                  <Text
-                    numberOfLines={1}
-                    style={styles.smallCardTitle}>
-                    Aciliyet
-                  </Text>
-
-                </View>
-
-              </View>
-
-              <View style={styles.urgencyGrid}>
-
-                {URGENCIES.map(item => {
-                  const selected = urgency === item;
-
-                  return (
-                    <TouchableOpacity
-                      key={item}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        setUrgency(item);
-                        setResult(null);
-                        setAiMessage('');
-                      }}
-                      style={[
-                        styles.urgencyOption,
-                        item === 'Emin değilim' &&
-                          styles.urgencyWide,
-                      ]}>
-
-                      {selected ? (
-                        <LinearGradient
-                          colors={[
-                            '#F6B89F',
-                            '#EE9F86',
-                          ]}
-                          start={{x: 0, y: 0}}
-                          end={{x: 1, y: 1}}
+                      return (
+                        <TouchableOpacity
+                          key={item.key}
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            setDuration(item.key);
+                            setResult(null);
+                            setAiMessage('');
+                          }}
                           style={[
-                            styles.urgencyGradient,
-                            item === 'Emin değilim' &&
-                              styles.urgencyWide,
-                          ]}>
-
-                          <Text style={styles.urgencySelectedText}>
-                            {item}
-                          </Text>
-
-                        </LinearGradient>
-                      ) : (
-                        <View
-                          style={[
-                            styles.urgencyDefault,
-                            item === 'Emin değilim' &&
-                              styles.urgencyWide,
+                            styles.durationOption,
+                            selected &&
+                              styles.durationOptionSelected,
                           ]}>
 
                           <Text
                             numberOfLines={1}
-                            style={styles.urgencyText}>
-                            {item}
+                            style={[
+                              styles.durationOptionText,
+                              selected &&
+                                styles.durationOptionTextSelected,
+                            ]}>
+                            {item.label}
                           </Text>
 
-                        </View>
-                      )}
-
-                    </TouchableOpacity>
-                  );
-                })}
-
-              </View>
-
-            </View>
-
-          </View>
-
-          {/* =================================================
-              SUMMARY
-              ================================================= */}
-
-          <View style={styles.summaryCard}>
-
-            <View style={styles.summaryHeader}>
-
-              <View style={styles.summaryHeaderLeft}>
-                <View>
-                  <Text style={styles.summaryTitle}>
-                    Analiz Özeti
-                  </Text>
-
-                  <Text style={styles.summarySubtitle}>
-                    Seçimlerine göre hazırlanan özet
-                  </Text>
-                </View>
-
-              </View>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.editButton}
-                onPress={resetForm}>
-
-
-                <Text style={styles.editText}>
-                  Sıfırla
-                </Text>
-
-              </TouchableOpacity>
-
-            </View>
-
-            <View style={styles.summaryInner}>
-
-              <View style={styles.summaryDetails}>
-
-                <View style={styles.summaryLine}>
-
-                  <Text style={styles.summaryLabel}>
-                    Evcil Hayvan Türü:
-                  </Text>
-
-                  <Text
-                    numberOfLines={1}
-                    style={styles.summaryValue}>
-                    {petType || 'Seçilmedi'}
-                  </Text>
-
-                </View>
-
-                <View style={styles.summaryLine}>
-
-                  <Text style={styles.summaryLabel}>
-                    Semptom:
-                  </Text>
-
-                  <Text
-                    numberOfLines={1}
-                    style={styles.summaryValue}>
-                    {problemType || 'Seçilmedi'}
-                  </Text>
-
-                </View>
-
-                <View style={styles.summaryLine}>
-
-                  <Text style={styles.summaryLabel}>
-                    Süre:
-                  </Text>
-
-                  <Text
-                    numberOfLines={1}
-                    style={styles.summaryValue}>
-                    {duration
-                      ? durationLabelMap[duration]
-                      : 'Seçilmedi'}
-                  </Text>
-
-                </View>
-
-                <View style={styles.summaryLine}>
-
-                  <Text style={styles.summaryLabel}>
-                    Aciliyet:
-                  </Text>
-
-                  <Text
-                    numberOfLines={1}
-                    style={styles.summaryValue}>
-                    {urgency || 'Seçilmedi'}
-                  </Text>
-
-                </View>
-
-              </View>
-
-              <Image
-                source={aiAssistant}
-                resizeMode="contain"
-                style={styles.robotImage}
-              />
-
-            </View>
-
-          </View>
-
-          {/* =================================================
-              AI BUTTON
-              ================================================= */}
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            disabled={loading}
-            onPress={fetchRisk}
-            style={styles.aiButtonOuter}>
-
-            <LinearGradient
-              colors={[
-                '#9A83F5',
-                '#8770ED',
-                '#7662E2',
-              ]}
-              locations={[0, 0.5, 1]}
-              start={{x: 0, y: 0.5}}
-              end={{x: 1, y: 0.5}}
-              style={styles.aiButton}>
-
-              {loading ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#FFFFFF"
-                />
-              ) : (
-                <>
-                  <View style={styles.aiButtonCenter}>
-
-                    <Text style={styles.aiButtonText}>
-                      AI Tanı Başlat
-                    </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
 
                   </View>
 
-                  <View style={styles.arrowCircle}>
-                    <ArrowRight
-                      size={21}
-                      color={COLORS.purpleDark}
-                      strokeWidth={2.3}
+                </View>
+
+                {/* URGENCY */}
+
+                <View style={[styles.smallCard, styles.urgencyCard]}>
+
+                  <View style={styles.smallCardHeader}>
+
+                    <Siren
+                      size={24}
+                      color={COLORS.red}
+                      strokeWidth={2.4}
                     />
+
+                    <View style={styles.smallHeaderTextBox}>
+                      <Text
+                        numberOfLines={1}
+                        style={styles.smallCardTitle}>
+                        Aciliyet
+                      </Text>
+
+                    </View>
+
                   </View>
-                </>
-              )}
 
-            </LinearGradient>
+                  <View style={styles.urgencyGrid}>
 
-          </TouchableOpacity>
+                    {URGENCIES.map(item => {
+                      const selected = urgency === item;
 
-          {/* =================================================
-              DISCLAIMER
-              ================================================= */}
+                      return (
+                        <TouchableOpacity
+                          key={item}
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            setUrgency(item);
+                            setResult(null);
+                            setAiMessage('');
+                          }}
+                          style={[
+                            styles.urgencyOption,
+                            item === 'Emin değilim' &&
+                              styles.urgencyWide,
+                          ]}>
 
-          <View style={styles.disclaimerRow}>
+                          {selected ? (
+                            <LinearGradient
+                              colors={[
+                                '#F6B89F',
+                                '#EE9F86',
+                              ]}
+                              start={{x: 0, y: 0}}
+                              end={{x: 1, y: 1}}
+                              style={[
+                                styles.urgencyGradient,
+                                item === 'Emin değilim' &&
+                                  styles.urgencyWide,
+                              ]}>
 
-            <Info
-              size={15}
-              color="#5045F3"
-              strokeWidth={2.3}
-            />
+                              <Text style={styles.urgencySelectedText}>
+                                {item}
+                              </Text>
 
-            <Text style={styles.disclaimerText}>
-              Bu bir ön değerlendirmedir, kesin tanı için veteriner
-              hekiminize danışınız.
-            </Text>
+                            </LinearGradient>
+                          ) : (
+                            <View
+                              style={[
+                                styles.urgencyDefault,
+                                item === 'Emin değilim' &&
+                                  styles.urgencyWide,
+                              ]}>
 
-          </View>
+                              <Text
+                                numberOfLines={1}
+                                style={styles.urgencyText}>
+                                {item}
+                              </Text>
 
-          {/* =================================================
-              RESULT
-              ================================================= */}
+                            </View>
+                          )}
 
-          {loading && (
-            <View style={styles.loadingCard}>
+                        </TouchableOpacity>
+                      );
+                    })}
 
-              <ActivityIndicator
-                size="large"
-                color={COLORS.purple}
-              />
+                  </View>
 
-              <Text style={styles.loadingTitle}>
-                Analiz hazırlanıyor...
-              </Text>
-
-              <Text style={styles.loadingText}>
-                Seçimlerin yapay zeka tarafından değerlendiriliyor.
-              </Text>
-
-            </View>
-          )}
-
-          {!loading && result && (
-            <View style={styles.resultCard}>
-
-              <View style={styles.resultHeader}>
-
-                <View style={styles.riskBadge}>
-                  <Text style={styles.riskBadgeText}>
-                    {result.riskLevel} Risk Seviyesi
-                  </Text>
                 </View>
-
-                <Text style={styles.score}>
-                  Skor: {result.riskScore}/100
-                </Text>
 
               </View>
 
-              <Text style={styles.resultTitle}>
-                Önerilen Eylem
-              </Text>
+              {/* =================================================
+                  SUMMARY
+                  ================================================= */}
 
-              <Text style={styles.resultAction}>
-                {result.action}
-              </Text>
+              <View style={styles.summaryCard}>
 
-              {!!aiMessage && (
-                <View style={styles.aiMessageBox}>
+                <View style={styles.summaryHeader}>
 
-                  <Text style={styles.aiMessageTitle}>
-                    PetCare AI Yorumu
-                  </Text>
+                  <View style={styles.summaryHeaderLeft}>
+                    <View>
+                      <Text style={styles.summaryTitle}>
+                        Analiz Özeti
+                      </Text>
 
-                  <Text style={styles.aiMessage}>
-                    {aiMessage}
-                  </Text>
+                      <Text style={styles.summarySubtitle}>
+                        Seçimlerine göre hazırlanan özet
+                      </Text>
+                    </View>
 
-                </View>
-              )}
-
-              <Text style={styles.resultDisclaimer}>
-                Bu sonuç yalnızca yapay zeka ön değerlendirmesidir.
-                Veteriner hekim muayenesinin yerini tutmaz.
-              </Text>
-
-            </View>
-          )}
-
-        </ScrollView>
-
-        {/* =================================================
-            HISTORY DRAWER
-            ================================================= */}
-
-        <Modal
-          visible={historyVisible}
-          transparent
-          animationType="none"
-          statusBarTranslucent
-          onRequestClose={closeHistory}>
-
-          <View style={styles.morphOverlay}>
-
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.morphBackdropVisual,
-                {opacity: backdropOpacity},
-              ]}
-            />
-
-            <Pressable
-              style={StyleSheet.absoluteFillObject}
-              onPress={closeHistory}
-            />
-
-            <Animated.View
-              style={[
-                styles.morphPanel,
-                {
-                  top: morphTop,
-                  left: morphLeft,
-                  width: morphWidth,
-                  height: morphHeight,
-                  borderRadius: morphBorderRadius,
-                  opacity: morphPanelOpacity,
-                },
-              ]}>
-
-              <Animated.View
-                style={[
-                  styles.morphPanelContent,
-                  {
-                    opacity: panelContentOpacity,
-                    transform: [{translateY: panelContentTranslateY}],
-                  },
-                ]}>
-
-                <View style={styles.drawerHeader}>
-
-                  <View>
-                    <Text style={styles.drawerTitle}>
-                      Geçmiş Analizler
-                    </Text>
-
-                    <Text style={styles.drawerSubtitle}>
-                      Önceki değerlendirmelerin
-                    </Text>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.drawerClose}
                     activeOpacity={0.8}
-                    onPress={closeHistory}>
+                    style={styles.editButton}
+                    onPress={resetForm}>
 
-                    <X
-                      size={20}
-                      color={COLORS.navy}
-                    />
+
+                    <Text style={styles.editText}>
+                      Sıfırla
+                    </Text>
 
                   </TouchableOpacity>
 
                 </View>
 
-                {chatHistory.length === 0 ? (
-                  <View style={styles.emptyHistory}>
+                <View style={styles.summaryInner}>
 
-                    <Clock3
-                      size={28}
-                      color="#9AA3B7"
+                  <View style={styles.summaryDetails}>
+
+                    <View style={styles.summaryLine}>
+
+                      <Text style={styles.summaryLabel}>
+                        Evcil Hayvan Türü:
+                      </Text>
+
+                      <Text
+                        numberOfLines={1}
+                        style={styles.summaryValue}>
+                        {petType || 'Seçilmedi'}
+                      </Text>
+
+                    </View>
+
+                    <View style={styles.summaryLine}>
+
+                      <Text style={styles.summaryLabel}>
+                        Semptom:
+                      </Text>
+
+                      <Text
+                        numberOfLines={1}
+                        style={styles.summaryValue}>
+                        {problemType || 'Seçilmedi'}
+                      </Text>
+
+                    </View>
+
+                    <View style={styles.summaryLine}>
+
+                      <Text style={styles.summaryLabel}>
+                        Süre:
+                      </Text>
+
+                      <Text
+                        numberOfLines={1}
+                        style={styles.summaryValue}>
+                        {duration
+                          ? durationLabelMap[duration]
+                          : 'Seçilmedi'}
+                      </Text>
+
+                    </View>
+
+                    <View style={styles.summaryLine}>
+
+                      <Text style={styles.summaryLabel}>
+                        Aciliyet:
+                      </Text>
+
+                      <Text
+                        numberOfLines={1}
+                        style={styles.summaryValue}>
+                        {urgency || 'Seçilmedi'}
+                      </Text>
+
+                    </View>
+
+                  </View>
+
+                  <Image
+                    source={aiAssistant}
+                    resizeMode="contain"
+                    style={styles.robotImage}
+                  />
+
+                </View>
+
+              </View>
+
+              {/* =================================================
+                  AI BUTTON
+                  ================================================= */}
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                disabled={loading}
+                onPress={fetchRisk}
+                style={styles.aiButtonOuter}>
+
+                <LinearGradient
+                  colors={[
+                    '#9A83F5',
+                    '#8770ED',
+                    '#7662E2',
+                  ]}
+                  locations={[0, 0.5, 1]}
+                  start={{x: 0, y: 0.5}}
+                  end={{x: 1, y: 0.5}}
+                  style={styles.aiButton}>
+
+                  {loading ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#FFFFFF"
                     />
+                  ) : (
+                    <>
+                      <View style={styles.aiButtonCenter}>
 
-                    <Text style={styles.emptyHistoryText}>
-                      Henüz kaydedilmiş bir değerlendirme yok.
+                        <Text style={styles.aiButtonText}>
+                          AI Tanı Başlat
+                        </Text>
+
+                      </View>
+
+                      <View style={styles.arrowCircle}>
+                        <ArrowRight
+                          size={21}
+                          color={COLORS.purpleDark}
+                          strokeWidth={2.3}
+                        />
+                      </View>
+                    </>
+                  )}
+
+                </LinearGradient>
+
+              </TouchableOpacity>
+
+              {/* =================================================
+                  DISCLAIMER
+                  ================================================= */}
+
+              <View style={styles.disclaimerRow}>
+
+                <Info
+                  size={15}
+                  color="#5045F3"
+                  strokeWidth={2.3}
+                />
+
+                <Text style={styles.disclaimerText}>
+                  Bu bir ön değerlendirmedir, kesin tanı için veteriner
+                  hekiminize danışınız.
+                </Text>
+
+              </View>
+
+              {/* =================================================
+                  RESULT
+                  ================================================= */}
+
+              {loading && (
+                <View style={styles.loadingCard}>
+
+                  <ActivityIndicator
+                    size="large"
+                    color={COLORS.purple}
+                  />
+
+                  <Text style={styles.loadingTitle}>
+                    Analiz hazırlanıyor...
+                  </Text>
+
+                  <Text style={styles.loadingText}>
+                    Seçimlerin yapay zeka tarafından değerlendiriliyor.
+                  </Text>
+
+                </View>
+              )}
+
+              {!loading && result && (
+                <View style={styles.resultCard}>
+
+                  <View style={styles.resultHeader}>
+
+                    <View style={styles.riskBadge}>
+                      <Text style={styles.riskBadgeText}>
+                        {result.riskLevel} Risk Seviyesi
+                      </Text>
+                    </View>
+
+                    <Text style={styles.score}>
+                      Skor: {result.riskScore}/100
                     </Text>
 
                   </View>
-                ) : (
-                  <ScrollView
-                    style={styles.morphHistoryScroll}
-                    showsVerticalScrollIndicator={false}>
 
-                    {chatHistory.map(chat => (
-                      <Pressable
-                        key={chat.id}
-                        style={styles.historyItem}
-                        onPress={() =>
-                          openChatFromHistory(chat)
-                        }>
+                  <Text style={styles.resultTitle}>
+                    Önerilen Eylem
+                  </Text>
 
-                        <View style={styles.historyTextArea}>
+                  <Text style={styles.resultAction}>
+                    {result.action}
+                  </Text>
 
-                          <Text style={styles.historyTitle}>
-                            {chat.petType} • {chat.problemType}
-                          </Text>
+                  {!!aiMessage && (
+                    <View style={styles.aiMessageBox}>
 
-                          <Text style={styles.historySub}>
-                            {chat.result?.riskLevel || '-'} Risk • Skor{' '}
-                            {chat.result?.riskScore ?? '-'}
-                          </Text>
+                      <Text style={styles.aiMessageTitle}>
+                        PetCare AI Yorumu
+                      </Text>
 
-                        </View>
+                      <Text style={styles.aiMessage}>
+                        {aiMessage}
+                      </Text>
 
-                        <Pressable
-                          hitSlop={10}
-                          style={styles.deleteButton}
-                          onPress={() =>
-                            deleteChatFromHistory(chat.id)
-                          }>
+                    </View>
+                  )}
 
-                          <Trash2
-                            size={17}
-                            color="#EF4444"
-                          />
+                  <Text style={styles.resultDisclaimer}>
+                    Bu sonuç yalnızca yapay zeka ön değerlendirmesidir.
+                    Veteriner hekim muayenesinin yerini tutmaz.
+                  </Text>
 
-                        </Pressable>
+                </View>
+              )}
 
-                      </Pressable>
-                    ))}
+            </ScrollView>
 
-                  </ScrollView>
-                )}
+            {/* =================================================
+                HISTORY DRAWER
+                ================================================= */}
 
-              </Animated.View>
+            <Modal
+              visible={historyVisible}
+              transparent
+              animationType="none"
+              statusBarTranslucent
+              onRequestClose={closeHistory}>
 
-            </Animated.View>
+              <View style={styles.morphOverlay}>
+
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.morphBackdropVisual,
+                    {opacity: backdropOpacity},
+                  ]}
+                />
+
+                <Pressable
+                  style={StyleSheet.absoluteFillObject}
+                  onPress={closeHistory}
+                />
+
+                <Animated.View
+                  style={[
+                    styles.morphPanel,
+                    {
+                      top: morphTop,
+                      left: morphLeft,
+                      width: morphWidth,
+                      height: morphHeight,
+                      borderRadius: morphBorderRadius,
+                      opacity: morphPanelOpacity,
+                    },
+                  ]}>
+
+                  <Animated.View
+                    style={[
+                      styles.morphPanelContent,
+                      {
+                        opacity: panelContentOpacity,
+                        transform: [{translateY: panelContentTranslateY}],
+                      },
+                    ]}>
+
+                    <View style={styles.drawerHeader}>
+
+                      <View>
+                        <Text style={styles.drawerTitle}>
+                          Geçmiş Analizler
+                        </Text>
+
+                        <Text style={styles.drawerSubtitle}>
+                          Önceki değerlendirmelerin
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.drawerClose}
+                        activeOpacity={0.8}
+                        onPress={closeHistory}>
+
+                        <X
+                          size={20}
+                          color={COLORS.navy}
+                        />
+
+                      </TouchableOpacity>
+
+                    </View>
+
+                    {chatHistory.length === 0 ? (
+                      <View style={styles.emptyHistory}>
+
+                        <Clock3
+                          size={28}
+                          color="#9AA3B7"
+                        />
+
+                        <Text style={styles.emptyHistoryText}>
+                          Henüz kaydedilmiş bir değerlendirme yok.
+                        </Text>
+
+                      </View>
+                    ) : (
+                      <ScrollView
+                        style={styles.morphHistoryScroll}
+                        showsVerticalScrollIndicator={false}>
+
+                        {chatHistory.map(chat => (
+                          <Pressable
+                            key={chat.id}
+                            style={styles.historyItem}
+                            onPress={() =>
+                              openChatFromHistory(chat)
+                            }>
+
+                            <View style={styles.historyTextArea}>
+
+                              <Text style={styles.historyTitle}>
+                                {chat.petType} • {chat.problemType}
+                              </Text>
+
+                              <Text style={styles.historySub}>
+                                {chat.result?.riskLevel || '-'} Risk • Skor{' '}
+                                {chat.result?.riskScore ?? '-'}
+                              </Text>
+
+                            </View>
+
+                            <Pressable
+                              hitSlop={10}
+                              style={styles.deleteButton}
+                              onPress={() =>
+                                deleteChatFromHistory(chat.id)
+                              }>
+
+                              <Trash2
+                                size={17}
+                                color="#EF4444"
+                              />
+
+                            </Pressable>
+
+                          </Pressable>
+                        ))}
+
+                      </ScrollView>
+                    )}
+
+                  </Animated.View>
+
+                </Animated.View>
+
+              </View>
+
+            </Modal>
 
           </View>
 
+        </SafeAreaView>
+
+        {/* =================================================
+            CONNECTION ERROR MODAL (ÖZEL HATA POPUP - KLİNİK İKONU)
+            ================================================= */}
+        <Modal
+          visible={connectionErrorVisible}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setConnectionErrorVisible(false)}>
+
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={() => setConnectionErrorVisible(false)}
+            />
+
+            <View style={styles.modalContent}>
+              <View style={styles.iconCircle}>
+                <Hospital size={40} color="#991B27" strokeWidth={2.2} />
+              </View>
+
+              <Text style={styles.modalTitle}>Bağlantı Kurulamadı</Text>
+              <Text style={styles.modalMessage}>
+                Yapay zeka asistanı sunucusuna şu anda erişilemiyor. Lütfen sunucunuzu başlatın ve internet bağlantınızı kontrol edin.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                activeOpacity={0.8}
+                onPress={() => setConnectionErrorVisible(false)}>
+                <Text style={styles.modalButtonText}>Tamam</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </Modal>
-
-      </View>
-
-    </SafeAreaView>
-  );
+      </>
+    );
 };
 
 export default AssistantScreen;
@@ -2379,4 +2417,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  /* --- CONNECTION ERROR MODAL STİLLERİ --- */
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(20, 22, 50, 0.5)',
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: COLORS.white,
+      borderRadius: 28,
+      padding: 24,
+      width: '100%',
+      maxWidth: 350,
+      alignItems: 'center',
+      shadowColor: '#7257FF',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    iconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: '#FFF1F3',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 20,
+      marginTop: -10,
+    },
+    modalTitle: {
+      fontFamily: 'Quicksand-Bold',
+      fontSize: 22,
+      color: COLORS.navy,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    modalMessage: {
+      fontFamily: 'Quicksand-Medium',
+      fontSize: 15,
+      color: COLORS.secondary,
+      lineHeight: 22,
+      textAlign: 'center',
+      marginBottom: 24,
+      paddingHorizontal: 10,
+    },
+    modalButton: {
+      backgroundColor: COLORS.purpleDark,
+      width: '100%',
+      height: 56,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: COLORS.purpleDark,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    modalButtonText: {
+      fontFamily: 'Quicksand-Bold',
+      fontSize: 18,
+      color: COLORS.white,
+    },
 });
