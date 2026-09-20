@@ -7,6 +7,7 @@ import {
   Pressable,
   StatusBar,
   Image,
+  ImageSourcePropType,
 } from 'react-native';
 
 import {
@@ -25,6 +26,30 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {usePets} from '../data/PetContext';
 import {Pet} from '../types/Pet';
+
+/* =========================================================
+   DEFAULT PET AVATARS
+========================================================= */
+
+const defaultCatAvatar = require(
+  '../assets/images/pets/default-cat-pixel.png',
+);
+
+const defaultDogAvatar = require(
+  '../assets/images/pets/default-dog-pixel.png',
+);
+
+const defaultRabbitAvatar = require(
+  '../assets/images/pets/default-rabbit-pixel.png',
+);
+
+const defaultBirdAvatar = require(
+  '../assets/images/pets/default-bird-pixel.png',
+);
+
+const defaultHamsterAvatar = require(
+  '../assets/images/pets/default-hamster-pixel.png',
+);
 
 /* =========================================================
    FONTS
@@ -69,53 +94,90 @@ const C = {
   border: '#ECE9F4',
 };
 
+/* =========================================================
+   PET AVATAR HELPERS
+========================================================= */
+
+function normalizePetType(type?: string) {
+  return (type || '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+}
+
+function getDefaultPetAvatar(
+  type?: string,
+): ImageSourcePropType {
+  const value = normalizePetType(type);
+
+  /* KEDİ */
+
+  if (
+    value.includes('kedi') ||
+    value.includes('cat')
+  ) {
+    return defaultCatAvatar;
+  }
+
+  /* KÖPEK */
+
+  if (
+    value.includes('köpek') ||
+    value.includes('kopek') ||
+    value.includes('dog')
+  ) {
+    return defaultDogAvatar;
+  }
+
+  /* TAVŞAN */
+
+  if (
+    value.includes('tavşan') ||
+    value.includes('tavsan') ||
+    value.includes('rabbit')
+  ) {
+    return defaultRabbitAvatar;
+  }
+
+  /* KUŞ */
+
+  if (
+    value.includes('kuş') ||
+    value.includes('kus') ||
+    value.includes('bird') ||
+    value.includes('muhabbet')
+  ) {
+    return defaultBirdAvatar;
+  }
+
+  /* HAMSTER */
+
+  if (value.includes('hamster')) {
+    return defaultHamsterAvatar;
+  }
+
+  /*
+   * Balık ve "Diğer" için henüz özel pixel avatar
+   * hazırlamadığımız için geçici fallback.
+   */
+  return defaultCatAvatar;
+}
+
+/* =========================================================
+   HOME SCREEN
+========================================================= */
+
 export default function HomeScreen() {
   const {pets} = usePets();
+
   const navigation = useNavigation<any>();
 
   const petList: Pet[] = pets || [];
+
   const totalPets = petList.length;
 
   const petsWithVaccines = petList.filter(
     pet => pet.vaccines?.trim(),
   ).length;
-
-  const getPetEmoji = (type?: string) => {
-    const value = (type || '').toLowerCase();
-
-    if (value.includes('köpek') || value.includes('dog')) {
-      return '🐶';
-    }
-
-    if (value.includes('kedi') || value.includes('cat')) {
-      return '🐱';
-    }
-
-    if (value.includes('tavşan') || value.includes('rabbit')) {
-      return '🐰';
-    }
-
-    if (value.includes('kuş') || value.includes('bird')) {
-      return '🐦';
-    }
-
-    if (value.includes('balık') || value.includes('fish')) {
-      return '🐠';
-    }
-
-    if (value.includes('hamster')) {
-      return '🐹';
-    }
-
-    if (
-      value.includes('kaplumbağa') ||
-      value.includes('turtle')
-    ) {
-      return '🐢';
-    }
-
-    return '🐾';
-  };
 
   return (
     <View style={styles.screen}>
@@ -195,7 +257,9 @@ export default function HomeScreen() {
           {/* KAYITLI DOST */}
 
           <Pressable
-            onPress={() => navigation.navigate('Pets')}
+            onPress={() =>
+              navigation.navigate('Pets')
+            }
             style={({pressed}) => [
               styles.statCard,
               pressed && styles.pressed,
@@ -382,7 +446,6 @@ export default function HomeScreen() {
             <PetProfile
               key={pet.id}
               pet={pet}
-              emoji={getPetEmoji(pet.type)}
               onPress={() =>
                 navigation.navigate(
                   'PetDetail',
@@ -537,11 +600,9 @@ function QuickAction({
 
 function PetProfile({
   pet,
-  emoji,
   onPress,
 }: {
   pet: Pet;
-  emoji: string;
   onPress: () => void;
 }) {
   return (
@@ -556,9 +617,11 @@ function PetProfile({
 
         <View style={styles.petProfileBlob} />
 
-        <Text style={styles.petProfileEmoji}>
-          {emoji}
-        </Text>
+        <Image
+          source={getDefaultPetAvatar(pet.type)}
+          style={styles.petProfileImage}
+          resizeMode="contain"
+        />
 
       </View>
 
@@ -989,8 +1052,16 @@ const styles = StyleSheet.create({
     bottom: -18,
   },
 
-  petProfileEmoji: {
-    fontSize: 48,
+  /*
+   * Eski petProfileEmoji kaldırıldı.
+   * Artık hazırladığımız PNG avatar burada.
+   */
+
+  petProfileImage: {
+    width: 68,
+    height: 68,
+
+    zIndex: 2,
   },
 
   petProfileName: {

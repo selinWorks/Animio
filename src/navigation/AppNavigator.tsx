@@ -117,14 +117,11 @@ function PetCareLoading() {
 
   return (
     <View style={loadingStyles.container}>
-      {/* Arka plan dekorları */}
       <View style={loadingStyles.glowTop} />
       <View style={loadingStyles.glowBottom} />
 
       <View style={loadingStyles.content}>
-        {/* Loader */}
         <View style={loadingStyles.loaderWrapper}>
-          {/* Dönen dış halka */}
           <Animated.View
             style={[
               loadingStyles.rotatingRing,
@@ -135,7 +132,6 @@ function PetCareLoading() {
             <View style={loadingStyles.ringAccent} />
           </Animated.View>
 
-          {/* Beyaz merkez */}
           <View style={loadingStyles.pawCircle}>
             <Animated.View
               style={{
@@ -151,7 +147,6 @@ function PetCareLoading() {
           </View>
         </View>
 
-        {/* Yazılar */}
         <Text style={loadingStyles.brand}>
           PetCare
         </Text>
@@ -160,7 +155,6 @@ function PetCareLoading() {
           PetCare hazırlanıyor...
         </Text>
 
-        {/* Mini loading noktaları */}
         <View style={loadingStyles.dots}>
           <View style={loadingStyles.dot} />
           <View style={loadingStyles.dotMiddle} />
@@ -288,6 +282,7 @@ function TabNavigator() {
           return null;
         },
       })}>
+
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -354,6 +349,7 @@ function MainAppNavigator() {
 
         headerTintColor: '#6366F1',
       }}>
+
       <Stack.Screen
         name="MainTabs"
         component={TabNavigator}
@@ -362,11 +358,14 @@ function MainAppNavigator() {
         }}
       />
 
+      {/* PET DETAIL
+          Kendi özel header tasarımına sahip olduğu için
+          React Navigation header'ını göstermiyoruz. */}
       <Stack.Screen
         name="PetDetail"
         component={PetDetailScreen}
         options={{
-          title: 'Dost Detayı',
+          headerShown: false,
         }}
       />
 

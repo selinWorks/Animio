@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -8,842 +8,1743 @@ import {
   Modal,
   Animated,
   Easing,
+  Image,
+  StatusBar,
 } from 'react-native';
+
 import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+
+import {
+  Activity,
+  BarChart3,
+  CalendarDays,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Heart,
+  NotebookPen,
+  Pencil,
+  Scale,
+  Trash2,
+  Venus,
+} from 'lucide-react-native';
+
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'PetDetail'>;
-type PetDetailRouteProp = RouteProp<RootStackParamList, 'PetDetail'>;
+/* =========================================================
+   IMAGES
+========================================================= */
+
+const petDetailCatHero = require(
+  '../assets/images/pets/pet-detail-cat-hero.png',
+);
+
+const defaultCatAvatar = require(
+  '../assets/images/pets/default-cat-pixel.png',
+);
+
+const defaultDogAvatar = require(
+  '../assets/images/pets/default-dog-pixel.png',
+);
+
+const defaultRabbitAvatar = require(
+  '../assets/images/pets/default-rabbit-pixel.png',
+);
+
+const defaultBirdAvatar = require(
+  '../assets/images/pets/default-bird-pixel.png',
+);
+
+const defaultHamsterAvatar = require(
+  '../assets/images/pets/default-hamster-pixel.png',
+);
+
+const defaultOtherAvatar = require(
+  '../assets/images/pets/default-other-pixel.png',
+);
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type NavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'PetDetail'
+>;
+
+type PetDetailRouteProp = RouteProp<
+  RootStackParamList,
+  'PetDetail'
+>;
 
 type PetDetailScreenProps = {
   route: PetDetailRouteProp;
 };
 
-type StatusConfig = {
+type InfoRowProps = {
   label: string;
-  description: string;
-  accent: string;
-  badgeBg: string;
-  badgeText: string;
-  heroTint: string;
+  value: string;
+  last?: boolean;
 };
 
-function getPetEmoji(type: string) {
-  const lowerType = (type || '').toLowerCase().trim();
+type SmallNavigationCardProps = {
+  title: string;
+  subtitle: string;
+  backgroundColor: string;
+  iconBackground: string;
+  icon: React.ReactNode;
+  onPress?: () => void;
+};
 
-  if (lowerType.includes('kedi')) return '🐱';
-  if (lowerType.includes('köpek') || lowerType.includes('kopek')) return '🐶';
-  if (lowerType.includes('kuş') || lowerType.includes('kus')) return '🐦';
-  if (lowerType.includes('balık') || lowerType.includes('balik')) return '🐠';
-  if (lowerType.includes('hamster')) return '🐹';
-  if (lowerType.includes('tavşan') || lowerType.includes('tavsan')) return '🐰';
-  if (lowerType.includes('kaplumbağa') || lowerType.includes('kaplumbaga')) return '🐢';
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function normalizePetType(type: string) {
+  return (type || '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+}
+
+function getPetEmoji(type: string) {
+  const lowerType = normalizePetType(type);
+
+  if (lowerType.includes('kedi')) {
+    return '🐱';
+  }
+
+  if (
+    lowerType.includes('köpek') ||
+    lowerType.includes('kopek')
+  ) {
+    return '🐶';
+  }
+
+  if (
+    lowerType.includes('kuş') ||
+    lowerType.includes('kus')
+  ) {
+    return '🐦';
+  }
+
+  if (
+    lowerType.includes('balık') ||
+    lowerType.includes('balik')
+  ) {
+    return '🐠';
+  }
+
+  if (lowerType.includes('hamster')) {
+    return '🐹';
+  }
+
+  if (
+    lowerType.includes('tavşan') ||
+    lowerType.includes('tavsan')
+  ) {
+    return '🐰';
+  }
+
+  if (
+    lowerType.includes('kaplumbağa') ||
+    lowerType.includes('kaplumbaga')
+  ) {
+    return '🐢';
+  }
 
   return '🐾';
 }
 
-function getPetAvatarColor(type: string) {
-  const lowerType = (type || '').toLowerCase().trim();
+/*
+ * Kullanıcının kendi fotoğrafı yoksa
+ * hayvan türüne göre gösterilecek default pixel avatar.
+ */
+function getDefaultPetAvatar(type: string) {
+  const lowerType = normalizePetType(type);
 
-  if (lowerType.includes('kedi')) return '#FFE7EF';
-  if (lowerType.includes('köpek') || lowerType.includes('kopek')) return '#E6F0FF';
-  if (lowerType.includes('kuş') || lowerType.includes('kus')) return '#FFF3D9';
-  if (lowerType.includes('balık') || lowerType.includes('balik')) return '#DCFCE7';
-  if (lowerType.includes('hamster')) return '#FDE68A';
-  if (lowerType.includes('tavşan') || lowerType.includes('tavsan')) return '#EFE7FF';
-  if (lowerType.includes('kaplumbağa') || lowerType.includes('kaplumbaga')) return '#DDF7EE';
+  /* KEDİ */
 
-  return '#EEF2FF';
-}
-
-function getStatusConfig(pet: {
-  weight?: string;
-  lastVetVisit?: string;
-  vaccines?: string;
-}): StatusConfig {
-  const hasWeight = !!pet.weight;
-  const hasVetVisit = !!pet.lastVetVisit;
-  const hasVaccines = !!pet.vaccines;
-
-  if (hasWeight && hasVetVisit && hasVaccines) {
-    return {
-      label: 'Harika durumda',
-      description: 'Bakım ve sağlık bilgileri düzenli görünüyor.',
-      accent: '#22C55E',
-      badgeBg: '#DCFCE7',
-      badgeText: '#166534',
-      heroTint: '#F4FFF7',
-    };
+  if (lowerType.includes('kedi')) {
+    return defaultCatAvatar;
   }
 
-  if (hasVaccines || hasVetVisit) {
-    return {
-      label: 'Takip sürüyor',
-      description: 'Profil güçlü, birkaç bilgiyle daha da tamamlanabilir.',
-      accent: '#F59E0B',
-      badgeBg: '#FEF3C7',
-      badgeText: '#92400E',
-      heroTint: '#FFFCF5',
-    };
+  /* KÖPEK */
+
+  if (
+    lowerType.includes('köpek') ||
+    lowerType.includes('kopek')
+  ) {
+    return defaultDogAvatar;
   }
 
-  return {
-    label: 'Biraz ilgi istiyor',
-    description: 'Daha dolu bir profil, ekranı çok daha güçlü gösterecek.',
-    accent: '#EF4444',
-    badgeBg: '#FEE2E2',
-    badgeText: '#B91C1C',
-    heroTint: '#FFF8F8',
-  };
+  /* TAVŞAN */
+
+  if (
+    lowerType.includes('tavşan') ||
+    lowerType.includes('tavsan')
+  ) {
+    return defaultRabbitAvatar;
+  }
+
+  /* KUŞ */
+
+  if (
+    lowerType.includes('kuş') ||
+    lowerType.includes('kus')
+  ) {
+    return defaultBirdAvatar;
+  }
+
+  /* HAMSTER */
+
+  if (lowerType.includes('hamster')) {
+    return defaultHamsterAvatar;
+  }
+
+  /* DİĞER */
+
+  if (
+    lowerType.includes('diğer') ||
+    lowerType.includes('diger') ||
+    lowerType.includes('other')
+  ) {
+    return defaultOtherAvatar;
+  }
+
+  /*
+   * Balık, kaplumbağa veya ileride eklenebilecek
+   * tanımlanmamış türler için nötr avatar.
+   */
+  return defaultOtherAvatar;
 }
 
-function getProfileHighlights(pet: {
-  age: string | number;
-  gender?: string;
-  weight?: string;
-  vaccines?: string;
-}) {
-  return [
-    {
-      label: 'Yaş',
-      value: `${pet.age || '-'} yaş`,
-    },
-    {
-      label: 'Cinsiyet',
-      value: pet.gender || 'Belirtilmedi',
-    },
-    {
-      label: 'Kilo',
-      value: pet.weight || 'Eksik',
-    },
-    {
-      label: 'Aşı durumu',
-      value: pet.vaccines ? 'Kayıtlı' : 'Eksik',
-    },
-  ];
-}
-
-function getQuickInsight(pet: {
+function getStatusLabel(pet: {
   vaccines?: string;
   lastVetVisit?: string;
-  notes?: string;
-  weight?: string;
 }) {
-  if (pet.lastVetVisit) {
-    return `Son veteriner ziyareti ${pet.lastVetVisit} tarihinde kaydedildi.`;
+  if (pet.vaccines && pet.lastVetVisit) {
+    return 'Aktif';
   }
 
-  if (pet.vaccines) {
-    return 'Aşı bilgileri mevcut, sağlık takibi aktif görünüyor.';
+  if (pet.vaccines || pet.lastVetVisit) {
+    return 'Takipte';
   }
 
-  if (!pet.weight) {
-    return 'Kilo bilgisi henüz eklenmemiş. Küçük bir güncellemeyle profil tamamlanabilir.';
-  }
-
-  if (pet.notes) {
-    return 'Bu profilin not alanı dolu, bakım tarafında iyi bir başlangıç var.';
-  }
-
-  return 'Bu profili daha güçlü göstermek için birkaç bilgi daha eklenebilir.';
+  return 'Yeni';
 }
 
-type InfoLineProps = {
-  label: string;
-  value: string;
-};
+function getVaccineStatus(vaccines?: string) {
+  return vaccines ? 'Güncel' : 'Eksik';
+}
 
-function InfoLine({label, value}: InfoLineProps) {
+/* =========================================================
+   SMALL COMPONENTS
+========================================================= */
+
+function InfoRow({
+  label,
+  value,
+  last = false,
+}: InfoRowProps) {
   return (
-    <View style={styles.infoLine}>
-      <Text style={styles.infoLineLabel}>{label}</Text>
-      <Text style={styles.infoLineValue}>{value}</Text>
+    <View
+      style={[
+        styles.infoRow,
+        last && styles.infoRowLast,
+      ]}>
+      <Text style={styles.infoLabel}>
+        {label}
+      </Text>
+
+      <Text
+        style={styles.infoValue}
+        numberOfLines={1}
+        ellipsizeMode="tail">
+        {value}
+      </Text>
     </View>
   );
 }
 
-type HighlightCardProps = {
-  label: string;
-  value: string;
-  index: number;
-};
-
-function HighlightCard({label, value, index}: HighlightCardProps) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 320,
-        delay: 180 + index * 70,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 360,
-        delay: 180 + index * 70,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [opacity, translateY, index]);
-
+function SmallNavigationCard({
+  title,
+  subtitle,
+  backgroundColor,
+  iconBackground,
+  icon,
+  onPress,
+}: SmallNavigationCardProps) {
   return (
-    <Animated.View
-      style={[
-        styles.highlightCard,
-        {
-          opacity,
-          transform: [{translateY}],
-        },
-      ]}>
-      <Text style={styles.highlightLabel}>{label}</Text>
-      <Text style={styles.highlightValue}>{value}</Text>
-    </Animated.View>
+    <Pressable
+      style={({pressed}) => [
+        styles.smallNavCard,
+        {backgroundColor},
+        pressed && styles.pressedCard,
+      ]}
+      onPress={onPress}>
+
+      <View
+        style={[
+          styles.smallNavIcon,
+          {backgroundColor: iconBackground},
+        ]}>
+        {icon}
+      </View>
+
+      <View style={styles.smallNavTextWrap}>
+        <Text style={styles.smallNavTitle}>
+          {title}
+        </Text>
+
+        <Text
+          style={styles.smallNavSubtitle}
+          numberOfLines={2}>
+          {subtitle}
+        </Text>
+      </View>
+
+      <ChevronRight
+        size={24}
+        color="#263E73"
+        strokeWidth={2.2}
+      />
+    </Pressable>
   );
 }
 
-export default function PetDetailScreen({route}: PetDetailScreenProps) {
-  const {pet} = route.params;
-  const navigation = useNavigation<NavigationProp>();
-  const {removePet} = usePets();
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+/* =========================================================
+   SCREEN
+========================================================= */
 
-  const heroOpacity = useRef(new Animated.Value(0)).current;
-  const heroTranslate = useRef(new Animated.Value(20)).current;
-  const sectionOpacity = useRef(new Animated.Value(0)).current;
-  const sectionTranslate = useRef(new Animated.Value(24)).current;
+export default function PetDetailScreen({
+  route,
+}: PetDetailScreenProps) {
+  const {pet} = route.params;
+
+  const navigation =
+    useNavigation<NavigationProp>();
+
+  const {removePet} = usePets();
+
+  const [
+    deleteModalVisible,
+    setDeleteModalVisible,
+  ] = useState(false);
+
+  const screenOpacity =
+    useRef(new Animated.Value(0)).current;
+
+  const screenTranslateY =
+    useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(heroOpacity, {
+      Animated.timing(screenOpacity, {
         toValue: 1,
         duration: 420,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(heroTranslate, {
+
+      Animated.timing(screenTranslateY, {
         toValue: 0,
         duration: 420,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 420,
-        delay: 90,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslate, {
-        toValue: 0,
-        duration: 420,
-        delay: 90,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [heroOpacity, heroTranslate, sectionOpacity, sectionTranslate]);
-
-  const status = useMemo(() => getStatusConfig(pet), [pet]);
-  const highlights = useMemo(() => getProfileHighlights(pet), [pet]);
-  const quickInsight = useMemo(() => getQuickInsight(pet), [pet]);
+  }, [screenOpacity, screenTranslateY]);
 
   const handleDelete = () => {
     removePet(pet.id);
+
     setDeleteModalVisible(false);
+
     navigation.goBack();
   };
 
+  const vaccineStatus =
+    getVaccineStatus(pet.vaccines);
+
+  const statusLabel =
+    getStatusLabel(pet);
+
   return (
-    <>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={[
-            styles.heroWrap,
-            {
-              backgroundColor: status.heroTint,
-              opacity: heroOpacity,
-              transform: [{translateY: heroTranslate}],
-            },
-          ]}>
-          <View style={styles.heroGlowOne} />
-          <View style={styles.heroGlowTwo} />
+    <View style={styles.screen}>
 
-          <View style={styles.heroTopRow}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
+      <Animated.View
+        style={[
+          styles.animatedScreen,
+          {
+            opacity: screenOpacity,
+            transform: [
+              {
+                translateY:
+                  screenTranslateY,
+              },
+            ],
+          },
+        ]}>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={
+            styles.scrollContent
+          }
+          bounces={false}>
+
+          {/* =====================================================
+              HERO
+          ===================================================== */}
+
+          <View style={styles.hero}>
+
+            <Image
+              source={petDetailCatHero}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+
             <View
-              style={[
-                styles.statusPill,
-                {backgroundColor: status.badgeBg},
-              ]}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {backgroundColor: status.accent},
+              style={styles.heroSoftOverlay}
+            />
+
+            <View style={styles.heroTopBar}>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.circleButton,
+                  pressed &&
+                    styles.topButtonPressed,
                 ]}
-              />
-              <Text style={[styles.statusPillText, {color: status.badgeText}]}>
-                {status.label}
-              </Text>
-            </View>
+                onPress={() =>
+                  navigation.goBack()
+                }>
 
-            <View style={styles.typeChip}>
-              <Text style={styles.typeChipText}>{pet.type}</Text>
+                <ChevronLeft
+                  size={28}
+                  color="#263E73"
+                  strokeWidth={2}
+                />
+
+              </Pressable>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.editTopButton,
+                  pressed &&
+                    styles.topButtonPressed,
+                ]}
+                onPress={() =>
+                  navigation.navigate(
+                    'EditPet',
+                    {pet},
+                  )
+                }>
+
+                <Pencil
+                  size={20}
+                  color="#355497"
+                  strokeWidth={2}
+                />
+
+                <Text
+                  style={
+                    styles.editTopButtonText
+                  }>
+                  Düzenle
+                </Text>
+
+              </Pressable>
+
             </View>
           </View>
 
-          <View style={styles.heroCenter}>
+          {/* =====================================================
+              PROFILE
+          ===================================================== */}
+
+          <View style={styles.profileSection}>
+
+            <View
+              style={styles.profileAvatarArea}>
+
+              <View style={styles.avatarOuter}>
+
+                <Image
+                  source={getDefaultPetAvatar(
+                    pet.type,
+                  )}
+                  style={[
+                    styles.avatarImage,
+                    (
+                      normalizePetType(pet.type).includes('diğer') ||
+                      normalizePetType(pet.type).includes('diger') ||
+                      normalizePetType(pet.type).includes('other')
+                    ) && styles.otherAvatarImage,
+                  ]}
+                  resizeMode="cover"
+                />
+
+              </View>
+
+              <Pressable
+                style={styles.cameraButton}>
+
+                <Camera
+                  size={20}
+                  color="#FFFFFF"
+                  strokeWidth={2.2}
+                />
+
+              </Pressable>
+
+            </View>
+
+            <View
+              style={styles.profileTextArea}>
+
+              <View style={styles.nameRow}>
+
+                <Text
+                  style={styles.petName}
+                  numberOfLines={1}>
+                  {pet.name}
+                </Text>
+
+              </View>
+
+              <Text style={styles.petMeta}>
+                {getPetEmoji(pet.type)}{' '}
+                {pet.type}
+                {'  |  '}
+                {pet.age} yaş
+                {'  |  '}
+                {pet.weight || '-'}
+              </Text>
+
+            </View>
+          </View>
+
+          {/* =====================================================
+              QUICK STATS
+          ===================================================== */}
+
+          <View style={styles.quickStatsRow}>
+
             <View
               style={[
-                styles.avatarOuter,
-                {borderColor: status.accent + '30'},
+                styles.quickStatCard,
+                styles.genderStatCard,
               ]}>
+
               <View
                 style={[
-                  styles.avatar,
-                  {backgroundColor: getPetAvatarColor(pet.type)},
+                  styles.statIconCircle,
+                  styles.genderIconCircle,
                 ]}>
-                <Text style={styles.avatarText}>{getPetEmoji(pet.type)}</Text>
+
+                <Venus
+                  size={25}
+                  color="#F04478"
+                  strokeWidth={2}
+                />
+
               </View>
+
+              <View>
+                <Text style={styles.statLabel}>
+                  Cinsiyet
+                </Text>
+
+                <Text style={styles.statValue}>
+                  {pet.gender || 'Belirsiz'}
+                </Text>
+              </View>
+
             </View>
 
-            <Text style={styles.title}>{pet.name}</Text>
-            <Text style={styles.subtitle}>{status.description}</Text>
+            <View
+              style={[
+                styles.quickStatCard,
+                styles.weightStatCard,
+              ]}>
+
+              <View
+                style={[
+                  styles.statIconCircle,
+                  styles.weightIconCircle,
+                ]}>
+
+                <Scale
+                  size={24}
+                  color="#15A96A"
+                  strokeWidth={2}
+                />
+
+              </View>
+
+              <View>
+                <Text style={styles.statLabel}>
+                  Kilo
+                </Text>
+
+                <Text style={styles.statValue}>
+                  {pet.weight || '-'}
+                </Text>
+              </View>
+
+            </View>
+
+            <View
+              style={[
+                styles.quickStatCard,
+                styles.statusStatCard,
+              ]}>
+
+              <View
+                style={[
+                  styles.statIconCircle,
+                  styles.statusIconCircle,
+                ]}>
+
+                <Activity
+                  size={25}
+                  color="#168DE2"
+                  strokeWidth={2}
+                />
+
+              </View>
+
+              <View>
+                <Text style={styles.statLabel}>
+                  Durum
+                </Text>
+
+                <Text style={styles.statValue}>
+                  {statusLabel}
+                </Text>
+              </View>
+
+            </View>
+
           </View>
 
-          <View style={styles.heroBottomRow}>
-            <View style={styles.heroMiniCard}>
-              <Text style={styles.heroMiniLabel}>Yaş</Text>
-              <Text style={styles.heroMiniValue}>{pet.age} yaş</Text>
-            </View>
+          {/* =====================================================
+              GENERAL + HEALTH
+          ===================================================== */}
 
-            <View style={styles.heroMiniCard}>
-              <Text style={styles.heroMiniLabel}>Cinsiyet</Text>
-              <Text style={styles.heroMiniValue}>
-                {pet.gender || 'Belirtilmedi'}
-              </Text>
-            </View>
+          <View style={styles.twoColumnRow}>
 
-            <View style={styles.heroMiniCard}>
-              <Text style={styles.heroMiniLabel}>Kilo</Text>
-              <Text style={styles.heroMiniValue}>{pet.weight || 'Eksik'}</Text>
-            </View>
-          </View>
-        </Animated.View>
+            {/* GENERAL */}
 
-        <Animated.View
-          style={{
-            opacity: sectionOpacity,
-            transform: [{translateY: sectionTranslate}],
-          }}>
-          <View style={styles.insightPanel}>
-            <Text style={styles.panelEyebrow}>Bugünün özeti</Text>
-            <Text style={styles.panelTitle}>Profil görünümü güçlü mü?</Text>
-            <Text style={styles.panelText}>{quickInsight}</Text>
-          </View>
+            <View
+              style={[
+                styles.largeCard,
+                styles.generalCard,
+              ]}>
 
-          <View style={styles.highlightsGrid}>
-            {highlights.map((item, index) => (
-              <HighlightCard
-                key={`${item.label}-${index}`}
-                label={item.label}
-                value={item.value}
-                index={index}
+              <View style={styles.cardHeader}>
+
+                <View
+                  style={styles.cardHeaderLeft}>
+
+                  <View
+                    style={[
+                      styles.cardIconCircle,
+                      styles.generalIconCircle,
+                    ]}>
+
+                    <FileText
+                      size={24}
+                      color="#7655F5"
+                      strokeWidth={2}
+                    />
+
+                  </View>
+
+                  <Text style={styles.cardTitle}>
+                    Genel Bilgiler
+                  </Text>
+
+                </View>
+
+                <ChevronRight
+                  size={23}
+                  color="#172C59"
+                  strokeWidth={2.2}
+                />
+
+              </View>
+
+              <InfoRow
+                label="Tür"
+                value={pet.type || '-'}
               />
-            ))}
-          </View>
 
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Sağlık geçmişi</Text>
-              <View style={styles.sectionBadge}>
-                <Text style={styles.sectionBadgeText}>Takip</Text>
+              <InfoRow
+                label="Yaş"
+                value={`${pet.age || '-'} yaş`}
+              />
+
+              <InfoRow
+                label="Cinsiyet"
+                value={
+                  pet.gender ||
+                  'Belirtilmedi'
+                }
+                last
+              />
+
+            </View>
+
+            {/* HEALTH */}
+
+            <Pressable
+              style={({pressed}) => [
+                styles.largeCard,
+                styles.healthCard,
+                pressed &&
+                  styles.pressedCard,
+              ]}>
+
+              <View style={styles.cardHeader}>
+
+                <View
+                  style={styles.cardHeaderLeft}>
+
+                  <View
+                    style={[
+                      styles.cardIconCircle,
+                      styles.healthIconCircle,
+                    ]}>
+
+                    <Heart
+                      size={24}
+                      color="#F04C73"
+                      strokeWidth={2}
+                    />
+
+                  </View>
+
+                  <Text style={styles.cardTitle}>
+                    Sağlık Geçmişi
+                  </Text>
+
+                </View>
+
+                <ChevronRight
+                  size={23}
+                  color="#172C59"
+                  strokeWidth={2.2}
+                />
+
               </View>
-            </View>
 
-            <InfoLine
-              label="Aşı bilgileri"
-              value={pet.vaccines || 'Henüz eklenmemiş'}
-            />
-            <InfoLine
-              label="Son veteriner ziyareti"
-              value={pet.lastVetVisit || 'Henüz eklenmemiş'}
-            />
+              <InfoRow
+                label="Son Veteriner"
+                value={
+                  pet.lastVetVisit ||
+                  'Eklenmedi'
+                }
+              />
+
+              <InfoRow
+                label="Aşı Bilgisi"
+                value={
+                  pet.vaccines ||
+                  'Eklenmedi'
+                }
+              />
+
+              <View
+                style={
+                  styles.vaccineStatusRow
+                }>
+
+                <Text style={styles.infoLabel}>
+                  Aşı Durumu
+                </Text>
+
+                <View
+                  style={
+                    styles.vaccineStatusRight
+                  }>
+
+                  <Text
+                    style={styles.infoValue}>
+                    {vaccineStatus}
+                  </Text>
+
+                  {pet.vaccines ? (
+                    <View
+                      style={
+                        styles.checkCircle
+                      }>
+
+                      <Check
+                        size={14}
+                        color="#FFFFFF"
+                        strokeWidth={3}
+                      />
+
+                    </View>
+                  ) : null}
+
+                </View>
+              </View>
+
+              <View
+                style={styles.viewAllButton}>
+
+                <Text
+                  style={styles.viewAllText}>
+                  Tümünü Gör
+                </Text>
+
+                <ChevronRight
+                  size={20}
+                  color="#C9203D"
+                  strokeWidth={2.3}
+                />
+
+              </View>
+
+            </Pressable>
           </View>
 
-          <View style={styles.notesCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitleDark}>Notlar</Text>
-              <Text style={styles.notesEmoji}>✦</Text>
-            </View>
-            <Text style={styles.notesValue}>
-              {pet.notes || 'Bu dost için henüz not eklenmemiş.'}
-            </Text>
+          {/* =====================================================
+              TRACKING NAVIGATION
+          ===================================================== */}
+
+          <View
+            style={
+              styles.navigationCardsRow
+            }>
+
+            <SmallNavigationCard
+              title="Kilo Takibi"
+              subtitle={`${pet.name}’un gelişimini takip et`}
+              backgroundColor="#F0EFFF"
+              iconBackground="#E5E1FF"
+              icon={
+                <BarChart3
+                  size={26}
+                  color="#6552EE"
+                  strokeWidth={2}
+                />
+              }
+            />
+
+            <SmallNavigationCard
+              title="Hatırlatmalar"
+              subtitle="Yaklaşan bakım görevleri"
+              backgroundColor="#E9FAF0"
+              iconBackground="#D9F5E6"
+              icon={
+                <CalendarDays
+                  size={26}
+                  color="#13A968"
+                  strokeWidth={2}
+                />
+              }
+            />
+
           </View>
 
-          <View style={styles.actionsWrap}>
+          {/* =====================================================
+              NOTES
+          ===================================================== */}
+
+          <Pressable
+            style={({pressed}) => [
+              styles.notesCard,
+              pressed &&
+                styles.pressedCard,
+            ]}>
+
+            <View
+              style={styles.notesIconCircle}>
+
+              <NotebookPen
+                size={25}
+                color="#F47A19"
+                strokeWidth={2}
+              />
+
+            </View>
+
+            <View style={styles.notesContent}>
+
+              <Text style={styles.notesTitle}>
+                Notlar
+              </Text>
+
+              <Text
+                style={styles.notesText}
+                numberOfLines={2}>
+                {pet.notes ||
+                  'Bu dost için henüz not eklenmemiş.'}
+              </Text>
+
+            </View>
+
+            <ChevronRight
+              size={24}
+              color="#172C59"
+              strokeWidth={2.2}
+            />
+
+          </Pressable>
+
+          {/* =====================================================
+              ACTIONS
+          ===================================================== */}
+
+          <View style={styles.actionsRow}>
+
             <Pressable
-              style={styles.editButton}
-              onPress={() => navigation.navigate('EditPet', {pet})}>
-              <Text style={styles.editButtonText}>Profili Düzenle</Text>
+              style={({pressed}) => [
+                styles.deleteButton,
+                pressed &&
+                  styles.actionPressed,
+              ]}
+              onPress={() =>
+                setDeleteModalVisible(true)
+              }>
+
+              <Trash2
+                size={22}
+                color="#E31B23"
+                strokeWidth={2.2}
+              />
+
+              <Text
+                style={
+                  styles.deleteButtonText
+                }>
+                Profili Sil
+              </Text>
+
             </Pressable>
 
             <Pressable
-              style={styles.deleteButton}
-              onPress={() => setDeleteModalVisible(true)}>
-              <Text style={styles.deleteButtonText}>Profili Sil</Text>
+              style={({pressed}) => [
+                styles.editButton,
+                pressed &&
+                  styles.actionPressed,
+              ]}
+              onPress={() =>
+                navigation.navigate(
+                  'EditPet',
+                  {pet},
+                )
+              }>
+
+              <Pencil
+                size={22}
+                color="#FFFFFF"
+                strokeWidth={2.2}
+              />
+
+              <Text
+                style={
+                  styles.editButtonText
+                }>
+                Profili Düzenle
+              </Text>
+
             </Pressable>
+
           </View>
-        </Animated.View>
-      </ScrollView>
+
+        </ScrollView>
+      </Animated.View>
+
+      {/* =====================================================
+          DELETE MODAL
+      ===================================================== */}
 
       <Modal
         visible={deleteModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}>
+        statusBarTranslucent
+        onRequestClose={() =>
+          setDeleteModalVisible(false)
+        }>
+
         <View style={styles.modalOverlay}>
+
           <View style={styles.modalCard}>
-            <View style={styles.modalIconWrap}>
-              <Text style={styles.modalEmoji}>🫧</Text>
+
+            <View
+              style={styles.modalIconCircle}>
+
+              <Trash2
+                size={28}
+                color="#A66AD4"
+                strokeWidth={1.8}
+              />
+
             </View>
 
-            <Text style={styles.modalTitle}>Profili silmek istiyor musun?</Text>
-            <Text style={styles.modalText}>
-              {pet.name} için oluşturduğun profil kaldırılacak. Bu işlem geri alınamaz.
+            <Text style={styles.modalTitle}>
+              Profili silmek istiyor musunuz?
+            </Text>
+
+            <Text
+              style={styles.modalDescription}>
+              {pet.name} için oluşturduğun profil
+              silinecek. Bu işlem geri alınamaz.
             </Text>
 
             <View style={styles.modalButtons}>
+
               <Pressable
-                style={styles.cancelButton}
-                onPress={() => setDeleteModalVisible(false)}>
-                <Text style={styles.cancelButtonText}>Vazgeç</Text>
+                style={({pressed}) => [
+                  styles.cancelModalButton,
+                  pressed &&
+                    styles.actionPressed,
+                ]}
+                onPress={() =>
+                  setDeleteModalVisible(false)
+                }>
+
+                <Text
+                  style={styles.cancelModalText}>
+                  Vazgeç
+                </Text>
+
               </Pressable>
 
-              <Pressable style={styles.confirmButton} onPress={handleDelete}>
-                <Text style={styles.confirmButtonText}>Sil</Text>
+              <Pressable
+                style={({pressed}) => [
+                  styles.confirmDeleteButton,
+                  pressed &&
+                    styles.actionPressed,
+                ]}
+                onPress={handleDelete}>
+
+                <Text
+                  style={
+                    styles.confirmDeleteText
+                  }>
+                  Sil
+                </Text>
+
               </Pressable>
+
             </View>
+
           </View>
         </View>
       </Modal>
-    </>
+
+    </View>
   );
 }
 
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    paddingBottom: 36,
-    backgroundColor: '#F6F8FC',
+  screen: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
   },
 
-  heroWrap: {
+  animatedScreen: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingBottom: 42,
+  },
+
+  /* HERO */
+
+  hero: {
+    height: 250,
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: 30,
-    padding: 18,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ECEEF4',
-    shadowColor: '#101828',
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 3,
+    backgroundColor: '#F3EEFF',
   },
-  heroGlowOne: {
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  heroSoftOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor:
+      'rgba(246,243,255,0.06)',
+  },
+
+  heroTopBar: {
     position: 'absolute',
-    top: -20,
-    right: -10,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(139, 122, 230, 0.10)',
-  },
-  heroGlowTwo: {
-    position: 'absolute',
-    bottom: -30,
-    left: -20,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(255,255,255,0.65)',
-  },
-  heroTopRow: {
+    top: 52,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  typeChip: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#EEF1F6',
-  },
-  typeChipText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#344054',
   },
 
-  heroCenter: {
-    alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 18,
-  },
-  avatarOuter: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    borderWidth: 2,
-    backgroundColor: '#FFFFFFAA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  avatar: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 38,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 8,
-    letterSpacing: -0.6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#667085',
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 12,
-    fontWeight: '500',
-  },
-
-  heroBottomRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  heroMiniCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#EDF1F5',
-  },
-  heroMiniLabel: {
-    fontSize: 11,
-    color: '#98A2B3',
-    textTransform: 'uppercase',
-    fontWeight: '800',
-    marginBottom: 6,
-    letterSpacing: 0.4,
-  },
-  heroMiniValue: {
-    fontSize: 14,
-    color: '#111827',
-    fontWeight: '800',
-  },
-
-  insightPanel: {
-    backgroundColor: '#111827',
+  circleButton: {
+    width: 52,
+    height: 52,
     borderRadius: 26,
-    padding: 18,
-    marginBottom: 14,
-    shadowColor: '#111827',
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor:
+      'rgba(255,255,255,0.90)',
+
+    shadowColor: '#3D4770',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
   },
-  panelEyebrow: {
-    fontSize: 11,
-    color: '#C7D2FE',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  panelTitle: {
-    fontSize: 22,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    marginBottom: 8,
-    letterSpacing: -0.4,
-  },
-  panelText: {
-    fontSize: 14,
-    color: '#D0D5DD',
-    lineHeight: 22,
-    fontWeight: '500',
-  },
 
-  highlightsGrid: {
+  editTopButton: {
+    height: 52,
+    borderRadius: 26,
+    paddingHorizontal: 19,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  highlightCard: {
-    width: '48.3%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#ECEFF4',
-    shadowColor: '#101828',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.04,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  highlightLabel: {
-    fontSize: 12,
-    color: '#98A2B3',
-    fontWeight: '800',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  highlightValue: {
-    fontSize: 18,
-    color: '#111827',
-    fontWeight: '800',
-    lineHeight: 24,
-  },
-
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#ECEFF4',
-    marginBottom: 14,
-    shadowColor: '#101828',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.04,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    color: '#111827',
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  sectionTitleDark: {
-    fontSize: 22,
-    color: '#1F2937',
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  sectionBadge: {
-    backgroundColor: '#EEF2FF',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  sectionBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#5B5BD6',
+    gap: 8,
+    backgroundColor:
+      'rgba(255,255,255,0.92)',
+
+    shadowColor: '#3D4770',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
 
-  infoLine: {
-    paddingTop: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F4F8',
-  },
-  infoLineLabel: {
-    fontSize: 13,
-    color: '#98A2B3',
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  infoLineValue: {
-    fontSize: 17,
-    color: '#111827',
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-
-  notesCard: {
-    backgroundColor: '#F7F0FF',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#EBDDFF',
-    marginBottom: 18,
-    shadowColor: '#7C3AED',
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.05,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  notesEmoji: {
-    fontSize: 16,
-    color: '#7C3AED',
-  },
-  notesValue: {
+  editTopButtonText: {
     fontSize: 15,
-    color: '#4B5563',
-    lineHeight: 24,
-    fontWeight: '500',
-    marginTop: 6,
+    fontWeight: '700',
+    color: '#23375F',
   },
 
-  actionsWrap: {
-    gap: 12,
-    marginBottom: 8,
+  topButtonPressed: {
+    opacity: 0.76,
+    transform: [{scale: 0.97}],
   },
-  editButton: {
-    backgroundColor: '#111827',
-    paddingVertical: 17,
-    borderRadius: 18,
-    alignItems: 'center',
-    shadowColor: '#111827',
-    shadowOffset: {width: 0, height: 8},
+
+  /* PROFILE */
+
+  profileSection: {
+    minHeight: 110,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    paddingHorizontal: 22,
+    paddingBottom: 20,
+  },
+
+  profileAvatarArea: {
+    width: 112,
+    height: 112,
+    marginTop: -48,
+    position: 'relative',
+    marginRight: 16,
+  },
+
+  avatarOuter: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 5,
+    borderColor: '#B9A8FF',
+    overflow: 'hidden',
+
+    shadowColor: '#7258C8',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
     shadowOpacity: 0.12,
-    shadowRadius: 14,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  otherAvatarImage: {
+    position: 'absolute',
+    width: '135%',
+    height: '135%',
+    left: '-17.5%',
+    top: '-19.5%',
+  },
+
+  cameraButton: {
+    position: 'absolute',
+    right: -2,
+    bottom: 1,
+    width: 39,
+    height: 39,
+    borderRadius: 14,
+    backgroundColor: '#8467F4',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    shadowColor: '#7356DF',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+
+  profileTextArea: {
+    flex: 1,
+    paddingTop: 14,
+  },
+
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  petName: {
+    flexShrink: 1,
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#101D3D',
+    letterSpacing: -0.8,
+  },
+
+  petMeta: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#536997',
+    fontWeight: '500',
+  },
+
+  quotePill: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    marginTop: 10,
+    backgroundColor: '#F3EFFF',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  quoteText: {
+    flexShrink: 1,
+    color: '#6974B3',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  /* QUICK STATS */
+
+  quickStatsRow: {
+    flexDirection: 'row',
+    gap: 9,
+    paddingHorizontal: 18,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+
+  quickStatCard: {
+    flex: 1,
+    minHeight: 86,
+    borderRadius: 22,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+
+    shadowColor: '#253659',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  genderStatCard: {
+    backgroundColor: '#FFF0F4',
+  },
+
+  weightStatCard: {
+    backgroundColor: '#EAFBF1',
+  },
+
+  statusStatCard: {
+    backgroundColor: '#EAF6FF',
+  },
+
+  statIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  genderIconCircle: {
+    backgroundColor: '#FFE0EA',
+  },
+
+  weightIconCircle: {
+    backgroundColor: '#D9F6E6',
+  },
+
+  statusIconCircle: {
+    backgroundColor: '#D9EEFF',
+  },
+
+  statLabel: {
+    color: '#536991',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+
+  statValue: {
+    color: '#111C37',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  /* MAIN CARDS */
+
+  twoColumnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+  },
+
+  largeCard: {
+    flex: 1,
+    minHeight: 245,
+    borderRadius: 24,
+    padding: 14,
+
+    shadowColor: '#24345B',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.055,
+    shadowRadius: 12,
     elevation: 3,
   },
+
+  generalCard: {
+    backgroundColor: '#F5F0FF',
+  },
+
+  healthCard: {
+    backgroundColor: '#FFF0F1',
+  },
+
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  cardHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  cardIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  generalIconCircle: {
+    backgroundColor: '#E8DFFF',
+  },
+
+  healthIconCircle: {
+    backgroundColor: '#FFDDE3',
+  },
+
+  cardTitle: {
+    flexShrink: 1,
+    fontSize: 15,
+    color: '#101C39',
+    fontWeight: '800',
+  },
+
+  infoRow: {
+    minHeight: 45,
+    borderBottomWidth: 1,
+    borderBottomColor:
+      'rgba(95,107,150,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 7,
+  },
+
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+
+  infoLabel: {
+    flexShrink: 1,
+    color: '#536A96',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  infoValue: {
+    flexShrink: 1,
+    maxWidth: '58%',
+    textAlign: 'right',
+    color: '#17213B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  vaccineStatusRow: {
+    minHeight: 45,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  vaccineStatusRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#36C976',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  viewAllButton: {
+    minHeight: 40,
+    marginTop: 5,
+    borderRadius: 14,
+    backgroundColor: '#FFDDE3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+
+  viewAllText: {
+    color: '#C9203D',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  /* NAV CARDS */
+
+  navigationCardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+  },
+
+  smallNavCard: {
+    flex: 1,
+    minHeight: 112,
+    borderRadius: 23,
+    paddingHorizontal: 13,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+
+    shadowColor: '#253659',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  smallNavIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  smallNavTextWrap: {
+    flex: 1,
+  },
+
+  smallNavTitle: {
+    color: '#101C39',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+
+  smallNavSubtitle: {
+    color: '#6376A2',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  pressedCard: {
+    opacity: 0.82,
+    transform: [{scale: 0.985}],
+  },
+
+  /* NOTES */
+
+  notesCard: {
+    marginHorizontal: 18,
+    minHeight: 100,
+    borderRadius: 24,
+    backgroundColor: '#FFF5E6',
+    paddingHorizontal: 16,
+    paddingVertical: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    marginBottom: 18,
+
+    shadowColor: '#503C28',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  notesIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    backgroundColor: '#FFEBCB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  notesContent: {
+    flex: 1,
+  },
+
+  notesTitle: {
+    color: '#101C39',
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  notesText: {
+    color: '#34486F',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+
+  /* ACTIONS */
+
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 18,
+    marginTop: 2,
+  },
+
+  deleteButton: {
+    flex: 1,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.4,
+    borderColor: '#FF9DA6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+
+  deleteButtonText: {
+    color: '#E31B23',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  editButton: {
+    flex: 1,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: '#7658F5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+
+    shadowColor: '#6547DD',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+
   editButtonText: {
     color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '800',
-    fontSize: 16,
-    letterSpacing: 0.2,
   },
-  deleteButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 17,
-    borderRadius: 18,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F4D4D8',
+
+  actionPressed: {
+    opacity: 0.78,
+    transform: [{scale: 0.98}],
   },
-  deleteButtonText: {
-    color: '#C62828',
-    fontWeight: '800',
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
+
+  /* MODAL */
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.34)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    backgroundColor:
+      'rgba(29,31,48,0.36)',
+    justifyContent: 'flex-end',
   },
+
   modalCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    padding: 22,
+    backgroundColor: '#FFF9FF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 36,
     alignItems: 'center',
-    shadowColor: '#111827',
-    shadowOffset: {width: 0, height: 14},
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    elevation: 6,
+
+    shadowColor: '#101828',
+    shadowOffset: {
+      width: 0,
+      height: -8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  modalIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: '#F7F0FF',
+
+  modalIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: '#F3E5FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 17,
   },
-  modalEmoji: {
-    fontSize: 28,
-  },
+
   modalTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 8,
+    color: '#17182B',
+    fontSize: 20,
+    fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: -0.4,
+    marginBottom: 9,
   },
-  modalText: {
-    fontSize: 15,
-    color: '#667085',
+
+  modalDescription: {
+    maxWidth: 310,
+    color: '#697089',
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
-    lineHeight: 23,
-    marginBottom: 22,
+    marginBottom: 24,
   },
+
   modalButtons: {
-    flexDirection: 'row',
     width: '100%',
-    gap: 10,
+    flexDirection: 'row',
+    gap: 12,
   },
-  cancelButton: {
+
+  cancelModalButton: {
     flex: 1,
-    backgroundColor: '#F4F4F5',
-    paddingVertical: 15,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#FFF2D9',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelButtonText: {
-    color: '#344054',
+
+  cancelModalText: {
+    color: '#403A36',
     fontSize: 15,
     fontWeight: '800',
   },
-  confirmButton: {
+
+  confirmDeleteButton: {
     flex: 1,
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 15,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#FFF9FF',
+    borderWidth: 1.4,
+    borderColor: '#E8A9CF',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  confirmButtonText: {
-    color: '#B91C1C',
+
+  confirmDeleteText: {
+    color: '#B8325A',
     fontSize: 15,
     fontWeight: '800',
   },
