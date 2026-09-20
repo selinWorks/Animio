@@ -39,9 +39,29 @@ import {usePets} from '../data/PetContext';
    IMAGES
 ========================================================= */
 
+/* HERO / BANNER IMAGES */
+
 const petDetailCatHero = require(
   '../assets/images/pets/pet-detail-cat-hero.png',
 );
+
+const petDetailDogHero = require(
+  '../assets/images/pets/pet-detail-dog-hero.png',
+);
+
+const petDetailBirdHero = require(
+  '../assets/images/pets/pet-detail-bird-hero.png',
+);
+
+const petDetailHamsterHero = require(
+  '../assets/images/pets/pet-detail-hamster-hero.png',
+);
+
+const petDetailRabbitHero = require(
+  '../assets/images/pets/pet-detail-rabbit-hero.png',
+);
+
+/* DEFAULT AVATARS */
 
 const defaultCatAvatar = require(
   '../assets/images/pets/default-cat-pixel.png',
@@ -220,6 +240,59 @@ function getDefaultPetAvatar(type: string) {
    * tanımlanmamış türler için nötr avatar.
    */
   return defaultOtherAvatar;
+}
+
+/*
+ * Hayvan türüne göre Pet Detail ekranında
+ * gösterilecek hero/banner görseli.
+ */
+function getPetHero(type: string) {
+  const lowerType = normalizePetType(type);
+
+  /* KEDİ */
+
+  if (lowerType.includes('kedi')) {
+    return petDetailCatHero;
+  }
+
+  /* KÖPEK */
+
+  if (
+    lowerType.includes('köpek') ||
+    lowerType.includes('kopek')
+  ) {
+    return petDetailDogHero;
+  }
+
+  /* KUŞ */
+
+  if (
+    lowerType.includes('kuş') ||
+    lowerType.includes('kus')
+  ) {
+    return petDetailBirdHero;
+  }
+
+  /* HAMSTER */
+
+  if (lowerType.includes('hamster')) {
+    return petDetailHamsterHero;
+  }
+
+  /* TAVŞAN */
+
+  if (
+    lowerType.includes('tavşan') ||
+    lowerType.includes('tavsan')
+  ) {
+    return petDetailRabbitHero;
+  }
+
+  /*
+   * Balık, kaplumbağa, diğer veya ileride
+   * eklenecek türlerde geçici varsayılan hero.
+   */
+  return petDetailCatHero;
 }
 
 function getStatusLabel(pet: {
@@ -410,7 +483,7 @@ export default function PetDetailScreen({
           <View style={styles.hero}>
 
             <Image
-              source={petDetailCatHero}
+              source={getPetHero(pet.type)}
               style={styles.heroImage}
               resizeMode="cover"
             />
