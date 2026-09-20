@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,13 @@ import {
   Lightbulb,
 } from 'lucide-react-native';
 
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {usePets} from '../data/PetContext';
+import {useAuth} from '../data/AuthContext';
 import {Pet} from '../types/Pet';
+import {getCareEventsFromFirestore} from '../services/firestore';
 
 /* =========================================================
    DEFAULT PET AVATARS
@@ -159,6 +163,7 @@ function getDefaultPetAvatar(
    * Balık ve "Diğer" için henüz özel pixel avatar
    * hazırlamadığımız için geçici fallback.
    */
+
   return defaultCatAvatar;
 }
 
@@ -168,8 +173,85 @@ function getDefaultPetAvatar(
 
 export default function HomeScreen() {
   const {pets} = usePets();
+  const {user} = useAuth();
 
   const navigation = useNavigation<any>();
+
+  /* =========================================================
+     NOTIFICATION STATE
+  ========================================================= */
+
+  const [hasNewNotifications, setHasNewNotifications] =
+    useState(false);
+
+  /*
+   * Ana sayfa her odaklandığında bildirimleri kontrol ediyoruz.
+   *
+   * Bir etkinliğin kırmızı noktayı göstermesi için:
+   *
+   * 1. Etkinliğin zamanı gelmiş/geçmiş olmalı.
+   * 2. Etkinlik zamanı, kullanıcının bildirim ekranına
+   *    son baktığı zamandan daha yeni olmalı.
+   */
+
+  useFocusEffect(
+    useCallback(() => {
+      const checkActiveNotifications = async () => {
+        if (!user?.uid) {
+          setHasNewNotifications(false);
+          return;
+        }
+
+        try {
+          const events = await getCareEventsFromFirestore(
+            user.uid,
+          );
+
+          const lastRead = await AsyncStorage.getItem(
+            'last_notification_read_time',
+          );
+
+          const lastReadDate = lastRead
+            ? new Date(lastRead)
+            : new Date(0);
+
+          const now = new Date();
+
+          const hasActive = events.some((item: any) => {
+            if (!item.date) {
+              return false;
+            }
+
+            const eventDate = new Date(item.date);
+
+            const isTimePassed =
+              eventDate <= now;
+
+            const isNewerThanRead =
+              eventDate > lastReadDate;
+
+            return (
+              isTimePassed &&
+              isNewerThanRead
+            );
+          });
+
+          setHasNewNotifications(hasActive);
+        } catch (error) {
+          console.log(
+            'Bildirim kontrol hatası:',
+            error,
+          );
+        }
+      };
+
+      checkActiveNotifications();
+    }, [user?.uid]),
+  );
+
+  /* =========================================================
+     PET DATA
+  ========================================================= */
 
   const petList: Pet[] = pets || [];
 
@@ -217,7 +299,15 @@ export default function HomeScreen() {
 
           </View>
 
+          {/* =================================================
+              NOTIFICATION BUTTON
+          ================================================= */}
+
           <Pressable
+            onPress={() => {
+              setHasNewNotifications(false);
+              navigation.navigate('Notifications');
+            }}
             style={({pressed}) => [
               styles.notification,
               pressed && styles.pressed,
@@ -229,7 +319,11 @@ export default function HomeScreen() {
               strokeWidth={1.9}
             />
 
-            <View style={styles.notificationDot} />
+            {/* Sadece okunmamış aktif bildirim varsa görünür */}
+
+            {hasNewNotifications && (
+              <View style={styles.notificationDot} />
+            )}
 
           </Pressable>
         </View>

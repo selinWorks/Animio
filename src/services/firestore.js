@@ -69,6 +69,10 @@ export const addCareEventToFirestore = async (event, uid) => {
       ownerId: uid,
       title: event.title,
       date: event.date,
+
+      // Bildirim / görev saati
+      time: event.time || '',
+
       type: event.type || 'Custom',
       petName: event.petName || '',
       note: event.note || '',
@@ -80,10 +84,17 @@ export const addCareEventToFirestore = async (event, uid) => {
 };
 
 export const deleteCareEventFromFirestore = async eventId => {
-  await firestore().collection('careEvents').doc(eventId).delete();
+  await firestore()
+    .collection('careEvents')
+    .doc(eventId)
+    .delete();
 };
 
-export const addFeedbackToFirestore = async (feedback, uid, email) => {
+export const addFeedbackToFirestore = async (
+  feedback,
+  uid,
+  email,
+) => {
   const docRef = await firestore()
     .collection('feedbacks')
     .add({
@@ -96,7 +107,10 @@ export const addFeedbackToFirestore = async (feedback, uid, email) => {
   return docRef.id;
 };
 
-export const saveUserSettingsToFirestore = async (uid, settings) => {
+export const saveUserSettingsToFirestore = async (
+  uid,
+  settings,
+) => {
   await firestore()
     .collection('userSettings')
     .doc(uid)
@@ -122,7 +136,11 @@ export const getUserSettingsFromFirestore = async uid => {
   return doc.data();
 };
 
-export const addAssistantChatToFirestore = async (chat, uid, email) => {
+export const addAssistantChatToFirestore = async (
+  chat,
+  uid,
+  email,
+) => {
   const docRef = await firestore()
     .collection('assistantChats')
     .add({

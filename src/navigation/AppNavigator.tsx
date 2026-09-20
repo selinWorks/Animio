@@ -19,6 +19,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import PetDetailScreen from '../screens/PetDetailScreen';
 import EditPetScreen from '../screens/EditPetScreen';
 import CalendarScreen from '../screens/CalendarScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import AboutAppScreen from '../screens/AboutAppScreen';
 import UpcomingFeaturesScreen from '../screens/UpcomingFeaturesScreen';
 
@@ -35,6 +36,10 @@ import {
   User,
 } from 'lucide-react-native';
 
+/* =========================================================
+   NAVIGATION TYPES
+========================================================= */
+
 export type TabParamList = {
   Home: undefined;
   Pets: undefined;
@@ -48,6 +53,10 @@ export type RootStackParamList = {
   PetDetail: {pet: Pet};
   EditPet: {pet: Pet};
   Calendar: undefined;
+
+  // Bildirim ekranı
+  Notifications: undefined;
+
   AboutApp: undefined;
   UpcomingFeatures: undefined;
   FirestoreTest: undefined;
@@ -58,11 +67,16 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /* =========================================================
    PETCARE LOADING
-   ========================================================= */
+========================================================= */
 
 function PetCareLoading() {
-  const rotateAnimation = useRef(new Animated.Value(0)).current;
-  const pulseAnimation = useRef(new Animated.Value(0)).current;
+  const rotateAnimation = useRef(
+    new Animated.Value(0),
+  ).current;
+
+  const pulseAnimation = useRef(
+    new Animated.Value(0),
+  ).current;
 
   useEffect(() => {
     const rotateLoop = Animated.loop(
@@ -82,6 +96,7 @@ function PetCareLoading() {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
+
         Animated.timing(pulseAnimation, {
           toValue: 0,
           duration: 750,
@@ -117,10 +132,14 @@ function PetCareLoading() {
 
   return (
     <View style={loadingStyles.container}>
+      {/* Arka plan dekorları */}
+
       <View style={loadingStyles.glowTop} />
       <View style={loadingStyles.glowBottom} />
 
       <View style={loadingStyles.content}>
+        {/* Loader */}
+
         <View style={loadingStyles.loaderWrapper}>
           <Animated.View
             style={[
@@ -147,6 +166,8 @@ function PetCareLoading() {
           </View>
         </View>
 
+        {/* Yazılar */}
+
         <Text style={loadingStyles.brand}>
           PetCare
         </Text>
@@ -154,6 +175,8 @@ function PetCareLoading() {
         <Text style={loadingStyles.loadingText}>
           PetCare hazırlanıyor...
         </Text>
+
+        {/* Mini loading noktaları */}
 
         <View style={loadingStyles.dots}>
           <View style={loadingStyles.dot} />
@@ -167,7 +190,7 @@ function PetCareLoading() {
 
 /* =========================================================
    BOTTOM TAB NAVIGATOR
-   ========================================================= */
+========================================================= */
 
 function TabNavigator() {
   return (
@@ -212,6 +235,7 @@ function TabNavigator() {
           shadowColor: '#31275A',
           shadowOpacity: 0.1,
           shadowRadius: 16,
+
           shadowOffset: {
             width: 0,
             height: -4,
@@ -283,6 +307,8 @@ function TabNavigator() {
         },
       })}>
 
+      {/* HOME */}
+
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -290,6 +316,8 @@ function TabNavigator() {
           tabBarLabel: 'Home',
         }}
       />
+
+      {/* PETS */}
 
       <Tab.Screen
         name="Pets"
@@ -299,6 +327,8 @@ function TabNavigator() {
         }}
       />
 
+      {/* ADD PET */}
+
       <Tab.Screen
         name="AddPet"
         component={AddPetScreen}
@@ -306,6 +336,8 @@ function TabNavigator() {
           tabBarLabel: 'Add',
         }}
       />
+
+      {/* ASSISTANT */}
 
       <Tab.Screen
         name="Assistant"
@@ -315,6 +347,8 @@ function TabNavigator() {
         }}
       />
 
+      {/* PROFILE */}
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
@@ -322,13 +356,14 @@ function TabNavigator() {
           tabBarLabel: 'Profile',
         }}
       />
+
     </Tab.Navigator>
   );
 }
 
 /* =========================================================
    MAIN STACK
-   ========================================================= */
+========================================================= */
 
 function MainAppNavigator() {
   return (
@@ -350,6 +385,10 @@ function MainAppNavigator() {
         headerTintColor: '#6366F1',
       }}>
 
+      {/* =====================================================
+          MAIN TABS
+      ===================================================== */}
+
       <Stack.Screen
         name="MainTabs"
         component={TabNavigator}
@@ -358,9 +397,13 @@ function MainAppNavigator() {
         }}
       />
 
-      {/* PET DETAIL
+      {/* =====================================================
+          PET DETAIL
+
           Kendi özel header tasarımına sahip olduğu için
-          React Navigation header'ını göstermiyoruz. */}
+          React Navigation header'ını göstermiyoruz.
+      ===================================================== */}
+
       <Stack.Screen
         name="PetDetail"
         component={PetDetailScreen}
@@ -368,6 +411,10 @@ function MainAppNavigator() {
           headerShown: false,
         }}
       />
+
+      {/* =====================================================
+          EDIT PET
+      ===================================================== */}
 
       <Stack.Screen
         name="EditPet"
@@ -377,6 +424,10 @@ function MainAppNavigator() {
         }}
       />
 
+      {/* =====================================================
+          CALENDAR
+      ===================================================== */}
+
       <Stack.Screen
         name="Calendar"
         component={CalendarScreen}
@@ -384,6 +435,22 @@ function MainAppNavigator() {
           title: 'Takvim',
         }}
       />
+
+      {/* =====================================================
+          NOTIFICATIONS
+      ===================================================== */}
+
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Bildirimler',
+        }}
+      />
+
+      {/* =====================================================
+          ABOUT APP
+      ===================================================== */}
 
       <Stack.Screen
         name="AboutApp"
@@ -393,6 +460,10 @@ function MainAppNavigator() {
         }}
       />
 
+      {/* =====================================================
+          UPCOMING FEATURES
+      ===================================================== */}
+
       <Stack.Screen
         name="UpcomingFeatures"
         component={UpcomingFeaturesScreen}
@@ -400,13 +471,14 @@ function MainAppNavigator() {
           title: 'Yakında',
         }}
       />
+
     </Stack.Navigator>
   );
 }
 
 /* =========================================================
    ROOT NAVIGATOR
-   ========================================================= */
+========================================================= */
 
 export default function AppNavigator() {
   const {user, loading} = useAuth();
@@ -415,12 +487,14 @@ export default function AppNavigator() {
     return <PetCareLoading />;
   }
 
-  return user ? <MainAppNavigator /> : <AuthNavigator />;
+  return user
+    ? <MainAppNavigator />
+    : <AuthNavigator />;
 }
 
 /* =========================================================
    LOADING STYLES
-   ========================================================= */
+========================================================= */
 
 const loadingStyles = StyleSheet.create({
   container: {
@@ -433,20 +507,28 @@ const loadingStyles = StyleSheet.create({
 
   glowTop: {
     position: 'absolute',
+
     width: 330,
     height: 330,
+
     borderRadius: 165,
+
     backgroundColor: '#EEE9FF',
+
     top: -150,
     right: -120,
   },
 
   glowBottom: {
     position: 'absolute',
+
     width: 300,
     height: 300,
+
     borderRadius: 150,
+
     backgroundColor: '#F0ECFF',
+
     bottom: -160,
     left: -130,
   },
@@ -459,8 +541,10 @@ const loadingStyles = StyleSheet.create({
   loaderWrapper: {
     width: 116,
     height: 116,
+
     alignItems: 'center',
     justifyContent: 'center',
+
     marginBottom: 22,
   },
 
@@ -510,10 +594,12 @@ const loadingStyles = StyleSheet.create({
     elevation: 7,
 
     shadowColor: '#7560D9',
+
     shadowOffset: {
       width: 0,
       height: 7,
     },
+
     shadowOpacity: 0.14,
     shadowRadius: 14,
   },
