@@ -144,13 +144,34 @@ export const addAssistantChatToFirestore = async (
     .add({
       ownerId: uid,
       email: email || '',
+
       petType: chat.petType || '',
+
+      // Eski kayıtlarla uyumlu olması için
       problemType: chat.problemType || '',
+
+      // Yeni çoklu semptom sistemi
+      problemTypes: Array.isArray(chat.problemTypes)
+        ? chat.problemTypes
+        : chat.problemType
+          ? [chat.problemType]
+          : [],
+
       duration: chat.duration || '',
       urgency: chat.urgency || '',
+
+      // Dinamik takip sorularının cevapları
+      followUpAnswers: chat.followUpAnswers || {},
+
       result: chat.result || '',
       aiMessage: chat.aiMessage || '',
-      title: `${chat.petType || ''} - ${chat.problemType || ''}`,
+
+      title: `${chat.petType || ''} - ${
+        Array.isArray(chat.problemTypes)
+          ? chat.problemTypes.join(', ')
+          : chat.problemType || ''
+      }`,
+
       createdAt: firestore.FieldValue.serverTimestamp(),
     });
 

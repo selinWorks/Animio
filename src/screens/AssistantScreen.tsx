@@ -13,35 +13,29 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import LinearGradient from 'react-native-linear-gradient';
 
 import {
-  AlertTriangle,
   Bird,
   Bone,
   CalendarDays,
   Cat,
   Clock3,
   Dog,
-  PawPrint,
   Info,
   Menu,
   MoreHorizontal,
-  Pencil,
+  PawPrint,
   Rabbit,
-  RotateCcw,
   Siren,
   Stethoscope,
   Syringe,
-  Tag,
   Trash2,
   Utensils,
   X,
   ArrowRight,
   Frown,
   Moon,
-  Hospital,
 } from 'lucide-react-native';
 
 import {useAuth} from '../data/AuthContext';
@@ -57,7 +51,7 @@ import {
 
 const aiOrb = require('../assets/images/assistant/ai-orb.png');
 const aiAssistant = require('../assets/images/assistant/ai-assistant.png');
-const hospitalErrorIcon = require('../assets/popup-icons/hospital-icon.png');
+const hospitalErrorIcon = require('../assets/popup-icons/warning.png');
 const petcareWarningGroup = require('../assets/popup-icons/my-custom-icon.png');
 
 /* =========================================================
@@ -82,9 +76,36 @@ type ProblemType =
   | 'Diğer'
   | '';
 
-type DurationType = 'bugun' | '1-2_gundur' | '1_hafta' | 'uzun' | '';
+type FollowUpAnswers = {
+  vomitingFrequency?: string;
+  vomitAppearance?: string;
+  canKeepWater?: string;
+  abdominalPain?: string;
+  foreignBodyRisk?: string;
 
-type UrgencyType = 'Evet' | 'Hayır' | 'Emin değilim' | '';
+  foodIntake?: string;
+  waterIntake?: string;
+  weightLoss?: string;
+
+  energyLevel?: string;
+  canWalkNormally?: string;
+
+  foodChange?: string;
+  unusualFood?: string;
+};
+
+type DurationType =
+  | 'bugun'
+  | '1-2_gundur'
+  | '1_hafta'
+  | 'uzun'
+  | '';
+
+type UrgencyType =
+  | 'Evet'
+  | 'Hayır'
+  | 'Emin değilim'
+  | '';
 
 type RiskResult = {
   riskScore: number;
@@ -95,9 +116,17 @@ type RiskResult = {
 type AssistantChat = {
   id?: string;
   petType: PetType;
-  problemType: ProblemType;
+
+  problemTypes?: ProblemType[];
+
+  // Eski kayıtlarla uyumluluk
+  problemType?: ProblemType;
+
   duration: DurationType;
   urgency: UrgencyType;
+
+  followUpAnswers?: FollowUpAnswers;
+
   result: RiskResult;
   aiMessage: string;
   title?: string;
@@ -155,43 +184,174 @@ const SYMPTOMS: ProblemType[] = [
   'Diğer',
 ];
 
+/* =========================================================
+   FOLLOW UP OPTIONS
+   ========================================================= */
+
+const FOLLOW_UP_OPTIONS = {
+  vomitingFrequency: [
+    '1 kez',
+    '2-3 kez',
+    '4+ kez',
+    'Sayısını bilmiyorum',
+  ],
+
+  vomitAppearance: [
+    'Mama / yiyecek',
+    'Sarı-yeşil sıvı',
+    'Beyaz köpük',
+    'Kan',
+    'Koyu / kahve telvesi gibi',
+    'Yabancı madde',
+    'Emin değilim',
+  ],
+
+  canKeepWater: [
+    'Evet',
+    'Hayır',
+    'Emin değilim',
+  ],
+
+  abdominalPain: [
+    'Evet',
+    'Hayır',
+    'Emin değilim',
+  ],
+
+  foreignBodyRisk: [
+    'Hayır',
+    'Evet',
+    'Emin değilim',
+  ],
+
+  foodIntake: [
+    'Normalinin %75+ kadarı',
+    '%50-75',
+    '%25-50',
+    'Neredeyse hiç',
+    'Hiç yemedi',
+  ],
+
+  waterIntake: [
+    'Normal',
+    'Azaldı',
+    'Arttı',
+    'Hiç içmiyor',
+    'Emin değilim',
+  ],
+
+  weightLoss: [
+    'Evet',
+    'Hayır',
+    'Emin değilim',
+  ],
+
+  energyLevel: [
+    'Normal',
+    'Biraz azaldı',
+    'Belirgin şekilde azaldı',
+    'Çok halsiz',
+  ],
+
+  canWalkNormally: [
+    'Evet',
+    'Hayır',
+    'Emin değilim',
+  ],
+
+  foodChange: [
+    'Hayır',
+    'Yeni mamaya geçildi',
+    'Mama miktarı değişti',
+    'Yeni ödül/yiyecek verildi',
+    'Emin değilim',
+  ],
+
+  unusualFood: [
+    'Hayır',
+    'Evet',
+    'Emin değilim',
+  ],
+} as const;
+
 const DURATIONS: {key: DurationType; label: string}[] = [
-  {key: 'bugun', label: 'Bugün başladı'},
-  {key: '1-2_gundur', label: '1-2 gündür'},
-  {key: '1_hafta', label: '1 haftadır'},
-  {key: 'uzun', label: 'Uzun süredir'},
+  {
+    key: 'bugun',
+    label: 'Bugün başladı',
+  },
+  {
+    key: '1-2_gundur',
+    label: '1-2 gündür',
+  },
+  {
+    key: '1_hafta',
+    label: '1 haftadır',
+  },
+  {
+    key: 'uzun',
+    label: 'Uzun süredir',
+  },
 ];
 
-const URGENCIES: UrgencyType[] = ['Evet', 'Hayır', 'Emin değilim'];
+const URGENCIES: UrgencyType[] = [
+  'Evet',
+  'Hayır',
+  'Emin değilim',
+];
 
 /* =========================================================
    SCREEN
    ========================================================= */
 
 const AssistantScreen = () => {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = 80;
   const {user} = useAuth();
 
-  const [petType, setPetType] = useState<PetType>('Köpek');
-  const [problemType, setProblemType] =
-    useState<ProblemType>('İştahsızlık');
+  const [petType, setPetType] =
+    useState<PetType>('Köpek');
+
+  const [problemTypes, setProblemTypes] =
+    useState<ProblemType[]>(['İştahsızlık']);
+
+  const [followUpAnswers, setFollowUpAnswers] =
+    useState<FollowUpAnswers>({});
+
   const [duration, setDuration] =
     useState<DurationType>('1-2_gundur');
-  const [urgency, setUrgency] = useState<UrgencyType>('Hayır');
 
-  const [result, setResult] = useState<RiskResult | null>(null);
-  const [aiMessage, setAiMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [urgency, setUrgency] =
+    useState<UrgencyType>('Hayır');
 
-  const [historyVisible, setHistoryVisible] = useState(false);
-  const [chatHistory, setChatHistory] = useState<AssistantChat[]>([]);
-  const drawerAnimation = useRef(new Animated.Value(0)).current;
-  const [connectionErrorVisible, setConnectionErrorVisible] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const [result, setResult] =
+    useState<RiskResult | null>(null);
+
+  const [aiMessage, setAiMessage] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [historyVisible, setHistoryVisible] =
+    useState(false);
+
+  const [chatHistory, setChatHistory] =
+    useState<AssistantChat[]>([]);
+
+  const drawerAnimation =
+    useRef(new Animated.Value(0)).current;
+
+  const [validationModalVisible, setValidationModalVisible] =
+    useState(false);
+
+  const [connectionErrorVisible, setConnectionErrorVisible] =
+    useState(false);
+
+  const scrollViewRef =
+    useRef<ScrollView>(null);
 
   const canShowSummary =
     petType !== '' &&
-    problemType !== '' &&
+    problemTypes.length > 0 &&
     duration !== '' &&
     urgency !== '';
 
@@ -205,10 +365,15 @@ const AssistantScreen = () => {
         return;
       }
 
-      const chats = await getAssistantChatsFromFirestore(user.uid);
+      const chats =
+        await getAssistantChatsFromFirestore(user.uid);
+
       setChatHistory(chats);
     } catch (error) {
-      console.log('Sohbet geçmişi yüklenemedi:', error);
+      console.log(
+        'Sohbet geçmişi yüklenemedi:',
+        error,
+      );
     }
   };
 
@@ -222,61 +387,207 @@ const AssistantScreen = () => {
 
   const fetchRisk = async () => {
     if (!canShowSummary) {
-          setConnectionErrorVisible(true);
-          return;
-        }
+      setValidationModalVisible(true);
+      return;
+    }
 
     try {
       setLoading(true);
       setResult(null);
       setAiMessage('');
 
+      // -------------------------------------------------------
+      // SADECE SEÇİLİ SEMPTOMlarla İLGİLİ TAKİP CEVAPLARINI AL
+      // -------------------------------------------------------
+
+      const activeFollowUpAnswers: FollowUpAnswers = {};
+
+      // KUSMA
+      if (problemTypes.includes('Kusma')) {
+        if (followUpAnswers.vomitingFrequency) {
+          activeFollowUpAnswers.vomitingFrequency =
+            followUpAnswers.vomitingFrequency;
+        }
+
+        if (followUpAnswers.vomitAppearance) {
+          activeFollowUpAnswers.vomitAppearance =
+            followUpAnswers.vomitAppearance;
+        }
+
+        if (followUpAnswers.canKeepWater) {
+          activeFollowUpAnswers.canKeepWater =
+            followUpAnswers.canKeepWater;
+        }
+
+        if (followUpAnswers.abdominalPain) {
+          activeFollowUpAnswers.abdominalPain =
+            followUpAnswers.abdominalPain;
+        }
+
+        if (followUpAnswers.foreignBodyRisk) {
+          activeFollowUpAnswers.foreignBodyRisk =
+            followUpAnswers.foreignBodyRisk;
+        }
+      }
+
+      // İŞTAHSIZLIK / BESLENME
+      if (
+        problemTypes.includes('İştahsızlık') ||
+        problemTypes.includes('Beslenme')
+      ) {
+        if (followUpAnswers.foodIntake) {
+          activeFollowUpAnswers.foodIntake =
+            followUpAnswers.foodIntake;
+        }
+
+        if (followUpAnswers.waterIntake) {
+          activeFollowUpAnswers.waterIntake =
+            followUpAnswers.waterIntake;
+        }
+
+        if (followUpAnswers.weightLoss) {
+          activeFollowUpAnswers.weightLoss =
+            followUpAnswers.weightLoss;
+        }
+      }
+
+      // HALSİZLİK
+      if (problemTypes.includes('Halsizlik')) {
+        if (followUpAnswers.energyLevel) {
+          activeFollowUpAnswers.energyLevel =
+            followUpAnswers.energyLevel;
+        }
+
+        if (followUpAnswers.canWalkNormally) {
+          activeFollowUpAnswers.canWalkNormally =
+            followUpAnswers.canWalkNormally;
+        }
+      }
+
+      // BESLENME DEĞİŞİKLİĞİ
+      if (problemTypes.includes('Beslenme')) {
+        if (followUpAnswers.foodChange) {
+          activeFollowUpAnswers.foodChange =
+            followUpAnswers.foodChange;
+        }
+
+        if (followUpAnswers.unusualFood) {
+          activeFollowUpAnswers.unusualFood =
+            followUpAnswers.unusualFood;
+        }
+
+        if (followUpAnswers.foreignBodyRisk) {
+          activeFollowUpAnswers.foreignBodyRisk =
+            followUpAnswers.foreignBodyRisk;
+        }
+      }
+
+      // -------------------------------------------------------
+      // DEBUG
+      // İstersen test sırasında terminalde görebilirsin.
+      // -------------------------------------------------------
+
+      console.log(
+        'AKTİF SEMPTOMLAR:',
+        problemTypes,
+      );
+
+      console.log(
+        'AIYE GÖNDERİLEN TAKİP CEVAPLARI:',
+        activeFollowUpAnswers,
+      );
+
+      // -------------------------------------------------------
+      // API İSTEĞİ
+      // -------------------------------------------------------
+
       const response = await fetch(
         'http://10.0.2.2:5000/assistant/evaluate',
         {
           method: 'POST',
+
           headers: {
             'Content-Type': 'application/json',
           },
+
           body: JSON.stringify({
             petType,
-            problemType,
+
+            // Çoklu semptom sistemi
+            problemTypes,
+
+            // Eski backend kayıtları için
+            problemType: problemTypes.join(', '),
+
             duration,
             urgency,
+
+            // SADECE AKTİF SEMPTOM CEVAPLARI
+            followUpAnswers: activeFollowUpAnswers,
           }),
         },
       );
 
       const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            data?.message ||
+            'AI analiz isteği başarısız oldu.',
+        );
+      }
+
+      // -------------------------------------------------------
+      // SONUÇLARI EKRANA YAZ
+      // -------------------------------------------------------
+
       setResult(data.risk);
       setAiMessage(data.aiMessage || '');
 
+      // -------------------------------------------------------
+      // FIRESTORE
+      // -------------------------------------------------------
+
       if (user?.uid && data.risk) {
-              await addAssistantChatToFirestore(
-                {
-                  petType,
-                  problemType,
-                  duration,
-                  urgency,
-                  result: data.risk,
-                  aiMessage: data.aiMessage || '',
-                },
-                user.uid,
-                user.email || '',
-              );
+        await addAssistantChatToFirestore(
+          {
+            petType,
 
-              await loadChatHistory();
-            }
-          } catch (error: any) {
-                console.log('API HATA:', error);
+            problemTypes,
 
-                // Varsayılan uyarı yerine özel modalı açıyoruz:
-                setConnectionErrorVisible(true);
-          } finally {
-            setLoading(false);
-          }
-        };
+            problemType:
+              problemTypes[0] || '',
+
+            duration,
+            urgency,
+
+            // API'ye gönderdiğimiz temizlenmiş cevapları kaydet
+            followUpAnswers:
+              activeFollowUpAnswers,
+
+            result: data.risk,
+
+            aiMessage:
+              data.aiMessage || '',
+          },
+          user.uid,
+          user.email || '',
+        );
+
+        await loadChatHistory();
+      }
+    } catch (error: any) {
+      console.log(
+        'API HATA:',
+        error,
+      );
+
+      setConnectionErrorVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /* =======================================================
      RESET
@@ -284,7 +595,8 @@ const AssistantScreen = () => {
 
   const resetForm = () => {
     setPetType('');
-    setProblemType('');
+    setProblemTypes([]);
+    setFollowUpAnswers({});
     setDuration('');
     setUrgency('');
     setResult(null);
@@ -301,100 +613,151 @@ const AssistantScreen = () => {
     setHistoryVisible(true);
 
     requestAnimationFrame(() => {
-      Animated.spring(drawerAnimation, {
-        toValue: 1,
-        damping: 22,
-        stiffness: 155,
-        mass: 0.8,
-        useNativeDriver: false,
-      }).start();
+      Animated.spring(
+        drawerAnimation,
+        {
+          toValue: 1,
+          damping: 22,
+          stiffness: 155,
+          mass: 0.8,
+          useNativeDriver: false,
+        },
+      ).start();
     });
   };
 
   const closeHistory = () => {
-    Animated.timing(drawerAnimation, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: false,
-    }).start(({finished}) => {
+    Animated.timing(
+      drawerAnimation,
+      {
+        toValue: 0,
+        duration: 240,
+        useNativeDriver: false,
+      },
+    ).start(({finished}) => {
       if (finished) {
         setHistoryVisible(false);
       }
     });
   };
 
-  const morphWidth = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [54, 340],
-  });
+  const morphWidth =
+    drawerAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [54, 340],
+    });
 
-  const morphHeight = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [54, 650],
-  });
+  const morphHeight =
+    drawerAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [54, 650],
+    });
 
-  const morphBorderRadius = drawerAnimation.interpolate({
-    inputRange: [0, 0.45, 1],
-    outputRange: [27, 32, 30],
-  });
+  const morphBorderRadius =
+    drawerAnimation.interpolate({
+      inputRange: [0, 0.45, 1],
+      outputRange: [27, 32, 30],
+    });
 
-  const morphTop = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [65, 65],
-  });
+  const morphTop =
+    drawerAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [65, 65],
+    });
 
-  const morphLeft = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [16, 10],
-  });
+  const morphLeft =
+    drawerAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [16, 10],
+    });
 
-  const backdropOpacity = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const backdropOpacity =
+    drawerAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
 
-  const morphPanelOpacity = drawerAnimation.interpolate({
-    inputRange: [0, 0.12, 1],
-    outputRange: [0, 1, 1],
-    extrapolate: 'clamp',
-  });
+  const morphPanelOpacity =
+    drawerAnimation.interpolate({
+      inputRange: [0, 0.12, 1],
+      outputRange: [0, 1, 1],
+      extrapolate: 'clamp',
+    });
 
-  const panelContentOpacity = drawerAnimation.interpolate({
-    inputRange: [0, 0.55, 1],
-    outputRange: [0, 0, 1],
-  });
+  const panelContentOpacity =
+    drawerAnimation.interpolate({
+      inputRange: [0, 0.55, 1],
+      outputRange: [0, 0, 1],
+    });
 
-  const panelContentTranslateY = drawerAnimation.interpolate({
-    inputRange: [0, 0.55, 1],
-    outputRange: [12, 12, 0],
-  });
+  const panelContentTranslateY =
+    drawerAnimation.interpolate({
+      inputRange: [0, 0.55, 1],
+      outputRange: [12, 12, 0],
+    });
 
   /* =======================================================
      HISTORY
      ======================================================= */
 
-  const openChatFromHistory = (chat: AssistantChat) => {
+  const openChatFromHistory = (
+    chat: AssistantChat,
+  ) => {
     setPetType(chat.petType);
-    setProblemType(chat.problemType);
+
+    if (
+      chat.problemTypes &&
+      chat.problemTypes.length > 0
+    ) {
+      setProblemTypes(
+        chat.problemTypes,
+      );
+    } else if (chat.problemType) {
+      setProblemTypes([
+        chat.problemType,
+      ]);
+    } else {
+      setProblemTypes([]);
+    }
+
+    setFollowUpAnswers(
+      chat.followUpAnswers || {},
+    );
+
     setDuration(chat.duration);
     setUrgency(chat.urgency);
     setResult(chat.result);
-    setAiMessage(chat.aiMessage || '');
+    setAiMessage(
+      chat.aiMessage || '',
+    );
     setLoading(false);
+
     closeHistory();
   };
 
-  const deleteChatFromHistory = async (chatId?: string) => {
+  const deleteChatFromHistory = async (
+    chatId?: string,
+  ) => {
     try {
       if (!chatId) {
         return;
       }
 
-      await deleteAssistantChatFromFirestore(chatId);
+      await deleteAssistantChatFromFirestore(
+        chatId,
+      );
+
       await loadChatHistory();
     } catch (error) {
-      console.log('Sohbet silinemedi:', error);
-      Alert.alert('Hata', 'Sohbet silinemedi.');
+      console.log(
+        'Sohbet silinemedi:',
+        error,
+      );
+
+      Alert.alert(
+        'Hata',
+        'Sohbet silinemedi.',
+      );
     }
   };
 
@@ -402,9 +765,13 @@ const AssistantScreen = () => {
      PET ICON
      ======================================================= */
 
-  const renderPetIcon = (type: PetType) => {
+  const renderPetIcon = (
+    type: PetType,
+  ) => {
     const color =
-      petType === type ? '#B78328' : '#626D89';
+      petType === type
+        ? '#B78328'
+        : '#626D89';
 
     switch (type) {
       case 'Köpek':
@@ -455,70 +822,92 @@ const AssistantScreen = () => {
   };
 
   /* =======================================================
-     SYMPTOM ICON
+     FOLLOW UP QUESTION
      ======================================================= */
 
-  const renderSymptomIcon = (
-    type: ProblemType,
-    selected: boolean,
-  ) => {
-    const color = selected ? '#FFFFFF' : '#66728D';
+  const FollowUpQuestion = ({
+    title,
+    subtitle,
+    answerKey,
+    options,
+  }: {
+    title: string;
+    subtitle?: string;
+    answerKey: keyof FollowUpAnswers;
+    options: readonly string[];
+  }) => {
+    const selectedValue =
+      followUpAnswers[answerKey];
 
-    switch (type) {
-      case 'İştahsızlık':
-        return (
-          <Utensils
-            size={20}
-            color={color}
-            strokeWidth={2.3}
-          />
-        );
+    return (
+      <View
+        style={
+          styles.followUpQuestionCard
+        }>
 
-      case 'Kusma':
-        return (
-          <Frown
-            size={20}
-            color={color}
-            strokeWidth={2.2}
-          />
-        );
+        <Text
+          style={
+            styles.followUpQuestionTitle
+          }>
+          {title}
+        </Text>
 
-      case 'Halsizlik':
-        return (
-          <Moon
-            size={19}
-            color={color}
-            strokeWidth={2.2}
-          />
-        );
+        {subtitle ? (
+          <Text
+            style={
+              styles.followUpQuestionSubtitle
+            }>
+            {subtitle}
+          </Text>
+        ) : null}
 
-      case 'Aşı / Bakım':
-        return (
-          <Syringe
-            size={20}
-            color={color}
-            strokeWidth={2.2}
-          />
-        );
+        <View
+          style={
+            styles.followUpOptions
+          }>
 
-      case 'Beslenme':
-        return (
-          <Bone
-            size={20}
-            color={color}
-            strokeWidth={2.2}
-          />
-        );
+          {options.map(option => {
+            const selected =
+              selectedValue === option;
 
-      default:
-        return (
-          <MoreHorizontal
-            size={21}
-            color={color}
-            strokeWidth={2.5}
-          />
-        );
-    }
+            return (
+              <TouchableOpacity
+                key={option}
+                activeOpacity={0.8}
+                style={[
+                  styles.followUpOption,
+                  selected &&
+                    styles.followUpOptionSelected,
+                ]}
+                onPress={() => {
+                  setFollowUpAnswers(
+                    prev => ({
+                      ...prev,
+                      [answerKey]:
+                        option,
+                    }),
+                  );
+
+                  setResult(null);
+                  setAiMessage('');
+                }}>
+
+                <Text
+                  style={[
+                    styles.followUpOptionText,
+                    selected &&
+                      styles.followUpOptionTextSelected,
+                  ]}>
+                  {option}
+                </Text>
+
+              </TouchableOpacity>
+            );
+          })}
+
+        </View>
+      </View>
+    );
   };
 
   /* =======================================================
@@ -526,224 +915,924 @@ const AssistantScreen = () => {
      ======================================================= */
 
   return (
-      <>
-        <SafeAreaView
-          style={styles.safeArea}
-          edges={['top']}>
+    <>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={['top']}>
 
-          <View style={styles.screen}>
+        <View style={styles.screen}>
 
-            {/* =================================================
-                HERO BACKGROUND
-                ================================================= */}
+          {/* =================================================
+              HERO BACKGROUND
+              ================================================= */}
+
+          <View
+            pointerEvents="none"
+            style={
+              styles.heroBackground
+            }>
 
             <View
-              pointerEvents="none"
-              style={styles.heroBackground}>
+              style={styles.heroGlowOne}
+            />
 
-              <View style={styles.heroGlowOne} />
-              <View style={styles.heroGlowTwo} />
-              <View style={styles.heroWaveLeft} />
-              <View style={styles.heroWaveRight} />
+            <View
+              style={styles.heroGlowTwo}
+            />
+
+            <View
+              style={styles.heroWaveLeft}
+            />
+
+            <View
+              style={styles.heroWaveRight}
+            />
+
+          </View>
+
+          {/* =================================================
+              SCROLL CONTENT
+              ================================================= */}
+
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom:
+                  tabBarHeight + 24,
+              },
+            ]}>
+
+            {/* =================================================
+                HERO
+                ================================================= */}
+
+            <View style={styles.hero}>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.menuButton}
+                onPress={openHistory}>
+
+                <Menu
+                  size={27}
+                  color="#15174D"
+                  strokeWidth={2.3}
+                />
+
+              </TouchableOpacity>
+
+              <View
+                style={
+                  styles.heroTitleArea
+                }>
+
+                <View
+                  style={
+                    styles.titleRow
+                  }>
+
+                  <Text
+                    style={
+                      styles.heroTitle
+                    }>
+                    PetCare
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.heroTitleAI
+                    }>
+                    {' '}AI
+                  </Text>
+
+                </View>
+
+                <Text
+                  style={
+                    styles.heroSubtitle
+                  }>
+                  Sevimli dostun için
+                </Text>
+
+                <View
+                  style={
+                    styles.subtitleRow
+                  }>
+
+                  <Text
+                    style={
+                      styles.heroSubtitle
+                    }>
+                    her zaman yanındayım
+                  </Text>
+
+                </View>
+
+              </View>
+
+              <Image
+                source={aiOrb}
+                resizeMode="contain"
+                style={styles.orbImage}
+              />
 
             </View>
 
             {/* =================================================
-                SCROLL CONTENT
+                PET TYPE
                 ================================================= */}
 
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.scroll}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={[
-                styles.scrollContent,
-                {
-                  paddingBottom: tabBarHeight + 24,
-                },
-              ]}>
+            <View
+              style={styles.mainCard}>
 
-              {/* =================================================
-                  HERO
-                  ================================================= */}
+              <View
+                style={
+                  styles.sectionHeading
+                }>
 
-              <View style={styles.hero}>
+                <View
+                  style={
+                    styles.sectionHeadingIcon
+                  }>
 
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.menuButton}
-                  onPress={openHistory}>
-
-                  <Menu
-                    size={27}
-                    color="#15174D"
-                    strokeWidth={2.3}
+                  <PawPrint
+                    size={25}
+                    color="#B78328"
+                    strokeWidth={2.4}
                   />
-
-                </TouchableOpacity>
-
-                <View style={styles.heroTitleArea}>
-
-                  <View style={styles.titleRow}>
-                    <Text style={styles.heroTitle}>
-                      PetCare
-                    </Text>
-
-                    <Text style={styles.heroTitleAI}>
-                      {' '}AI
-                    </Text>
-                  </View>
-
-                  <Text style={styles.heroSubtitle}>
-                    Sevimli dostun için
-                  </Text>
-
-                  <View style={styles.subtitleRow}>
-                    <Text style={styles.heroSubtitle}>
-                      her zaman yanındayım
-                    </Text>
-
-                  </View>
 
                 </View>
 
-                <Image
-                  source={aiOrb}
-                  resizeMode="contain"
-                  style={styles.orbImage}
-                />
+                <View
+                  style={
+                    styles.sectionHeadingTexts
+                  }>
+
+                  <Text
+                    style={
+                      styles.sectionTitle
+                    }>
+                    Evcil Hayvan Türü
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.sectionSubtitle
+                    }>
+                    Danışacağın dostunu seç
+                  </Text>
+
+                </View>
 
               </View>
 
-              {/* =================================================
-                  PET TYPE
-                  ================================================= */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={
+                  false
+                }
+                contentContainerStyle={
+                  styles.petRow
+                }>
 
-              <View style={styles.mainCard}>
+                {PETS.map(item => {
+                  const selected =
+                    petType === item;
 
-                <View style={styles.sectionHeading}>
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      activeOpacity={0.86}
+                      onPress={() => {
+                        setPetType(item);
+                        setResult(null);
+                        setAiMessage('');
+                      }}
+                      style={[
+                        styles.petItem,
+                        selected &&
+                          styles.petItemSelected,
+                      ]}>
 
-                  <View style={styles.sectionHeadingIcon}>
-                    <PawPrint
-                      size={25}
-                      color="#B78328"
-                      strokeWidth={2.4}
+                      <View
+                        style={
+                          styles.petIconArea
+                        }>
+                        {renderPetIcon(
+                          item,
+                        )}
+                      </View>
+
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.petText,
+                          selected &&
+                            styles.petTextSelected,
+                          item ===
+                            'Küçük Hayvan' &&
+                            styles.petTextSmall,
+                        ]}>
+                        {item}
+                      </Text>
+
+                    </TouchableOpacity>
+                  );
+                })}
+
+              </ScrollView>
+
+            </View>
+
+            {/* =================================================
+                SYMPTOMS
+                ================================================= */}
+
+            <View
+              style={styles.mainCard}>
+
+              <View
+                style={
+                  styles.sectionHeading
+                }>
+
+                <View
+                  style={
+                    styles.sectionHeadingIcon
+                  }>
+
+                  <Stethoscope
+                    size={27}
+                    color="#68BDAA"
+                    strokeWidth={2.5}
+                  />
+
+                </View>
+
+                <View
+                  style={
+                    styles.sectionHeadingTexts
+                  }>
+
+                  <Text
+                    style={
+                      styles.sectionTitle
+                    }>
+                    Semptom Etiketleri
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.sectionSubtitle
+                    }>
+                    Gözlemlediğin belirtileri seç
+                    (birden fazla olabilir)
+                  </Text>
+
+                </View>
+
+              </View>
+
+              <View
+                style={
+                  styles.symptomGrid
+                }>
+
+                {SYMPTOMS.map(item => {
+                  const selected =
+                    problemTypes.includes(
+                      item,
+                    );
+
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        const nextProblemTypes = problemTypes.includes(item)
+                          ? problemTypes.filter(symptom => symptom !== item)
+                          : [...problemTypes, item];
+
+                        setProblemTypes(nextProblemTypes);
+
+                        setFollowUpAnswers(current => {
+                          const cleaned = {...current};
+
+                          // Kusma artık seçili değilse kusma sorularını temizle
+                          if (!nextProblemTypes.includes('Kusma')) {
+                            delete cleaned.vomitingFrequency;
+                            delete cleaned.vomitAppearance;
+                            delete cleaned.canKeepWater;
+                            delete cleaned.abdominalPain;
+                          }
+
+                          // İştahsızlık ve Beslenme artık seçili değilse
+                          // iştah/sıvı sorularını temizle
+                          if (
+                            !nextProblemTypes.includes('İştahsızlık') &&
+                            !nextProblemTypes.includes('Beslenme')
+                          ) {
+                            delete cleaned.foodIntake;
+                            delete cleaned.waterIntake;
+                            delete cleaned.weightLoss;
+                          }
+
+                          // Halsizlik artık seçili değilse
+                          if (!nextProblemTypes.includes('Halsizlik')) {
+                            delete cleaned.energyLevel;
+                            delete cleaned.canWalkNormally;
+                          }
+
+                          // Beslenme artık seçili değilse beslenme değişikliği
+                          // sorularını temizle
+                          if (!nextProblemTypes.includes('Beslenme')) {
+                            delete cleaned.foodChange;
+                            delete cleaned.unusualFood;
+                          }
+
+                          // Yabancı cisim sorusu sadece Kusma veya Beslenme
+                          // seçiliyken geçerli
+                          if (
+                            !nextProblemTypes.includes('Kusma') &&
+                            !nextProblemTypes.includes('Beslenme')
+                          ) {
+                            delete cleaned.foreignBodyRisk;
+                          }
+
+                          return cleaned;
+                        });
+
+                        // Yeni seçim yapıldığında eski AI sonucunu kaldır
+                        setResult(null);
+                        setAiMessage('');
+                      }}
+                      style={
+                        styles.symptomCell
+                      }>
+
+                      {selected ? (
+                        <View
+                          style={
+                            styles.symptomSelected
+                          }>
+
+                          <Text
+                            style={
+                              styles.symptomTextSelected
+                            }>
+                            {item}
+                          </Text>
+
+                        </View>
+                      ) : (
+                        <View
+                          style={
+                            styles.symptomDefault
+                          }>
+
+                          <Text
+                            style={
+                              styles.symptomText
+                            }>
+                            {item}
+                          </Text>
+
+                        </View>
+                      )}
+
+                    </TouchableOpacity>
+                  );
+                })}
+
+              </View>
+
+            </View>
+
+            {/* =================================================
+                DYNAMIC FOLLOW-UP QUESTIONS
+                ================================================= */}
+
+            {problemTypes.length > 0 && (
+              <View
+                style={
+                  styles.followUpSection
+                }>
+
+                <View
+                  style={
+                    styles.followUpSectionHeader
+                  }>
+
+                  <Text
+                    style={
+                      styles.followUpSectionTitle
+                    }>
+                    Birkaç ek bilgi
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.followUpSectionSubtitle
+                    }>
+                    Seçtiğin belirtilere göre
+                    sana birkaç kısa soru
+                    soracağız.
+                  </Text>
+
+                </View>
+
+                {/* =================================================
+                    KUSMA
+                    ================================================= */}
+
+                {problemTypes.includes(
+                  'Kusma',
+                ) && (
+                  <>
+
+                    <View
+                      style={
+                        styles.followUpGroupTitle
+                      }>
+
+                      <Frown
+                        size={19}
+                        color="#7257FF"
+                        strokeWidth={2.3}
+                      />
+
+                      <Text
+                        style={
+                          styles.followUpGroupTitleText
+                        }>
+                        Kusma
+                      </Text>
+
+                    </View>
+
+                    <FollowUpQuestion
+                      title="Son 24 saatte kaç kez kustu?"
+                      answerKey="vomitingFrequency"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .vomitingFrequency
+                      }
                     />
+
+                    <FollowUpQuestion
+                      title="Kusmuğun görünümü nasıldı?"
+                      subtitle="En yakın seçeneği seç."
+                      answerKey="vomitAppearance"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .vomitAppearance
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Su içtiğinde suyunu tutabiliyor mu?"
+                      subtitle="Suyu içtikten kısa süre sonra tekrar kusuyor mu?"
+                      answerKey="canKeepWater"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .canKeepWater
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Karın bölgesinde ağrı veya belirgin şişlik var mı?"
+                      answerKey="abdominalPain"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .abdominalPain
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Yabancı bir cisim yutmuş olma ihtimali var mı?"
+                      subtitle="Oyuncak parçası, kemik, ip, plastik vb."
+                      answerKey="foreignBodyRisk"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .foreignBodyRisk
+                      }
+                    />
+
+                  </>
+                )}
+
+                {/* =================================================
+                    İŞTAHSIZLIK / BESLENME
+                    ================================================= */}
+
+                {(problemTypes.includes(
+                  'İştahsızlık',
+                ) ||
+                  problemTypes.includes(
+                    'Beslenme',
+                  )) && (
+                  <>
+
+                    <View
+                      style={
+                        styles.followUpGroupTitle
+                      }>
+
+                      <Utensils
+                        size={19}
+                        color="#68BDAA"
+                        strokeWidth={2.3}
+                      />
+
+                      <Text
+                        style={
+                          styles.followUpGroupTitleText
+                        }>
+                        Beslenme ve iştah
+                      </Text>
+
+                    </View>
+
+                    <FollowUpQuestion
+                      title="Bugün normaline göre ne kadar yemek yedi?"
+                      subtitle="Yaklaşık miktarı seç."
+                      answerKey="foodIntake"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .foodIntake
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Su tüketiminde bir değişiklik oldu mu?"
+                      answerKey="waterIntake"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .waterIntake
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Son günlerde kilo kaybı fark ettin mi?"
+                      answerKey="weightLoss"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .weightLoss
+                      }
+                    />
+
+                  </>
+                )}
+
+                {/* =================================================
+                    BESLENME DEĞİŞİKLİĞİ
+                    ================================================= */}
+
+                {problemTypes.includes(
+                  'Beslenme',
+                ) && (
+                  <>
+
+                    <View
+                      style={
+                        styles.followUpGroupTitle
+                      }>
+
+                      <Bone
+                        size={19}
+                        color="#D19A55"
+                        strokeWidth={2.3}
+                      />
+
+                      <Text
+                        style={
+                          styles.followUpGroupTitleText
+                        }>
+                        Beslenme değişikliği
+                      </Text>
+
+                    </View>
+
+                    <FollowUpQuestion
+                      title="Yakın zamanda mama veya beslenme düzeni değişti mi?"
+                      answerKey="foodChange"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .foodChange
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Normalde yemediği bir yiyecek veya ödül verildi mi?"
+                      answerKey="unusualFood"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .unusualFood
+                      }
+                    />
+
+                  </>
+                )}
+
+                {/* =================================================
+                    HALSİZLİK
+                    ================================================= */}
+
+                {problemTypes.includes(
+                  'Halsizlik',
+                ) && (
+                  <>
+
+                    <View
+                      style={
+                        styles.followUpGroupTitle
+                      }>
+
+                      <Moon
+                        size={19}
+                        color="#7D6BE8"
+                        strokeWidth={2.3}
+                      />
+
+                      <Text
+                        style={
+                          styles.followUpGroupTitleText
+                        }>
+                        Genel durum
+                      </Text>
+
+                    </View>
+
+                    <FollowUpQuestion
+                      title="Enerji seviyesi nasıl?"
+                      subtitle="Normal davranışına göre değerlendir."
+                      answerKey="energyLevel"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .energyLevel
+                      }
+                    />
+
+                    <FollowUpQuestion
+                      title="Normal şekilde yürüyebiliyor mu?"
+                      answerKey="canWalkNormally"
+                      options={
+                        FOLLOW_UP_OPTIONS
+                          .canWalkNormally
+                      }
+                    />
+
+                  </>
+                )}
+
+                {/* =================================================
+                    DİĞER
+                    ================================================= */}
+
+                {problemTypes.includes(
+                  'Diğer',
+                ) && (
+                  <View
+                    style={
+                      styles.otherInfoBox
+                    }>
+
+                    <Text
+                      style={
+                        styles.otherInfoTitle
+                      }>
+                      Bu belirtiyi daha ayrıntılı
+                      açıklayabilirsin.
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.otherInfoText
+                      }>
+                      Diğer seçeneği seçtiğinde
+                      değerlendirme mevcut
+                      bilgilerin üzerinden yapılır.
+                    </Text>
+
                   </View>
+                )}
 
-                  <View style={styles.sectionHeadingTexts}>
-                    <Text style={styles.sectionTitle}>
-                      Evcil Hayvan Türü
+              </View>
+            )}
+
+            {/* =================================================
+                DURATION + URGENCY
+                ================================================= */}
+
+            <View
+              style={
+                styles.doubleCardRow
+              }>
+
+              {/* DURATION */}
+
+              <View
+                style={[
+                  styles.smallCard,
+                  styles.durationCard,
+                ]}>
+
+                <View
+                  style={
+                    styles.smallCardHeader
+                  }>
+
+                  <CalendarDays
+                    size={23}
+                    color={COLORS.purple}
+                    strokeWidth={2.5}
+                  />
+
+                  <View
+                    style={
+                      styles.smallHeaderTextBox
+                    }>
+
+                    <Text
+                      style={
+                        styles.smallCardTitle
+                      }>
+                      Süre
                     </Text>
 
-                    <Text style={styles.sectionSubtitle}>
-                      Danışacağın dostunu seç
+                    <Text
+                      style={
+                        styles.smallCardSubtitle
+                      }>
+                      Ne zamandır devam ediyor?
                     </Text>
+
                   </View>
 
                 </View>
 
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.petRow}>
+                <View
+                  style={
+                    styles.durationGrid
+                  }>
 
-                  {PETS.map(item => {
-                    const selected = petType === item;
+                  {DURATIONS.map(item => {
+                    const selected =
+                      duration ===
+                      item.key;
 
                     return (
                       <TouchableOpacity
-                        key={item}
-                        activeOpacity={0.86}
+                        key={item.key}
+                        activeOpacity={0.85}
                         onPress={() => {
-                          setPetType(item);
+                          setDuration(
+                            item.key,
+                          );
                           setResult(null);
                           setAiMessage('');
                         }}
                         style={[
-                          styles.petItem,
-                          selected && styles.petItemSelected,
+                          styles.durationOption,
+                          selected &&
+                            styles.durationOptionSelected,
                         ]}>
 
-                        <View style={styles.petIconArea}>
-                          {renderPetIcon(item)}
-                        </View>
-
                         <Text
-                          numberOfLines={1}
+                          numberOfLines={2}
                           style={[
-                            styles.petText,
-                            selected && styles.petTextSelected,
-                            item === 'Küçük Hayvan' &&
-                              styles.petTextSmall,
+                            styles.durationOptionText,
+                            selected &&
+                              styles.durationOptionTextSelected,
                           ]}>
-                          {item}
+                          {item.label}
                         </Text>
 
                       </TouchableOpacity>
                     );
                   })}
 
-                </ScrollView>
+                </View>
 
               </View>
 
-              {/* =================================================
-                  SYMPTOMS
-                  ================================================= */}
+              {/* URGENCY */}
 
-              <View style={styles.mainCard}>
+              <View
+                style={[
+                  styles.smallCard,
+                  styles.urgencyCard,
+                ]}>
 
-                <View style={styles.sectionHeading}>
+                <View
+                  style={
+                    styles.smallCardHeader
+                  }>
 
-                  <View style={styles.sectionHeadingIcon}>
-                    <Stethoscope
-                      size={27}
-                      color="#68BDAA"
-                      strokeWidth={2.5}
-                    />
-                  </View>
+                  <Siren
+                    size={24}
+                    color={COLORS.red}
+                    strokeWidth={2.4}
+                  />
 
-                  <View style={styles.sectionHeadingTexts}>
-                    <Text style={styles.sectionTitle}>
-                      Semptom Etiketleri
+                  <View
+                    style={
+                      styles.smallHeaderTextBox
+                    }>
+
+                    <Text
+                      style={
+                        styles.smallCardTitle
+                      }>
+                      Aciliyet
                     </Text>
 
-                    <Text style={styles.sectionSubtitle}>
-                      Gözlemlediğin belirtileri seç (birden fazla olabilir)
+                    <Text
+                      style={
+                        styles.smallCardSubtitle
+                      }>
+                      Acil bir durum olduğunu
+                      düşünüyor musun?
                     </Text>
+
                   </View>
 
                 </View>
 
-                <View style={styles.symptomGrid}>
+                <View
+                  style={
+                    styles.urgencyGrid
+                  }>
 
-                  {SYMPTOMS.map(item => {
-                    const selected = problemType === item;
+                  {URGENCIES.map(item => {
+                    const selected =
+                      urgency === item;
 
                     return (
                       <TouchableOpacity
                         key={item}
                         activeOpacity={0.85}
                         onPress={() => {
-                          setProblemType(item);
+                          setUrgency(
+                            item,
+                          );
                           setResult(null);
                           setAiMessage('');
                         }}
-                        style={styles.symptomCell}>
+                        style={[
+                          styles.urgencyOption,
+                          item ===
+                            'Emin değilim' &&
+                            styles.urgencyWide,
+                        ]}>
 
                         {selected ? (
-                          <View style={styles.symptomSelected}>
+                          <LinearGradient
+                            colors={[
+                              '#F6B89F',
+                              '#EE9F86',
+                            ]}
+                            start={{
+                              x: 0,
+                              y: 0,
+                            }}
+                            end={{
+                              x: 1,
+                              y: 1,
+                            }}
+                            style={[
+                              styles.urgencyGradient,
+                              item ===
+                                'Emin değilim' &&
+                                styles.urgencyWide,
+                            ]}>
 
-                            <Text style={styles.symptomTextSelected}>
+                            <Text
+                              style={
+                                styles.urgencySelectedText
+                              }>
                               {item}
                             </Text>
 
-                          </View>
+                          </LinearGradient>
                         ) : (
-                          <View style={styles.symptomDefault}>
+                          <View
+                            style={[
+                              styles.urgencyDefault,
+                              item ===
+                                'Emin değilim' &&
+                                styles.urgencyWide,
+                            ]}>
 
-                            <Text style={styles.symptomText}>
+                            <Text
+                              numberOfLines={1}
+                              style={
+                                styles.urgencyText
+                              }>
                               {item}
                             </Text>
 
@@ -758,531 +1847,625 @@ const AssistantScreen = () => {
 
               </View>
 
-              {/* =================================================
-                  DURATION + URGENCY
-                  ================================================= */}
+            </View>
 
-              <View style={styles.doubleCardRow}>
+            {/* =================================================
+                SUMMARY
+                ================================================= */}
 
-                {/* DURATION */}
+            <View
+              style={
+                styles.summaryCard
+              }>
 
-                <View style={[styles.smallCard, styles.durationCard]}>
+              <View
+                style={
+                  styles.summaryHeader
+                }>
 
-                  <View style={styles.smallCardHeader}>
+                <View
+                  style={
+                    styles.summaryHeaderLeft
+                  }>
 
-                    <CalendarDays
-                      size={23}
-                      color={COLORS.purple}
-                      strokeWidth={2.5}
-                    />
-
-                    <View style={styles.smallHeaderTextBox}>
-                      <Text style={styles.smallCardTitle}>
-                        Süre
-                      </Text>
-
-                      <Text style={styles.smallCardSubtitle}>
-                        Ne zamandır devam ediyor?
-                      </Text>
-                    </View>
-
-                  </View>
-
-                  <View style={styles.durationGrid}>
-
-                    {DURATIONS.map(item => {
-                      const selected = duration === item.key;
-
-                      return (
-                        <TouchableOpacity
-                          key={item.key}
-                          activeOpacity={0.85}
-                          onPress={() => {
-                            setDuration(item.key);
-                            setResult(null);
-                            setAiMessage('');
-                          }}
-                          style={[
-                            styles.durationOption,
-                            selected &&
-                              styles.durationOptionSelected,
-                          ]}>
-
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.durationOptionText,
-                              selected &&
-                                styles.durationOptionTextSelected,
-                            ]}>
-                            {item.label}
-                          </Text>
-
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                  </View>
-
-                </View>
-
-                {/* URGENCY */}
-
-                <View style={[styles.smallCard, styles.urgencyCard]}>
-
-                  <View style={styles.smallCardHeader}>
-
-                    <Siren
-                      size={24}
-                      color={COLORS.red}
-                      strokeWidth={2.4}
-                    />
-
-                    <View style={styles.smallHeaderTextBox}>
-                      <Text
-                        numberOfLines={1}
-                        style={styles.smallCardTitle}>
-                        Aciliyet
-                      </Text>
-
-                    </View>
-
-                  </View>
-
-                  <View style={styles.urgencyGrid}>
-
-                    {URGENCIES.map(item => {
-                      const selected = urgency === item;
-
-                      return (
-                        <TouchableOpacity
-                          key={item}
-                          activeOpacity={0.85}
-                          onPress={() => {
-                            setUrgency(item);
-                            setResult(null);
-                            setAiMessage('');
-                          }}
-                          style={[
-                            styles.urgencyOption,
-                            item === 'Emin değilim' &&
-                              styles.urgencyWide,
-                          ]}>
-
-                          {selected ? (
-                            <LinearGradient
-                              colors={[
-                                '#F6B89F',
-                                '#EE9F86',
-                              ]}
-                              start={{x: 0, y: 0}}
-                              end={{x: 1, y: 1}}
-                              style={[
-                                styles.urgencyGradient,
-                                item === 'Emin değilim' &&
-                                  styles.urgencyWide,
-                              ]}>
-
-                              <Text style={styles.urgencySelectedText}>
-                                {item}
-                              </Text>
-
-                            </LinearGradient>
-                          ) : (
-                            <View
-                              style={[
-                                styles.urgencyDefault,
-                                item === 'Emin değilim' &&
-                                  styles.urgencyWide,
-                              ]}>
-
-                              <Text
-                                numberOfLines={1}
-                                style={styles.urgencyText}>
-                                {item}
-                              </Text>
-
-                            </View>
-                          )}
-
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                  </View>
-
-                </View>
-
-              </View>
-
-              {/* =================================================
-                  SUMMARY
-                  ================================================= */}
-
-              <View style={styles.summaryCard}>
-
-                <View style={styles.summaryHeader}>
-
-                  <View style={styles.summaryHeaderLeft}>
-                    <View>
-                      <Text style={styles.summaryTitle}>
-                        Analiz Özeti
-                      </Text>
-
-                      <Text style={styles.summarySubtitle}>
-                        Seçimlerine göre hazırlanan özet
-                      </Text>
-                    </View>
-
-                  </View>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.editButton}
-                    onPress={resetForm}>
-
-
-                    <Text style={styles.editText}>
-                      Sıfırla
+                  <View>
+                    <Text
+                      style={
+                        styles.summaryTitle
+                      }>
+                      Analiz Özeti
                     </Text>
 
-                  </TouchableOpacity>
-
-                </View>
-
-                <View style={styles.summaryInner}>
-
-                  <View style={styles.summaryDetails}>
-
-                    <View style={styles.summaryLine}>
-
-                      <Text style={styles.summaryLabel}>
-                        Evcil Hayvan Türü:
-                      </Text>
-
-                      <Text
-                        numberOfLines={1}
-                        style={styles.summaryValue}>
-                        {petType || 'Seçilmedi'}
-                      </Text>
-
-                    </View>
-
-                    <View style={styles.summaryLine}>
-
-                      <Text style={styles.summaryLabel}>
-                        Semptom:
-                      </Text>
-
-                      <Text
-                        numberOfLines={1}
-                        style={styles.summaryValue}>
-                        {problemType || 'Seçilmedi'}
-                      </Text>
-
-                    </View>
-
-                    <View style={styles.summaryLine}>
-
-                      <Text style={styles.summaryLabel}>
-                        Süre:
-                      </Text>
-
-                      <Text
-                        numberOfLines={1}
-                        style={styles.summaryValue}>
-                        {duration
-                          ? durationLabelMap[duration]
-                          : 'Seçilmedi'}
-                      </Text>
-
-                    </View>
-
-                    <View style={styles.summaryLine}>
-
-                      <Text style={styles.summaryLabel}>
-                        Aciliyet:
-                      </Text>
-
-                      <Text
-                        numberOfLines={1}
-                        style={styles.summaryValue}>
-                        {urgency || 'Seçilmedi'}
-                      </Text>
-
-                    </View>
-
+                    <Text
+                      style={
+                        styles.summarySubtitle
+                      }>
+                      Seçimlerine göre hazırlanan özet
+                    </Text>
                   </View>
 
-                  <Image
-                    source={aiAssistant}
-                    resizeMode="contain"
-                    style={styles.robotImage}
-                  />
-
                 </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={
+                    styles.editButton
+                  }
+                  onPress={
+                    resetForm
+                  }>
+
+                  <Text
+                    style={
+                      styles.editText
+                    }>
+                    Sıfırla
+                  </Text>
+
+                </TouchableOpacity>
 
               </View>
 
-              {/* =================================================
-                  AI BUTTON
-                  ================================================= */}
+              <View
+                style={
+                  styles.summaryInner
+                }>
 
-              <TouchableOpacity
-                activeOpacity={0.9}
-                disabled={loading}
-                onPress={fetchRisk}
-                style={styles.aiButtonOuter}>
+                <View
+                  style={
+                    styles.summaryDetails
+                  }>
 
-                <LinearGradient
-                  colors={[
-                    '#9A83F5',
-                    '#8770ED',
-                    '#7662E2',
-                  ]}
-                  locations={[0, 0.5, 1]}
-                  start={{x: 0, y: 0.5}}
-                  end={{x: 1, y: 0.5}}
-                  style={styles.aiButton}>
+                  <View
+                    style={
+                      styles.summaryLine
+                    }>
 
-                  {loading ? (
-                    <ActivityIndicator
-                      size="small"
-                      color="#FFFFFF"
-                    />
-                  ) : (
-                    <>
-                      <View style={styles.aiButtonCenter}>
+                    <Text
+                      style={
+                        styles.summaryLabel
+                      }>
+                      Evcil Hayvan Türü:
+                    </Text>
 
-                        <Text style={styles.aiButtonText}>
-                          AI Tanı Başlat
-                        </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={
+                        styles.summaryValue
+                      }>
+                      {petType ||
+                        'Seçilmedi'}
+                    </Text>
 
-                      </View>
+                  </View>
 
-                      <View style={styles.arrowCircle}>
-                        <ArrowRight
-                          size={21}
-                          color={COLORS.purpleDark}
-                          strokeWidth={2.3}
-                        />
-                      </View>
-                    </>
-                  )}
+                  <View
+                    style={
+                      styles.summaryLine
+                    }>
 
-                </LinearGradient>
+                    <Text
+                      style={
+                        styles.summaryLabel
+                      }>
+                      Semptom:
+                    </Text>
 
-              </TouchableOpacity>
+                    <Text
+                      numberOfLines={2}
+                      style={
+                        styles.summaryValue
+                      }>
+                      {problemTypes.length >
+                      0
+                        ? problemTypes.join(
+                            ', ',
+                          )
+                        : 'Seçilmedi'}
+                    </Text>
 
-              {/* =================================================
-                  DISCLAIMER
-                  ================================================= */}
+                  </View>
 
-              <View style={styles.disclaimerRow}>
+                  <View
+                    style={
+                      styles.summaryLine
+                    }>
 
-                <Info
-                  size={15}
-                  color="#5045F3"
-                  strokeWidth={2.3}
+                    <Text
+                      style={
+                        styles.summaryLabel
+                      }>
+                      Süre:
+                    </Text>
+
+                    <Text
+                      numberOfLines={1}
+                      style={
+                        styles.summaryValue
+                      }>
+                      {duration
+                        ? durationLabelMap[
+                            duration
+                          ]
+                        : 'Seçilmedi'}
+                    </Text>
+
+                  </View>
+
+                  <View
+                    style={
+                      styles.summaryLine
+                    }>
+
+                    <Text
+                      style={
+                        styles.summaryLabel
+                      }>
+                      Aciliyet:
+                    </Text>
+
+                    <Text
+                      numberOfLines={1}
+                      style={
+                        styles.summaryValue
+                      }>
+                      {urgency ||
+                        'Seçilmedi'}
+                    </Text>
+
+                  </View>
+
+                </View>
+
+                <Image
+                  source={aiAssistant}
+                  resizeMode="contain"
+                  style={
+                    styles.robotImage
+                  }
                 />
 
-                <Text style={styles.disclaimerText}>
-                  Bu bir ön değerlendirmedir, kesin tanı için veteriner
-                  hekiminize danışınız.
+              </View>
+
+            </View>
+
+            {/* =================================================
+                AI BUTTON
+                ================================================= */}
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              disabled={loading}
+              onPress={fetchRisk}
+              style={
+                styles.aiButtonOuter
+              }>
+
+              <LinearGradient
+                colors={[
+                  '#9A83F5',
+                  '#8770ED',
+                  '#7662E2',
+                ]}
+                locations={[
+                  0,
+                  0.5,
+                  1,
+                ]}
+                start={{
+                  x: 0,
+                  y: 0.5,
+                }}
+                end={{
+                  x: 1,
+                  y: 0.5,
+                }}
+                style={
+                  styles.aiButton
+                }>
+
+                {loading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <>
+                    <View
+                      style={
+                        styles.aiButtonCenter
+                      }>
+
+                      <Text
+                        style={
+                          styles.aiButtonText
+                        }>
+                        AI Tanı Başlat
+                      </Text>
+
+                    </View>
+
+                    <View
+                      style={
+                        styles.arrowCircle
+                      }>
+
+                      <ArrowRight
+                        size={21}
+                        color={
+                          COLORS.purpleDark
+                        }
+                        strokeWidth={2.3}
+                      />
+
+                    </View>
+                  </>
+                )}
+
+              </LinearGradient>
+
+            </TouchableOpacity>
+
+            {/* =================================================
+                DISCLAIMER
+                ================================================= */}
+
+            <View
+              style={
+                styles.disclaimerRow
+              }>
+
+              <Info
+                size={15}
+                color="#5045F3"
+                strokeWidth={2.3}
+              />
+
+              <Text
+                style={
+                  styles.disclaimerText
+                }>
+                Bu bir ön değerlendirmedir,
+                kesin tanı için veteriner
+                hekiminize danışınız.
+              </Text>
+
+            </View>
+
+            {/* =================================================
+                RESULT
+                ================================================= */}
+
+            {loading && (
+              <View
+                style={
+                  styles.loadingCard
+                }>
+
+                <ActivityIndicator
+                  size="large"
+                  color={
+                    COLORS.purple
+                  }
+                />
+
+                <Text
+                  style={
+                    styles.loadingTitle
+                  }>
+                  Analiz hazırlanıyor...
+                </Text>
+
+                <Text
+                  style={
+                    styles.loadingText
+                  }>
+                  Seçimlerin ve verdiğin ek
+                  bilgiler değerlendiriliyor.
                 </Text>
 
               </View>
+            )}
 
-              {/* =================================================
-                  RESULT
-                  ================================================= */}
+            {!loading &&
+              result && (
+                <View
+                  style={
+                    styles.resultCard
+                  }>
 
-              {loading && (
-                <View style={styles.loadingCard}>
+                  <View
+                    style={
+                      styles.resultHeader
+                    }>
 
-                  <ActivityIndicator
-                    size="large"
-                    color={COLORS.purple}
-                  />
+                    <View
+                      style={
+                        styles.riskBadge
+                      }>
 
-                  <Text style={styles.loadingTitle}>
-                    Analiz hazırlanıyor...
-                  </Text>
-
-                  <Text style={styles.loadingText}>
-                    Seçimlerin yapay zeka tarafından değerlendiriliyor.
-                  </Text>
-
-                </View>
-              )}
-
-              {!loading && result && (
-                <View style={styles.resultCard}>
-
-                  <View style={styles.resultHeader}>
-
-                    <View style={styles.riskBadge}>
-                      <Text style={styles.riskBadgeText}>
-                        {result.riskLevel} Risk Seviyesi
+                      <Text
+                        style={
+                          styles.riskBadgeText
+                        }>
+                        {result.riskLevel}{' '}
+                        Risk Seviyesi
                       </Text>
+
                     </View>
 
-                    <Text style={styles.score}>
-                      Skor: {result.riskScore}/100
+                    <Text
+                      style={
+                        styles.score
+                      }>
+                      Skor:{' '}
+                      {result.riskScore}
+                      /100
                     </Text>
 
                   </View>
 
-                  <Text style={styles.resultTitle}>
+                  <Text
+                    style={
+                      styles.resultTitle
+                    }>
                     Önerilen Eylem
                   </Text>
 
-                  <Text style={styles.resultAction}>
+                  <Text
+                    style={
+                      styles.resultAction
+                    }>
                     {result.action}
                   </Text>
 
                   {!!aiMessage && (
-                    <View style={styles.aiMessageBox}>
+                    <View
+                      style={
+                        styles.aiMessageBox
+                      }>
 
-                      <Text style={styles.aiMessageTitle}>
+                      <Text
+                        style={
+                          styles.aiMessageTitle
+                        }>
                         PetCare AI Yorumu
                       </Text>
 
-                      <Text style={styles.aiMessage}>
+                      <Text
+                        style={
+                          styles.aiMessage
+                        }>
                         {aiMessage}
                       </Text>
 
                     </View>
                   )}
 
-                  <Text style={styles.resultDisclaimer}>
-                    Bu sonuç yalnızca yapay zeka ön değerlendirmesidir.
-                    Veteriner hekim muayenesinin yerini tutmaz.
+                  <Text
+                    style={
+                      styles.resultDisclaimer
+                    }>
+                    Bu sonuç yalnızca yapay
+                    zeka ön değerlendirmesidir.
+                    Veteriner hekim muayenesinin
+                    yerini tutmaz.
                   </Text>
 
                 </View>
               )}
 
-            </ScrollView>
+          </ScrollView>
 
-            {/* =================================================
-                HISTORY DRAWER
-                ================================================= */}
+          {/* =================================================
+              HISTORY DRAWER
+              ================================================= */}
 
-            <Modal
-              visible={historyVisible}
-              transparent
-              animationType="none"
-              statusBarTranslucent
-              onRequestClose={closeHistory}>
+          <Modal
+            visible={historyVisible}
+            transparent
+            animationType="none"
+            statusBarTranslucent
+            onRequestClose={
+              closeHistory
+            }>
 
-              <View style={styles.morphOverlay}>
+            <View
+              style={
+                styles.morphOverlay
+              }>
+
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.morphBackdropVisual,
+                  {
+                    opacity:
+                      backdropOpacity,
+                  },
+                ]}
+              />
+
+              <Pressable
+                style={
+                  StyleSheet.absoluteFillObject
+                }
+                onPress={
+                  closeHistory
+                }
+              />
+
+              <Animated.View
+                style={[
+                  styles.morphPanel,
+                  {
+                    top: morphTop,
+                    left: morphLeft,
+                    width: morphWidth,
+                    height: morphHeight,
+                    borderRadius:
+                      morphBorderRadius,
+                    opacity:
+                      morphPanelOpacity,
+                  },
+                ]}>
 
                 <Animated.View
-                  pointerEvents="none"
                   style={[
-                    styles.morphBackdropVisual,
-                    {opacity: backdropOpacity},
-                  ]}
-                />
-
-                <Pressable
-                  style={StyleSheet.absoluteFillObject}
-                  onPress={closeHistory}
-                />
-
-                <Animated.View
-                  style={[
-                    styles.morphPanel,
+                    styles.morphPanelContent,
                     {
-                      top: morphTop,
-                      left: morphLeft,
-                      width: morphWidth,
-                      height: morphHeight,
-                      borderRadius: morphBorderRadius,
-                      opacity: morphPanelOpacity,
+                      opacity:
+                        panelContentOpacity,
+                      transform: [
+                        {
+                          translateY:
+                            panelContentTranslateY,
+                        },
+                      ],
                     },
                   ]}>
 
-                  <Animated.View
-                    style={[
-                      styles.morphPanelContent,
-                      {
-                        opacity: panelContentOpacity,
-                        transform: [{translateY: panelContentTranslateY}],
-                      },
-                    ]}>
+                  <View
+                    style={
+                      styles.drawerHeader
+                    }>
 
-                    <View style={styles.drawerHeader}>
+                    <View>
+                      <Text
+                        style={
+                          styles.drawerTitle
+                        }>
+                        Geçmiş Analizler
+                      </Text>
 
-                      <View>
-                        <Text style={styles.drawerTitle}>
-                          Geçmiş Analizler
-                        </Text>
-
-                        <Text style={styles.drawerSubtitle}>
-                          Önceki değerlendirmelerin
-                        </Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.drawerClose}
-                        activeOpacity={0.8}
-                        onPress={closeHistory}>
-
-                        <X
-                          size={20}
-                          color={COLORS.navy}
-                        />
-
-                      </TouchableOpacity>
-
+                      <Text
+                        style={
+                          styles.drawerSubtitle
+                        }>
+                        Önceki değerlendirmelerin
+                      </Text>
                     </View>
 
-                    {chatHistory.length === 0 ? (
-                      <View style={styles.emptyHistory}>
+                    <TouchableOpacity
+                      style={
+                        styles.drawerClose
+                      }
+                      activeOpacity={0.8}
+                      onPress={
+                        closeHistory
+                      }>
 
-                        <Clock3
-                          size={28}
-                          color="#9AA3B7"
-                        />
+                      <X
+                        size={20}
+                        color={
+                          COLORS.navy
+                        }
+                      />
 
-                        <Text style={styles.emptyHistoryText}>
-                          Henüz kaydedilmiş bir değerlendirme yok.
-                        </Text>
+                    </TouchableOpacity>
 
-                      </View>
-                    ) : (
-                      <ScrollView
-                        style={styles.morphHistoryScroll}
-                        showsVerticalScrollIndicator={false}>
+                  </View>
 
-                        {chatHistory.map(chat => (
+                  {chatHistory.length ===
+                  0 ? (
+                    <View
+                      style={
+                        styles.emptyHistory
+                      }>
+
+                      <Clock3
+                        size={28}
+                        color="#9AA3B7"
+                      />
+
+                      <Text
+                        style={
+                          styles.emptyHistoryText
+                        }>
+                        Henüz kaydedilmiş
+                        bir değerlendirme
+                        yok.
+                      </Text>
+
+                    </View>
+                  ) : (
+                    <ScrollView
+                      style={
+                        styles.morphHistoryScroll
+                      }
+                      showsVerticalScrollIndicator={
+                        false
+                      }>
+
+                      {chatHistory.map(
+                        chat => (
                           <Pressable
-                            key={chat.id}
-                            style={styles.historyItem}
+                            key={
+                              chat.id
+                            }
+                            style={
+                              styles.historyItem
+                            }
                             onPress={() =>
-                              openChatFromHistory(chat)
+                              openChatFromHistory(
+                                chat,
+                              )
                             }>
 
-                            <View style={styles.historyTextArea}>
+                            <View
+                              style={
+                                styles.historyTextArea
+                              }>
 
-                              <Text style={styles.historyTitle}>
-                                {chat.petType} • {chat.problemType}
+                              <Text
+                                style={
+                                  styles.historyTitle
+                                }>
+
+                                {chat.petType}{' '}
+                                •{' '}
+
+                                {chat
+                                  .problemTypes
+                                  ?.length
+                                  ? chat.problemTypes.join(
+                                      ', ',
+                                    )
+                                  : chat.problemType ||
+                                    'Belirtilmedi'}
+
                               </Text>
 
-                              <Text style={styles.historySub}>
-                                {chat.result?.riskLevel || '-'} Risk • Skor{' '}
-                                {chat.result?.riskScore ?? '-'}
+                              <Text
+                                style={
+                                  styles.historySub
+                                }>
+
+                                {chat
+                                  .result
+                                  ?.riskLevel ||
+                                  '-'}{' '}
+                                Risk • Skor{' '}
+                                {chat
+                                  .result
+                                  ?.riskScore ??
+                                  '-'}
+
                               </Text>
 
                             </View>
 
                             <Pressable
-                              hitSlop={10}
-                              style={styles.deleteButton}
+                              hitSlop={
+                                10
+                              }
+                              style={
+                                styles.deleteButton
+                              }
                               onPress={() =>
-                                deleteChatFromHistory(chat.id)
+                                deleteChatFromHistory(
+                                  chat.id,
+                                )
                               }>
 
                               <Trash2
@@ -1293,88 +2476,251 @@ const AssistantScreen = () => {
                             </Pressable>
 
                           </Pressable>
-                        ))}
+                        ),
+                      )}
 
-                      </ScrollView>
-                    )}
-
-                  </Animated.View>
+                    </ScrollView>
+                  )}
 
                 </Animated.View>
 
-              </View>
+              </Animated.View>
 
-            </Modal>
+            </View>
+
+          </Modal>
+
+        </View>
+
+      </SafeAreaView>
+
+      {/* =================================================
+          VALIDATION MODAL
+          ================================================= */}
+
+      <Modal
+        visible={
+          validationModalVisible
+        }
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setValidationModalVisible(
+            false,
+          )
+        }>
+
+        <View
+          style={
+            styles.modalOverlay
+          }>
+
+          <Pressable
+            style={
+              StyleSheet.absoluteFillObject
+            }
+            onPress={() =>
+              setValidationModalVisible(
+                false,
+              )
+            }
+          />
+
+          <View
+            style={
+              styles.modalContent
+            }>
+
+            <View
+              style={{
+                alignItems: 'center',
+                marginBottom: 15,
+                marginTop: -10,
+              }}>
+
+              <Image
+                source={
+                  petcareWarningGroup
+                }
+                style={{
+                  width: 160,
+                  height: 130,
+                  resizeMode:
+                    'contain',
+                }}
+              />
+
+            </View>
+
+            <Text
+              style={
+                styles.modalTitle
+              }>
+              Dikkat!
+            </Text>
+
+            <Text
+              style={
+                styles.modalMessage
+              }>
+              Evcil hayvan türü, semptom,
+              süre ve aciliyet bilgilerini
+              doldurman gerekiyor.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                {
+                  width: '80%',
+                  alignSelf: 'center',
+                  marginTop: 15,
+                  backgroundColor:
+                    '#9B86FF',
+                },
+              ]}
+              activeOpacity={0.8}
+              onPress={() => {
+
+                setValidationModalVisible(
+                  false,
+                );
+
+                scrollViewRef.current?.scrollTo(
+                  {
+                    y: 0,
+                    animated: true,
+                  },
+                );
+
+              }}>
+
+              <Text
+                style={
+                  styles.modalButtonText
+                }>
+                Doldur
+              </Text>
+
+            </TouchableOpacity>
 
           </View>
 
-        </SafeAreaView>
+        </View>
 
-        {/* =================================================
-            CONNECTION ERROR MODAL (ÖZEL HATA POPUP - KLİNİK İKONU)
-            ================================================= */}
-        <Modal
-          visible={connectionErrorVisible}
-          transparent
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={() => setConnectionErrorVisible(false)}>
+      </Modal>
 
-          <View style={styles.modalOverlay}>
-                    <Pressable
-                      style={StyleSheet.absoluteFillObject}
-                      onPress={() => setIsValidationModalVisible(false)}
-                    />
+      {/* =================================================
+          CONNECTION ERROR MODAL
+          ================================================= */}
 
-                    <View style={styles.modalContent}>
+      <Modal
+        visible={
+          connectionErrorVisible
+        }
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setConnectionErrorVisible(
+            false,
+          )
+        }>
 
-                      {/* --- YENİ GÜNCELLENEN İKON BÖLÜMÜ (Hayvan Grubu) --- */}
-                      <View style={{ alignItems: 'center', marginBottom: 15, marginTop: -10 }}>
-                        <Image
-                          source={petcareWarningGroup}
-                          style={{
-                            width: 160,   // Görseline göre boyutlandır
-                            height: 130,  // Görseline göre boyutlandır
-                            resizeMode: 'contain',
-                            // tintColor: '#991B27', // Kendi görselini kullanıyorsan bu satırı SİL
-                          }}
-                        />
-                      </View>
-                      {/* ------------------------------------------------- */}
+        <View
+          style={
+            styles.modalOverlay
+          }>
 
-                      <Text style={styles.modalTitle}>Dikkat!</Text>
-                      <Text style={styles.modalMessage}>
-                        Evcil hayvan türü ve semptom etiketleri eksik. Değerlendirmeyi başlatmak için lütfen bu alanları doldurun.
-                      </Text>
+          <Pressable
+            style={
+              StyleSheet.absoluteFillObject
+            }
+            onPress={() =>
+              setConnectionErrorVisible(
+                false,
+              )
+            }
+          />
 
-                      {/* --- GÜNCELLENEN TEK BUTON ("Doldur") --- */}
-                      <TouchableOpacity
-                        style={[
-                          styles.modalButton,
-                          {
-                            width: '80%',
-                            alignSelf: 'center',
-                            marginTop: 15,
-                            backgroundColor: '#9B86FF' // İstediğin pastel mor
-                          }
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          // 1. Pop-up'ı kapatıyoruz
-                          setConnectionErrorVisible(false);
+          <View
+            style={
+              styles.modalContent
+            }>
 
-                          // 2. Sayfayı akıcı bir şekilde en üste kaydırıyoruz
-                          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                        }}>
-                        <Text style={styles.modalButtonText}>Doldur</Text>
-                      </TouchableOpacity>
-                      {/* ---------------------------------------- */}
+            <View
+              style={{
+                alignItems: 'center',
+                marginBottom: 15,
+                marginTop: -10,
+              }}>
 
-                    </View>
-                  </View>
-        </Modal>
-      </>
-    );
+              <Image
+                source={
+                  hospitalErrorIcon
+                }
+                style={{
+                  width: 120,
+                  height: 120,
+                  resizeMode:
+                    'contain',
+                }}
+              />
+
+            </View>
+
+            <Text
+              style={
+                styles.modalTitle
+              }>
+              Bağlantı Hatası
+            </Text>
+
+            <Text
+              style={
+                styles.modalMessage
+              }>
+              AI analizine şu anda
+              ulaşılamıyor. Lütfen
+              bağlantınızı kontrol edip
+              tekrar deneyin.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                {
+                  width: '80%',
+                  alignSelf: 'center',
+                  marginTop: 15,
+                  backgroundColor:
+                    '#9B86FF',
+                },
+              ]}
+              activeOpacity={0.8}
+              onPress={() =>
+                setConnectionErrorVisible(
+                  false,
+                )
+              }>
+
+              <Text
+                style={
+                  styles.modalButtonText
+                }>
+                Tamam
+              </Text>
+
+            </TouchableOpacity>
+
+          </View>
+
+        </View>
+
+      </Modal>
+    </>
+  );
 };
 
 export default AssistantScreen;
@@ -1386,12 +2732,14 @@ export default AssistantScreen;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background2,
+    backgroundColor:
+      COLORS.background2,
   },
 
   screen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor:
+      COLORS.background,
   },
 
   scroll: {
@@ -1423,7 +2771,8 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     top: -120,
     right: -50,
-    backgroundColor: 'rgba(164, 143, 255, 0.13)',
+    backgroundColor:
+      'rgba(164, 143, 255, 0.13)',
   },
 
   heroGlowTwo: {
@@ -1433,7 +2782,8 @@ const styles = StyleSheet.create({
     borderRadius: 125,
     left: 70,
     top: -170,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor:
+      'rgba(255,255,255,0.95)',
   },
 
   heroWaveLeft: {
@@ -1444,7 +2794,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6E1FF',
     left: -205,
     bottom: -118,
-    transform: [{rotate: '10deg'}],
+    transform: [
+      {
+        rotate: '10deg',
+      },
+    ],
   },
 
   heroWaveRight: {
@@ -1455,7 +2809,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E9E4FF',
     right: -305,
     bottom: -132,
-    transform: [{rotate: '-22deg'}],
+    transform: [
+      {
+        rotate: '-22deg',
+      },
+    ],
   },
 
   /* =======================================================
@@ -1506,17 +2864,17 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 41,
     letterSpacing: -1.3,
-
     fontFamily: 'Quicksand-Bold',
   },
+
   heroTitleAI: {
     color: '#7658F7',
     fontSize: 34,
     lineHeight: 41,
     letterSpacing: -1.3,
-
     fontFamily: 'Quicksand-Bold',
   },
+
   heroSubtitle: {
     color: '#687491',
     fontSize: 16,
@@ -1527,11 +2885,6 @@ const styles = StyleSheet.create({
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-
-  heroHeart: {
-    color: '#7356F4',
-    fontSize: 18,
   },
 
   orbImage: {
@@ -1554,7 +2907,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
 
     borderWidth: 1,
-    borderColor: 'rgba(226,226,244,0.8)',
+    borderColor:
+      'rgba(226,226,244,0.8)',
 
     elevation: 4,
 
@@ -1653,9 +3007,9 @@ const styles = StyleSheet.create({
 
   petTextSelected: {
     color: '#A97822',
-
     fontFamily: 'Quicksand-Regular',
   },
+
   petTextSmall: {
     fontFamily: 'Quicksand-Regular',
     fontSize: 11,
@@ -1726,6 +3080,167 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontFamily: 'Quicksand-Bold',
+  },
+
+  /* =======================================================
+     FOLLOW UP
+     ======================================================= */
+
+  followUpSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+
+    padding: 14,
+
+    marginBottom: 12,
+
+    borderWidth: 1,
+    borderColor: '#E8E7F3',
+
+    elevation: 3,
+
+    shadowColor: '#7667C7',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.07,
+    shadowRadius: 13,
+  },
+
+  followUpSectionHeader: {
+    marginBottom: 14,
+  },
+
+  followUpSectionTitle: {
+    color: COLORS.navy,
+    fontSize: 17,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  followUpSectionSubtitle: {
+    color: '#77829D',
+    fontSize: 11.5,
+    fontFamily: 'Quicksand-Medium',
+    marginTop: 3,
+    lineHeight: 17,
+  },
+
+  followUpGroupTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+
+    marginTop: 6,
+    marginBottom: 8,
+    paddingTop: 7,
+
+    borderTopWidth: 1,
+    borderTopColor: '#F0EFF7',
+  },
+
+  followUpGroupTitleText: {
+    color: COLORS.navy,
+    fontSize: 14,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  followUpQuestionCard: {
+    backgroundColor: '#F9F8FF',
+    borderRadius: 18,
+
+    padding: 12,
+
+    marginBottom: 9,
+
+    borderWidth: 1,
+    borderColor: '#ECEAF7',
+  },
+
+  followUpQuestionTitle: {
+    color: '#1B2344',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  followUpQuestionSubtitle: {
+    color: '#7C86A0',
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontFamily: 'Quicksand-Medium',
+    marginTop: 2,
+  },
+
+  followUpOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+
+    marginTop: 9,
+
+    marginHorizontal: -3,
+
+    rowGap: 6,
+  },
+
+  followUpOption: {
+    minWidth: '47%',
+    flexGrow: 1,
+
+    minHeight: 39,
+
+    paddingHorizontal: 9,
+
+    borderRadius: 13,
+
+    borderWidth: 1,
+    borderColor: '#E1E3ED',
+
+    backgroundColor: '#FFFFFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginHorizontal: 3,
+  },
+
+  followUpOptionSelected: {
+    backgroundColor: '#EEEAFE',
+    borderColor: '#8C7AF1',
+  },
+
+  followUpOptionText: {
+    color: '#536079',
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: 'center',
+    fontFamily: 'Quicksand-SemiBold',
+  },
+
+  followUpOptionTextSelected: {
+    color: '#5141F4',
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  otherInfoBox: {
+    backgroundColor: '#F8F7FF',
+    borderRadius: 17,
+    padding: 13,
+    marginTop: 8,
+  },
+
+  otherInfoTitle: {
+    color: COLORS.navy,
+    fontSize: 12,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  otherInfoText: {
+    color: '#75809C',
+    fontSize: 10.5,
+    lineHeight: 16,
+    fontFamily: 'Quicksand-Medium',
+    marginTop: 4,
   },
 
   /* =======================================================
@@ -1940,45 +3455,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  summaryMagicIcon: {
-    width: 37,
-    height: 38,
-    position: 'relative',
-    marginRight: 5,
-  },
-
-  magicDiamondLarge: {
-    position: 'absolute',
-    left: 6,
-    top: 9,
-
-    width: 17,
-    height: 17,
-
-    backgroundColor: '#8B72FF',
-
-    transform: [
-      {rotate: '45deg'},
-      {scaleX: 0.65},
-    ],
-  },
-
-  magicDiamondSmall: {
-    position: 'absolute',
-    right: 4,
-    top: 3,
-
-    width: 8,
-    height: 8,
-
-    backgroundColor: '#9B86FF',
-
-    transform: [
-      {rotate: '45deg'},
-      {scaleX: 0.65},
-    ],
-  },
-
   summaryTitle: {
     color: COLORS.navy,
     fontSize: 16,
@@ -2096,7 +3572,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
 
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.75)',
+    borderColor:
+      'rgba(255,255,255,0.75)',
   },
 
   aiButtonCenter: {
@@ -2112,28 +3589,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: 'Quicksand-Bold',
     letterSpacing: 0.7,
-  },
-
-  buttonDiamond: {
-    width: 18,
-    height: 18,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    transform: [{rotate: '45deg'}],
-
-    borderWidth: 1.8,
-    borderColor: '#FFFFFF',
-  },
-
-  buttonDiamondInner: {
-    width: 5,
-    height: 5,
-
-    borderRadius: 3,
-
-    backgroundColor: '#FFFFFF',
   },
 
   arrowCircle: {
@@ -2323,7 +3778,8 @@ const styles = StyleSheet.create({
 
   morphBackdropVisual: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(20, 22, 50, 0.42)',
+    backgroundColor:
+      'rgba(20, 22, 50, 0.42)',
   },
 
   morphPanel: {
@@ -2447,69 +3903,82 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  /* --- CONNECTION ERROR MODAL STİLLERİ --- */
-    modalOverlay: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(20, 22, 50, 0.5)',
-      padding: 20,
+  /* =======================================================
+     MODALS
+     ======================================================= */
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor:
+      'rgba(20, 22, 50, 0.5)',
+    padding: 20,
+  },
+
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 28,
+    padding: 24,
+    width: '100%',
+    maxWidth: 350,
+    alignItems: 'center',
+
+    shadowColor: '#7257FF',
+    shadowOffset: {
+      width: 0,
+      height: 10,
     },
-    modalContent: {
-      backgroundColor: COLORS.white,
-      borderRadius: 28,
-      padding: 24,
-      width: '100%',
-      maxWidth: 350,
-      alignItems: 'center',
-      shadowColor: '#7257FF',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.15,
-      shadowRadius: 20,
-      elevation: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+
+    elevation: 10,
+  },
+
+  modalTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 22,
+    color: COLORS.navy,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+
+  modalMessage: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 15,
+    color: COLORS.secondary,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+
+  modalButton: {
+    backgroundColor:
+      COLORS.purpleDark,
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    shadowColor:
+      COLORS.purpleDark,
+
+    shadowOffset: {
+      width: 0,
+      height: 4,
     },
-    iconCircle: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: '#FFF1F3',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 20,
-      marginTop: -10,
-    },
-    modalTitle: {
-      fontFamily: 'Quicksand-Bold',
-      fontSize: 22,
-      color: COLORS.navy,
-      marginBottom: 12,
-      textAlign: 'center',
-    },
-    modalMessage: {
-      fontFamily: 'Quicksand-Medium',
-      fontSize: 15,
-      color: COLORS.secondary,
-      lineHeight: 22,
-      textAlign: 'center',
-      marginBottom: 24,
-      paddingHorizontal: 10,
-    },
-    modalButton: {
-      backgroundColor: COLORS.purpleDark,
-      width: '100%',
-      height: 56,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: COLORS.purpleDark,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 5,
-    },
-    modalButtonText: {
-      fontFamily: 'Quicksand-Bold',
-      fontSize: 18,
-      color: COLORS.white,
-    },
+
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+
+    elevation: 5,
+  },
+
+  modalButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 18,
+    color: COLORS.white,
+  },
 });
