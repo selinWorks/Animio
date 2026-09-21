@@ -98,8 +98,9 @@ const NotificationsScreen = () => {
               return false;
             }
 
-            const eventDate =
-              new Date(item.date);
+            const eventDate = new Date(
+              `${item.date}T${item.time || '00:00'}:00`,
+            );
 
             return eventDate <= now;
           });
@@ -231,17 +232,16 @@ const NotificationsScreen = () => {
                     }>
 
                     {new Date(
-                      item.date,
+                      `${item.date}T${item.time || '00:00'}:00`,
                     ).toLocaleDateString(
                       'tr-TR',
                       {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
                       },
-                    )}
+                    )}{' '}
+                    {item.time || '00:00'}
 
                   </Text>
 

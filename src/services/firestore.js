@@ -1,4 +1,5 @@
 import firestore from '@react-native-firebase/firestore';
+import notifee, { TriggerType, AndroidImportance } from '@notifee/react-native';
 
 export const addPetToFirestore = async (pet, uid) => {
   const docRef = await firestore()
@@ -69,10 +70,7 @@ export const addCareEventToFirestore = async (event, uid) => {
       ownerId: uid,
       title: event.title,
       date: event.date,
-
-      // Bildirim / görev saati
       time: event.time || '',
-
       type: event.type || 'Custom',
       petName: event.petName || '',
       note: event.note || '',

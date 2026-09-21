@@ -213,50 +213,125 @@ export default function CalendarScreen() {
     dateString: string,
     timeString: string,
   ) => {
-    return new Date(`${dateString}T${timeString}:00`);
+    const [year, month, day] =
+      dateString.split('-').map(Number);
+
+    const [hour, minute] =
+      timeString.split(':').map(Number);
+
+    return new Date(
+      year,
+      month - 1,
+      day,
+      hour,
+      minute,
+      0,
+      0,
+    );
   };
 
-  const scheduleCareNotification = async (
-    eventId: string,
-    eventTitle: string,
-    petNameText: string,
-    dateString: string,
-    timeString: string,
-  ) => {
-    await requestNotificationPermission();
+  const scheduleCareNotification = async ({
+    eventId,
+    eventTitle,
+    petNameText,
+    dateString,
+    timeString,
+  }: {
+    eventId: string;
+    eventTitle: string;
+    petNameText: string;
+    dateString: string;
+    timeString: string;
+  }) => {
+    try {
+      const notificationDate =
+        getNotificationDate(
+          dateString,
+          timeString,
+        );
 
-    const notificationDate = getNotificationDate(
-      dateString,
-      timeString,
-    );
-
-    if (notificationDate.getTime() <= Date.now()) {
       console.log(
-        'Bildirim planlanmadı: seçilen tarih/saat geçmişte.',
+        'PLANLANAN BİLDİRİM:',
+        notificationDate.toString(),
       );
 
-      return;
-    }
+      console.log(
+        'TIMESTAMP:',
+        notificationDate.getTime(),
+      );
 
-    await notifee.createTriggerNotification(
-      {
-        id: `care-${eventId}`,
-        title: 'PetCare Hatırlatma',
-        body: `${petNameText} için ${eventTitle} zamanı geldi.`,
+      console.log(
+        'ŞİMDİ:',
+        Date.now(),
+      );
 
-        android: {
-          channelId: 'care-reminders',
+      if (
+        notificationDate.getTime() <=
+        Date.now()
+      ) {
+        console.log(
+          'Bildirim zamanı geçmiş.',
+        );
 
-          pressAction: {
-            id: 'default',
+        return;
+      }
+
+      const channelId =
+        await notifee.createChannel({
+          id: 'care-reminders',
+          name: 'PetCare Hatırlatıcıları',
+          importance:
+            AndroidImportance.HIGH,
+        });
+
+      await notifee.createTriggerNotification(
+        {
+          id: `care-${eventId}`,
+
+          title: 'Bakım zamanı geldi ✨',
+
+          body: petNameText
+            ? `${petNameText} · ${eventTitle}`
+            : eventTitle,
+
+          data: {
+            eventId: String(eventId),
+            title: eventTitle || '',
+            note: '',
+            petName: petNameText || '',
+            type: 'Custom',
+            date: dateString,
+            time: timeString,
+          },
+
+          android: {
+            channelId,
+
+            smallIcon: 'ic_launcher',
+
+            pressAction: {
+              id: 'default',
+            },
           },
         },
-      },
-      {
-        type: TriggerType.TIMESTAMP,
-        timestamp: notificationDate.getTime(),
-      },
-    );
+
+        {
+          type: TriggerType.TIMESTAMP,
+
+          timestamp:
+            notificationDate.getTime(),
+        },
+      );
+
+      console.log(
+        'NOTİFİKASYON BAŞARIYLA PLANLANDI',
+      );
+    } catch (error) {
+      console.log(
+        'Bildirim planlama hatası:',
+        error,
+      );
+    }
   };
 
   const cancelCareNotification = async (
@@ -313,8 +388,31 @@ export default function CalendarScreen() {
       return;
     }
 
+    const hour = Number(selectedHour);
+    const minute = Number(selectedMinute);
+
+    if (
+      selectedHour === '' ||
+      selectedMinute === '' ||
+      !Number.isInteger(hour) ||
+      !Number.isInteger(minute) ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      Alert.alert(
+        'Geçersiz saat',
+        'Lütfen 00-23 arasında bir saat ve 00-59 arasında bir dakika gir.',
+      );
+
+      return;
+    }
+
     const selectedTime =
-      `${selectedHour}:${selectedMinute}`;
+      `${String(hour).padStart(2, '0')}:${String(
+        minute,
+      ).padStart(2, '0')}`;
 
     const selectedDateTime =
       getNotificationDate(
@@ -342,10 +440,7 @@ export default function CalendarScreen() {
           {
             title: eventTitle,
             date: selectedDate,
-
-            /* YENİ */
             time: selectedTime,
-
             type: 'Custom',
             petName: eventPetName,
             note: note.trim(),
@@ -355,13 +450,13 @@ export default function CalendarScreen() {
         );
 
       try {
-        await scheduleCareNotification(
+        await scheduleCareNotification({
           eventId,
           eventTitle,
-          eventPetName,
-          selectedDate,
-          selectedTime,
-        );
+          petNameText: eventPetName,
+          dateString: selectedDate,
+          timeString: selectedTime,
+        });
       } catch (notificationError) {
         console.log(
           'Bildirim planlanamadı:',
@@ -839,11 +934,29 @@ export default function CalendarScreen() {
 
                   </Pressable>
 
-                  <View style={styles.timeValueBox}>
-                    <Text style={styles.timeValue}>
-                      {selectedHour}
-                    </Text>
-                  </View>
+                  <TextInput
+                    value={selectedHour}
+                    onChangeText={text => {
+                      const digits = text.replace(/\D/g, '');
+
+                      if (digits === '') {
+                        setSelectedHour('');
+                        return;
+                      }
+
+                      const value = Number(digits);
+
+                      if (value >= 0 && value <= 23) {
+                        setSelectedHour(
+                          digits.padStart(2, '0').slice(-2),
+                        );
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    style={styles.timeInput}
+                    textAlign="center"
+                  />
 
                   <Pressable
                     onPress={() => {
@@ -898,9 +1011,9 @@ export default function CalendarScreen() {
                         Number(selectedMinute);
 
                       const nextMinute =
-                        minute >= 55
+                        minute >= 59
                           ? 0
-                          : minute + 5;
+                          : minute + 1;
 
                       setSelectedMinute(
                         String(
@@ -923,11 +1036,29 @@ export default function CalendarScreen() {
 
                   </Pressable>
 
-                  <View style={styles.timeValueBox}>
-                    <Text style={styles.timeValue}>
-                      {selectedMinute}
-                    </Text>
-                  </View>
+                  <TextInput
+                    value={selectedMinute}
+                    onChangeText={text => {
+                      const digits = text.replace(/\D/g, '');
+
+                      if (digits === '') {
+                        setSelectedMinute('');
+                        return;
+                      }
+
+                      const value = Number(digits);
+
+                      if (value >= 0 && value <= 59) {
+                        setSelectedMinute(
+                          digits.padStart(2, '0').slice(-2),
+                        );
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    style={styles.timeInput}
+                    textAlign="center"
+                  />
 
                   <Pressable
                     onPress={() => {
@@ -936,8 +1067,8 @@ export default function CalendarScreen() {
 
                       const nextMinute =
                         minute <= 0
-                          ? 55
-                          : minute - 5;
+                          ? 59
+                          : minute - 1;
 
                       setSelectedMinute(
                         String(
@@ -1568,16 +1699,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  timeValueBox: {
+  timeInput: {
     minWidth: 64,
     height: 48,
     borderRadius: 14,
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 7,
+
     borderWidth: 1,
     borderColor: '#E5E7EB',
+
+    marginVertical: 7,
+
+    fontSize: 22,
+    color: '#111827',
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingVertical: 0,
   },
 
   timeValue: {
