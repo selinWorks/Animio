@@ -182,13 +182,26 @@ export const getAssistantChatsFromFirestore = async uid => {
   const snapshot = await firestore()
     .collection('assistantChats')
     .where('ownerId', '==', uid)
-    .orderBy('createdAt', 'desc')
     .get();
 
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  const chats = snapshot.docs
+    .map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }))
+    .sort((a, b) => {
+      const aTime = a.createdAt?.toMillis
+        ? a.createdAt.toMillis()
+        : 0;
+
+      const bTime = b.createdAt?.toMillis
+        ? b.createdAt.toMillis()
+        : 0;
+
+      return bTime - aTime;
+    });
+
+  return chats;
 };
 
 export const deleteAssistantChatFromFirestore = async chatId => {

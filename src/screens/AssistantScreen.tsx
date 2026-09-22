@@ -383,6 +383,12 @@ const AssistantScreen = () => {
   const [connectionErrorVisible, setConnectionErrorVisible] =
     useState(false);
 
+  const [deleteConfirmVisible, setDeleteConfirmVisible] =
+    useState(false);
+
+  const [deleteChatId, setDeleteChatId] =
+    useState<string | undefined>(undefined);
+
   const scrollViewRef =
     useRef<ScrollView>(null);
 
@@ -407,24 +413,38 @@ const AssistantScreen = () => {
   const loadChatHistory = async () => {
     try {
       if (!user?.uid) {
+        console.log('CHAT: UID YOK');
         return;
       }
 
       const chats =
-        await getAssistantChatsFromFirestore(user.uid);
+        await getAssistantChatsFromFirestore(
+          user.uid,
+        );
 
       setChatHistory(chats);
+
+      console.log(
+        'CHAT: kayıt sayısı',
+        chats.length,
+      );
     } catch (error) {
       console.log(
-        'Sohbet geçmişi yüklenemedi:',
+        'CHAT: HATA',
         error,
       );
     }
   };
 
   useEffect(() => {
+    console.log(
+      '🟣 AssistantScreen useEffect ÇALIŞTI',
+      user?.uid,
+    );
+
     loadChatHistory();
   }, [user?.uid]);
+
 
   /* =======================================================
      AI REQUEST
@@ -833,6 +853,27 @@ const AssistantScreen = () => {
         'Sohbet silinemedi.',
       );
     }
+  };
+
+  const handleConfirmDeleteChat = async () => {
+    if (!deleteChatId) {
+      return;
+    }
+
+    setDeleteConfirmVisible(false);
+
+    await deleteChatFromHistory(deleteChatId);
+
+    setDeleteChatId(undefined);
+  };
+
+  const confirmDeleteChat = (chatId?: string) => {
+    if (!chatId) {
+      return;
+    }
+
+    setDeleteChatId(chatId);
+    setDeleteConfirmVisible(true);
   };
 
   /* =======================================================
@@ -2473,16 +2514,12 @@ const AssistantScreen = () => {
 
                     <View>
                       <Text
-                        style={
-                          styles.drawerTitle
-                        }>
+                        style={styles.drawerTitle}>
                         Geçmiş Analizler
                       </Text>
 
                       <Text
-                        style={
-                          styles.drawerSubtitle
-                        }>
+                        style={styles.drawerSubtitle}>
                         Önceki değerlendirmelerin
                       </Text>
                     </View>
@@ -2597,17 +2634,12 @@ const AssistantScreen = () => {
                             </View>
 
                             <Pressable
-                              hitSlop={
-                                10
-                              }
-                              style={
-                                styles.deleteButton
-                              }
-                              onPress={() =>
-                                deleteChatFromHistory(
-                                  chat.id,
-                                )
-                              }>
+                              hitSlop={10}
+                              style={styles.deleteButton}
+                              onPress={event => {
+                                event.stopPropagation();
+                                confirmDeleteChat(chat.id);
+                              }}>
 
                               <Trash2
                                 size={17}
@@ -2626,6 +2658,76 @@ const AssistantScreen = () => {
                 </Animated.View>
 
               </Animated.View>
+
+            </View>
+
+          </Modal>
+
+          <Modal
+            visible={deleteConfirmVisible}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() =>
+              setDeleteConfirmVisible(false)
+            }>
+
+            <View style={styles.deleteModalOverlay}>
+
+              <View style={styles.deleteModalCard}>
+
+                {/* İKON */}
+                <View style={styles.deleteIconCircle}>
+
+                  <Image
+                    source={require('../assets/popup-icons/delete-warning.png')}
+                    style={styles.deleteWarningImage}
+                    resizeMode="contain"
+                  />
+
+                </View>
+
+                {/* BAŞLIK */}
+                <Text style={styles.deleteModalTitle}>
+                  Sohbeti silmek istediğine emin misin?
+                </Text>
+
+                {/* AÇIKLAMA */}
+                <Text style={styles.deleteModalDescription}>
+                  Bu sohbet geçmişinden kaldırılacak ve
+                  bu işlem geri alınamaz.
+                </Text>
+
+                {/* BUTONLAR */}
+                <View style={styles.deleteModalButtons}>
+
+                  <Pressable
+                    style={styles.deleteCancelButton}
+                    onPress={() =>
+                      setDeleteConfirmVisible(false)
+                    }>
+
+                    <Text style={styles.deleteCancelText}>
+                      Vazgeç
+                    </Text>
+
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.deleteConfirmButton}
+                    onPress={
+                      handleConfirmDeleteChat
+                    }>
+
+                    <Text style={styles.deleteConfirmText}>
+                      Sil
+                    </Text>
+
+                  </Pressable>
+
+                </View>
+
+              </View>
 
             </View>
 
@@ -3418,6 +3520,148 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  deleteModalOverlay: {
+    flex: 1,
+
+    backgroundColor:
+      'rgba(20, 22, 50, 0.45)',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    paddingHorizontal: 28,
+  },
+
+  deleteModalCard: {
+    width: '100%',
+
+    maxWidth: 360,
+
+    backgroundColor: '#FAF9FF',
+
+    borderRadius: 28,
+
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 20,
+
+    alignItems: 'center',
+
+    shadowColor: '#312A78',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+
+    elevation: 20,
+  },
+
+  deleteIconCircle: {
+    width: 92,
+    height: 92,
+
+    borderRadius: 30,
+
+    backgroundColor: '#F1ECFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginBottom: 18,
+  },
+
+  deleteWarningImage: {
+    width: 92,
+    height: 92,
+  },
+
+  deleteModalButtons: {
+    width: '100%',
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  deleteCancelButton: {
+    width: '48%',
+    height: 50,
+
+    borderRadius: 17,
+
+    backgroundColor: '#EDE7FF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 1,
+    borderColor: '#DDD4FA',
+  },
+
+  deleteCancelText: {
+    color: '#6D5BA8',
+
+    fontSize: 13,
+
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  deleteModalTitle: {
+    color: COLORS.navy,
+    fontSize: 19,
+    fontFamily: 'Quicksand-Bold',
+    textAlign: 'center',
+    lineHeight: 25,
+    marginBottom: 8,
+  },
+
+  deleteModalDescription: {
+    color: '#7A849C',
+    fontSize: 12,
+    fontFamily: 'Quicksand-Regular',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 8,
+    marginBottom: 22,
+  },
+
+  deleteCancelText: {
+    color: '#6D5BA8',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  deleteConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  deleteConfirmButton: {
+    width: '48%',
+    height: 50,
+
+    borderRadius: 17,
+
+    backgroundColor: '#B9A7F5',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 1,
+    borderColor: '#AA96EF',
+  },
+
+  deleteConfirmText: {
+    color: '#FFFFFF',
+
+    fontSize: 13,
+
+    fontFamily: 'Quicksand-Bold',
+  },
 
   /* =======================================================
      DURATION / URGENCY
