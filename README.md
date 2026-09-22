@@ -1,207 +1,661 @@
-# 🐾 PetCare
+<div align="center">
 
-**PetCare** is a mobile application designed to help pet owners manage their pets' daily care, health information, and important activities from one place.
+# 🐾 Animio
 
-Built with **React Native and TypeScript**, PetCare combines pet management features with Firebase services and an AI-powered assistant that provides guidance based on information entered by the user.
+### Smarter care for the ones who can't tell you what's wrong.
+
+**A modern mobile pet care companion for managing daily care, health information, reminders, and AI-assisted guidance — all in one place.**
+
+<br/>
+
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge\&logo=react\&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge\&logo=typescript\&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge\&logo=firebase\&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge\&logo=node.js\&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge\&logo=express\&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI_API-412991?style=for-the-badge\&logo=openai\&logoColor=white)
+
+<br/>
+
+**React Native · TypeScript · Firebase · Node.js · Express · OpenAI**
+
+</div>
 
 ---
 
-## ✨ Features
+## ✦ About Animio
 
-### 🐶 Pet Management
+Pet care involves more than remembering feeding times.
 
-Users can create and manage individual profiles for their pets.
+Health information, vaccination records, veterinary visits, medication schedules, routine care, reminders, and everyday observations can quickly become scattered across different places.
 
-Pet profiles can contain information such as:
+**Animio brings them together.**
+
+Animio is a full-stack mobile application designed to give pet owners a structured and intuitive way to manage their pets' daily care and important health-related information.
+
+Users can create individual pet profiles, organize care activities through a calendar, receive scheduled reminders, manage pet information, and access an AI-powered assistant for general informational guidance.
+
+Behind the AI Assistant, Animio uses a dedicated **Node.js backend** and a custom **rule-based risk assessment system** that evaluates user-provided information before communicating with the AI service.
+
+The result is an application that combines mobile development, cloud services, backend architecture, notifications, persistent data, and AI integration within a single product.
+
+---
+
+## ✦ Key Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🐕 Pet Profiles
+
+Create and manage individual profiles for multiple pets.
+
+Profiles can contain:
 
 * Name
 * Animal type
 * Age
+* Gender
 * Weight
 * Vaccination information
 * Last veterinary visit
 * Health and care notes
+* Profile image
 
-Pet information can be viewed and updated directly from the mobile application.
+</td>
+<td width="50%" valign="top">
 
-### 📅 Care & Activity Tracking
+### 📅 Care Calendar
 
-PetCare helps users organize important activities related to their pets.
+Organize important pet-related activities through a dedicated calendar system.
 
-Users can manage care-related events and keep track of upcoming activities through the application's calendar system.
+Care activities can include:
 
-### 🤖 AI Pet Care Assistant
+* Vaccinations
+* Veterinary appointments
+* Medication
+* Feeding routines
+* Grooming
+* General care tasks
 
-PetCare includes an AI-powered assistant designed to provide general guidance based on the information provided by the user.
+</td>
+</tr>
 
-The assistant evaluates information such as:
+<tr>
+<td width="50%" valign="top">
 
-* Pet type
-* Type of problem
-* Duration
-* Urgency
+### 🔔 Smart Reminders
 
-Before generating an AI response, the backend uses its own **risk scoring system** to classify the situation into different risk levels:
+Scheduled notifications help users stay aware of upcoming care activities.
 
-* 🟢 Low
-* 🟡 Medium
-* 🟠 High
-* 🔴 Urgent
+Animio integrates:
 
-After the initial risk assessment, the backend communicates with the AI service to generate an appropriate response.
+* Care reminders
+* Local notifications
+* Notification preferences
+* Persistent notification state
 
-> **Note:** The AI Assistant is designed to provide general informational guidance and is not a replacement for professional veterinary diagnosis or treatment.
+</td>
+<td width="50%" valign="top">
+
+### 🤖 AI Assistant
+
+Receive general informational guidance based on contextual information about the pet and the reported situation.
+
+Requests are processed through Animio's backend before reaching the AI service.
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
 
 ### 🔐 Authentication
 
-PetCare uses **Firebase Authentication** to manage user authentication securely.
+Firebase Authentication provides account-based access to the application.
 
-Users can create an account and sign in to access their personal pet information.
+Authentication state is integrated with the navigation flow, separating login and registration from the main application.
 
-### ☁️ Cloud Data Storage
+</td>
+<td width="50%" valign="top">
 
-Application data is stored using **Cloud Firestore**.
+### ☁️ Cloud Synchronization
 
-Firestore is used to manage data such as:
+Animio uses Firebase services to persist user-specific information including:
 
-* User information
 * Pet profiles
 * Care activities
-* AI Assistant conversations
+* User preferences
+* AI conversations
 * Feedback
 
-### 💬 Feedback
-
-Users can provide feedback directly through the application, helping improve the overall PetCare experience.
+</td>
+</tr>
+</table>
 
 ---
 
-## 🛠️ Tech Stack
+# 🤖 AI-Assisted Pet Care
+
+The AI Assistant is one of Animio's core features.
+
+Rather than sending a free-form question directly from the mobile application to an AI model, Animio processes assistant requests through a dedicated backend.
+
+The assistant can use contextual information such as:
+
+* Pet type
+* Reported problem
+* Selected symptoms
+* Duration of the problem
+* User-reported urgency
+
+This information is evaluated by Animio's backend before an AI-generated response is returned.
+
+```text
+Pet Information
+      │
+      ▼
+User-Reported Situation
+      │
+      ▼
+Backend Validation
+      │
+      ▼
+Risk Assessment
+      │
+      ▼
+AI Processing
+      │
+      ▼
+Structured Guidance
+```
+
+> [!IMPORTANT]
+> **Animio does not provide veterinary diagnoses.**
+>
+> The AI Assistant is designed to provide general informational guidance and should not be considered a replacement for examination, diagnosis, or treatment by a qualified veterinarian.
+
+---
+
+# 🛡️ Risk Assessment System
+
+Animio includes a custom **rule-based risk scoring layer** within its backend.
+
+The purpose of this layer is to perform a deterministic assessment of the information submitted by the user before AI-generated guidance is produced.
+
+The system can evaluate factors including:
+
+* Problem category
+* Selected symptoms
+* Symptom combinations
+* Duration
+* Reported urgency
+* Pet type
+
+Based on these factors, the backend classifies the submitted situation into one of four levels.
+
+| Level | Classification | Description                                         |
+| :---: | :------------- | :-------------------------------------------------- |
+|   🟢  | **Low**        | General or lower-risk situation                     |
+|   🟡  | **Medium**     | Situation may require closer observation            |
+|   🟠  | **High**       | Potentially concerning situation                    |
+|   🔴  | **Urgent**     | Situation may require prompt professional attention |
+
+### Why a separate risk layer?
+
+The risk classification is handled by application logic rather than being delegated entirely to the language model.
+
+This creates a clear separation between:
+
+```text
+Rule-Based Assessment  →  AI-Generated Guidance
+```
+
+and allows Animio to maintain its own deterministic logic independently of the generated AI response.
+
+---
+
+# 🏗️ System Architecture
+
+Animio follows a client-cloud-backend architecture.
+
+```text
+┌─────────────────────────────────────────────────────┐
+│                     ANIMIO                          │
+│            React Native + TypeScript                │
+│                                                     │
+│   UI • Navigation • Pets • Calendar • Assistant    │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                ┌─────────┴─────────┐
+                │                   │
+                ▼                   ▼
+      ┌──────────────────┐   ┌──────────────────────┐
+      │     FIREBASE     │   │   NODE.JS BACKEND   │
+      │                  │   │      Express.js      │
+      │ Authentication   │   └──────────┬───────────┘
+      │ Cloud Firestore  │              │
+      │ Storage          │              ▼
+      └──────────────────┘   ┌──────────────────────┐
+                             │   RISK ASSESSMENT    │
+                             │                      │
+                             │  Rule-Based Scoring  │
+                             └──────────┬───────────┘
+                                        │
+                                        ▼
+                             ┌──────────────────────┐
+                             │      OPENAI API      │
+                             │                      │
+                             │  AI-Assisted Output  │
+                             └──────────────────────┘
+```
 
 ### Mobile Application
 
-* **React Native**
-* **TypeScript**
-* **React Native CLI**
+The React Native client is responsible for:
+
+* User interface
+* Navigation
+* Authentication flow
+* Pet management
+* Care calendar
+* Notification interaction
+* User preferences
+* AI Assistant interface
+
+### Firebase
+
+Firebase provides cloud infrastructure for:
+
+* Authentication
+* User-specific application data
+* Pet data
+* Care activities
+* Preferences
+* Conversation data
+* Media storage
 
 ### Backend
 
-* **Node.js**
-* **Express.js**
+The Node.js and Express backend is responsible for:
 
-### Database & Authentication
-
-* **Firebase Authentication**
-* **Cloud Firestore**
-
-### AI
-
-* **OpenAI API**
-* Custom risk scoring system
+* Receiving AI Assistant requests
+* Validating request data
+* Running risk assessment logic
+* Communicating with the OpenAI API
+* Keeping sensitive API credentials outside the mobile client
 
 ---
 
-## 🏗️ Architecture
+# 🔄 AI Request Flow
 
-PetCare consists of a React Native mobile application connected to Firebase services and a separate Node.js backend.
+A typical assistant request follows the flow below:
 
 ```text
-                     ┌─────────────────────┐
-                     │      PetCare        │
-                     │ React Native + TS   │
-                     └──────────┬──────────┘
-                                │
-                 ┌──────────────┴──────────────┐
-                 │                             │
-                 ▼                             ▼
-       ┌──────────────────┐          ┌──────────────────┐
-       │     Firebase     │          │ Node.js Backend  │
-       │                  │          │    Express.js    │
-       │ Authentication   │          └────────┬─────────┘
-       │ Cloud Firestore  │                   │
-       └──────────────────┘                   ▼
-                                      ┌──────────────────┐
-                                      │   Risk Scoring   │
-                                      │      System      │
-                                      └────────┬─────────┘
-                                               │
-                                               ▼
-                                      ┌──────────────────┐
-                                      │    OpenAI API    │
-                                      └──────────────────┘
+┌───────────────┐
+│     USER      │
+└───────┬───────┘
+        │
+        │ Pet + Situation Information
+        ▼
+┌─────────────────────┐
+│    ANIMIO MOBILE    │
+│ React Native + TS   │
+└──────────┬──────────┘
+           │
+           │ API Request
+           ▼
+┌─────────────────────┐
+│   EXPRESS BACKEND   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  INPUT VALIDATION   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│    RISK SCORING     │
+│                     │
+│  LOW       ●        │
+│  MEDIUM     ●       │
+│  HIGH        ●      │
+│  URGENT       ●     │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│      OPENAI API     │
+└──────────┬──────────┘
+           │
+           │ Generated Guidance
+           ▼
+┌─────────────────────┐
+│    ANIMIO MOBILE    │
+└─────────────────────┘
 ```
 
-The mobile application handles the user interface and pet management experience, while Firebase provides authentication and cloud data storage.
-
-AI Assistant requests are processed through the Node.js backend, where the application's risk scoring logic evaluates the provided information before interacting with the OpenAI API.
+This structure keeps the mobile client separated from sensitive server-side logic and credentials.
 
 ---
 
-## 📱 Screenshots
+# ☁️ Firebase Integration
 
-Application screenshots will be added here.
+Animio uses multiple Firebase services rather than treating Firebase as a single database layer.
+
+## Firebase Authentication
+
+Responsible for user account authentication and authenticated application access.
+
+## Cloud Firestore
+
+Used for structured application data such as:
+
+```text
+Users
+ ├── Pet Profiles
+ ├── Care Activities
+ ├── Preferences
+ ├── Assistant Conversations
+ └── Feedback
+```
+
+## Firebase Storage
+
+Used for media associated with the application, including pet profile images.
+
+Separating structured records from uploaded media keeps the application's data architecture cleaner and easier to maintain.
+
+---
+
+# 🔔 Notifications
+
+Animio includes a dedicated notification system for pet care reminders.
+
+**Notifee** is used for local notification functionality within the React Native application.
+
+Notification-related functionality includes:
+
+* Scheduled care reminders
+* Notification preferences
+* Care reminder preferences
+* Notification screen
+* Persistent local notification state
+
+This allows calendar-based care activities to become actionable reminders instead of remaining passive records.
+
+---
+
+# 🧭 Navigation
+
+Animio uses **React Navigation** with both stack-based and bottom-tab navigation.
+
+```text
+Animio
+│
+├── Authentication
+│   │
+│   ├── Login
+│   └── Register
+│
+└── Main Application
+    │
+    ├── Home
+    │
+    ├── Pets
+    │   ├── Add Pet
+    │   ├── Pet Details
+    │   └── Edit Pet
+    │
+    ├── Calendar
+    │
+    ├── AI Assistant
+    │
+    ├── Notifications
+    │
+    └── Profile
+        ├── About
+        └── Upcoming Features
+```
+
+This structure keeps major application areas easily accessible while allowing detail and editing screens to use their own navigation flow.
+
+---
+
+# 🛠️ Technology Stack
+
+## Mobile Development
+
+| Technology                       | Usage                              |
+| -------------------------------- | ---------------------------------- |
+| **React Native**                 | Cross-platform mobile application  |
+| **TypeScript**                   | Type-safe development              |
+| **React Native CLI**             | Native React Native environment    |
+| **React Navigation**             | Stack and bottom-tab navigation    |
+| **Notifee**                      | Local notifications                |
+| **AsyncStorage**                 | Local persistent application state |
+| **React Native Image Picker**    | Pet image selection                |
+| **React Native SVG**             | Vector UI elements                 |
+| **Lucide React Native**          | Application iconography            |
+| **React Native Linear Gradient** | Gradient-based UI components       |
+
+## Backend
+
+| Technology              | Usage                              |
+| ----------------------- | ---------------------------------- |
+| **Node.js**             | Server-side JavaScript runtime     |
+| **Express.js**          | REST API and request routing       |
+| **Custom Risk Scoring** | Rule-based risk classification     |
+| **OpenAI API**          | AI-assisted informational guidance |
+
+## Cloud
+
+| Technology                  | Usage                   |
+| --------------------------- | ----------------------- |
+| **Firebase Authentication** | Account authentication  |
+| **Cloud Firestore**         | Cloud data persistence  |
+| **Firebase Storage**        | Image and media storage |
+
+---
+
+# 📂 Project Structure
+
+```text
+Animio/
+│
+├── src/
+│   │
+│   ├── assets/
+│   │   ├── fonts/
+│   │   └── images/
+│   │
+│   ├── data/
+│   │
+│   ├── navigation/
+│   │
+│   ├── screens/
+│   │
+│   ├── services/
+│   │
+│   └── types/
+│
+├── backend/
+│   │
+│   └── src/
+│       ├── routes/
+│       └── services/
+│
+├── android/
+│
+├── ios/
+│
+├── App.tsx
+├── package.json
+└── README.md
+```
+
+---
+
+# 📱 Application Preview
+
+<div align="center">
+
+### Interface Preview
+
+Screenshots will be added as the interface is finalized.
 
 <!--
-Example:
 
-<p align="center">
-  <img src="screenshots/home.png" width="220" />
-  <img src="screenshots/pet-details.png" width="220" />
-  <img src="screenshots/ai-assistant.png" width="220" />
-</p>
+Create a "screenshots" directory in the repository and add
+the corresponding application screenshots.
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshots/home.png" width="210" />
+      <br/><br/>
+      <b>Home</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/pets.png" width="210" />
+      <br/><br/>
+      <b>Pet Management</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/pet-details.png" width="210" />
+      <br/><br/>
+      <b>Pet Details</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/calendar.png" width="210" />
+      <br/><br/>
+      <b>Care Calendar</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/assistant.png" width="210" />
+      <br/><br/>
+      <b>AI Assistant</b>
+    </td>
+    <td align="center">
+      <img src="screenshots/profile.png" width="210" />
+      <br/><br/>
+      <b>Profile</b>
+    </td>
+  </tr>
+</table>
+
 -->
+
+</div>
 
 ---
 
-## 🚀 Getting Started
+# 🚀 Getting Started
 
-### Prerequisites
+## Prerequisites
 
-Before running the project, make sure you have the following installed:
+Before running Animio, make sure the following are installed:
 
-* Node.js
-* npm
-* React Native development environment
-* Android Studio for Android development
-* Xcode for iOS development on macOS
+* **Node.js**
+* **npm**
+* **React Native development environment**
+* **Android Studio** for Android development
+* **Xcode** for iOS development on macOS
 
-You will also need the required Firebase configuration and environment variables for services used by the project.
+The project also requires valid Firebase configuration files and backend environment variables.
 
-### Installation
+---
 
-Clone the repository:
+## 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
+cd Animio
 ```
 
-Navigate to the project:
+---
 
-```bash
-cd PetCare
-```
-
-Install the dependencies:
+## 2. Install Mobile Dependencies
 
 ```bash
 npm install
 ```
 
-### Start Metro
+---
+
+## 3. Install Backend Dependencies
+
+```bash
+cd backend
+npm install
+```
+
+Return to the project root when necessary:
+
+```bash
+cd ..
+```
+
+---
+
+# 🔐 Environment Configuration
+
+Sensitive credentials must never be committed to source control.
+
+Create the backend environment configuration locally.
+
+```env
+OPENAI_API_KEY=your_openai_api_key
+```
+
+Environment files containing private credentials should remain excluded through `.gitignore`.
+
+Firebase configuration must also be provided locally according to the target platform.
+
+> [!CAUTION]
+> Never expose the OpenAI API key directly inside the React Native application.
+> AI requests should be sent through the backend so that server-side credentials remain outside the mobile client.
+
+---
+
+# ▶️ Running the Application
+
+## Start the Backend
+
+From the backend directory:
+
+```bash
+cd backend
+npm start
+```
+
+---
+
+## Start Metro
+
+From the project root:
 
 ```bash
 npm start
 ```
 
-### Run on Android
+---
 
-Open another terminal and run:
+## Run on Android
+
+Open another terminal:
 
 ```bash
 npm run android
 ```
 
-### Run on iOS
+---
+
+## Run on iOS
 
 ```bash
 npm run ios
@@ -211,58 +665,113 @@ npm run ios
 
 ---
 
-## 🔒 Environment Variables
+# 🔒 Security Considerations
 
-Sensitive information such as API keys should **not** be committed to the repository.
+Animio follows several basic security principles:
 
-Create the required environment configuration locally and provide the necessary credentials for services such as the OpenAI API.
+* Sensitive AI credentials remain on the backend
+* Environment files are excluded from source control
+* Authentication is handled through Firebase Authentication
+* User data is associated with authenticated application accounts
+* AI requests are processed through a backend rather than exposing credentials to the mobile client
+* Risk assessment is performed independently from generated AI content
 
-Example:
+These decisions help maintain separation between the client, cloud data, backend logic, and external AI services.
 
-```env
-OPENAI_API_KEY=your_api_key
+---
+
+# 🎯 Project Goals
+
+Animio was developed as a practical full-stack mobile project exploring how several modern technologies can work together within a single application.
+
+The project demonstrates experience with:
+
+```text
+✓ Cross-platform mobile development
+✓ TypeScript-based application architecture
+✓ Mobile UI/UX development
+✓ Authentication flows
+✓ Cloud database integration
+✓ Cloud media storage
+✓ Navigation architecture
+✓ Local notifications
+✓ Persistent application state
+✓ REST API communication
+✓ Backend development
+✓ AI API integration
+✓ Rule-based risk assessment
+✓ Client-server separation
 ```
 
-Make sure files containing private credentials are included in `.gitignore`.
+Rather than treating these technologies as isolated examples, Animio combines them into one connected product experience.
 
 ---
 
-## 🎯 Project Purpose
+# 🗺️ Roadmap
 
-PetCare was developed to create a practical mobile solution for everyday pet care while gaining hands-on experience with modern mobile and backend technologies.
+Animio is actively evolving.
 
-The project brings together:
+Potential future improvements include:
 
-* Cross-platform mobile development
-* User authentication
-* Cloud database management
-* REST API communication
-* Backend development
-* AI API integration
-* Rule-based risk assessment
-* Mobile UI/UX development
-
----
-
-## 🔮 Future Improvements
-
-PetCare can be expanded with features such as:
-
-* Push notifications for upcoming care activities
-* More detailed vaccination tracking
-* Veterinary appointment reminders
-* Improved pet health history
-* Enhanced AI Assistant capabilities
-* Additional personalization options
+* More detailed vaccination history
+* Extended health history
+* Recurring care routines
+* Advanced reminder customization
+* Improved health trend visualization
+* Additional pet types and personalization
+* More advanced Assistant context handling
+* Expanded care history
+* Improved accessibility
+* Further UI/UX refinements
 
 ---
 
-## 👩‍💻 Developer
+# ⚠️ Medical Disclaimer
 
-Developed with **React Native, TypeScript, Firebase, Node.js and Express.js**.
+Animio is a pet care organization and informational assistance application.
+
+The AI Assistant and risk assessment features are intended to provide **general informational guidance only**.
+
+They do not provide medical diagnoses and must not be used as a substitute for professional veterinary examination, diagnosis, advice, or treatment.
+
+If a pet appears seriously ill, injured, or in immediate danger, users should contact a qualified veterinarian or emergency veterinary service.
 
 ---
 
-<p align="center">
-  🐾 <b>Making everyday pet care easier.</b>
-</p>
+---
+
+# ©️ Copyright
+
+**Copyright © 2026 Selin & Betül Kızılkaya. All rights reserved.**
+
+The source code, application design, documentation, and original materials contained in this repository are the intellectual property of the project authors unless otherwise stated.
+
+Unauthorized copying, modification, redistribution, publication, sublicensing, or commercial use of substantial portions of this project is not permitted without prior permission from the authors.
+
+Third-party libraries, frameworks, APIs, trademarks, and other external materials remain subject to their respective licenses and terms.
+
+---
+
+<div align="center">
+
+<br/>
+
+## 🐾 Animio
+
+**Care. Organize. Understand.**
+
+*Making everyday pet care a little easier.*
+
+<br/>
+
+Developed with care by **[Selin](https://github.com/selinWorks)** & **[Betül Kızılkaya](https://github.com/betulkizilkaya)**
+
+<br/>
+
+Built with **React Native, TypeScript, Firebase, Node.js & Express.js**
+
+<br/>
+
+**© 2026 Animio · All rights reserved.**
+
+</div>
