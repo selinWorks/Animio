@@ -794,7 +794,7 @@ Risk Assessment      → Custom Rule-Based Risk Scoring
 
 # 📄 License & Copyright
 
-Copyright © 2026 **Selin & Betül Kızılkaya**. All rights reserved.
+Copyright © 2026 **Selin Ş & Betül Kızılkaya**. All rights reserved.
 
 The source code, design, documentation, and other original materials in this repository are the intellectual property of the project authors unless otherwise stated.
 
