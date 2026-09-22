@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -81,7 +82,6 @@ type FollowUpAnswers = {
   vomitAppearance?: string;
   canKeepWater?: string;
   abdominalPain?: string;
-  foreignBodyRisk?: string;
 
   foodIntake?: string;
   waterIntake?: string;
@@ -92,6 +92,15 @@ type FollowUpAnswers = {
 
   foodChange?: string;
   unusualFood?: string;
+  foreignBodyRisk?: string;
+
+  // Aşı / Bakım
+  careType?: string;
+  careTiming?: string;
+  careProblem?: string;
+
+  // Diğer
+  otherDetails?: string;
 };
 
 type DurationType =
@@ -272,6 +281,34 @@ const FOLLOW_UP_OPTIONS = {
     'Evet',
     'Emin değilim',
   ],
+
+  careType: [
+    'Aşı',
+    'İç parazit',
+    'Dış parazit',
+    'Genel kontrol',
+    'Tırnak / tüy / kulak bakımı',
+    'Diş bakımı',
+    'Diğer',
+    'Emin değilim',
+  ],
+
+  careTiming: [
+    'Bugün',
+    'Son birkaç gün içinde',
+    '1-4 hafta önce',
+    '1 aydan daha uzun süre önce',
+    'Henüz yapılmadı',
+    'Emin değilim',
+  ],
+
+  careProblem: [
+    'Hayır',
+    'Hafif bir değişiklik var',
+    'Belirgin bir değişiklik var',
+    'Emin değilim',
+  ],
+
 } as const;
 
 const DURATIONS: {key: DurationType; label: string}[] = [
@@ -354,6 +391,14 @@ const AssistantScreen = () => {
     problemTypes.length > 0 &&
     duration !== '' &&
     urgency !== '';
+
+  const hasFollowUpQuestions =
+    problemTypes.includes('Kusma') ||
+    problemTypes.includes('İştahsızlık') ||
+    problemTypes.includes('Beslenme') ||
+    problemTypes.includes('Halsizlik') ||
+    problemTypes.includes('Aşı / Bakım') ||
+    problemTypes.includes('Diğer');
 
   /* =======================================================
      FIRESTORE
@@ -461,6 +506,35 @@ const AssistantScreen = () => {
         if (followUpAnswers.canWalkNormally) {
           activeFollowUpAnswers.canWalkNormally =
             followUpAnswers.canWalkNormally;
+        }
+      }
+
+      // AŞI / BAKIM
+      if (problemTypes.includes('Aşı / Bakım')) {
+        if (followUpAnswers.careType) {
+          activeFollowUpAnswers.careType =
+            followUpAnswers.careType;
+        }
+
+        if (followUpAnswers.careTiming) {
+          activeFollowUpAnswers.careTiming =
+            followUpAnswers.careTiming;
+        }
+
+        if (followUpAnswers.careProblem) {
+          activeFollowUpAnswers.careProblem =
+            followUpAnswers.careProblem;
+        }
+      }
+
+      // DİĞER
+      if (problemTypes.includes('Diğer')) {
+        if (
+          followUpAnswers.otherDetails &&
+          followUpAnswers.otherDetails.trim()
+        ) {
+          activeFollowUpAnswers.otherDetails =
+            followUpAnswers.otherDetails.trim();
         }
       }
 
@@ -1253,6 +1327,15 @@ const AssistantScreen = () => {
                             delete cleaned.foodChange;
                             delete cleaned.unusualFood;
                           }
+                          if (!nextProblemTypes.includes('Aşı / Bakım')) {
+                            delete cleaned.careType;
+                            delete cleaned.careTiming;
+                            delete cleaned.careProblem;
+                          }
+
+                          if (!nextProblemTypes.includes('Diğer')) {
+                            delete cleaned.otherDetails;
+                          }
 
                           // Yabancı cisim sorusu sadece Kusma veya Beslenme
                           // seçiliyken geçerli
@@ -1316,7 +1399,7 @@ const AssistantScreen = () => {
                 DYNAMIC FOLLOW-UP QUESTIONS
                 ================================================= */}
 
-            {problemTypes.length > 0 && (
+            {hasFollowUpQuestions && (
               <View
                 style={
                   styles.followUpSection
@@ -1488,6 +1571,43 @@ const AssistantScreen = () => {
                   </>
                 )}
 
+                {problemTypes.includes('Aşı / Bakım') && (
+                  <>
+                    <View style={styles.followUpGroupTitle}>
+                      <Syringe
+                        size={19}
+                        color="#7257FF"
+                        strokeWidth={2.3}
+                      />
+
+                      <Text style={styles.followUpGroupTitleText}>
+                        Aşı ve bakım
+                      </Text>
+                    </View>
+
+                    <FollowUpQuestion
+                      title="Aşı veya bakım işlemi neyle ilgili?"
+                      answerKey="careType"
+                      options={FOLLOW_UP_OPTIONS.careType}
+                    />
+
+                    <FollowUpQuestion
+                      title="İşlem ne zaman yapıldı veya yapılacak?"
+                      answerKey="careTiming"
+                      options={FOLLOW_UP_OPTIONS.careTiming}
+                    />
+
+                    <FollowUpQuestion
+                      title="Şu anda bu işlemle ilişkili fark ettiğin bir sorun var mı?"
+                      subtitle="Örneğin davranış, iştah veya genel durumda belirgin bir değişiklik."
+                      answerKey="careProblem"
+                      options={FOLLOW_UP_OPTIONS.careProblem}
+                    />
+                  </>
+                )}
+
+
+
                 {/* =================================================
                     BESLENME DEĞİŞİKLİĞİ
                     ================================================= */}
@@ -1593,36 +1713,57 @@ const AssistantScreen = () => {
                     DİĞER
                     ================================================= */}
 
-                {problemTypes.includes(
-                  'Diğer',
-                ) && (
-                  <View
-                    style={
-                      styles.otherInfoBox
-                    }>
+                {problemTypes.includes('Diğer') && (
+                      <>
+                        <View style={styles.followUpGroupTitle}>
+                          <MoreHorizontal
+                            size={19}
+                            color="#8A7BEA"
+                            strokeWidth={2.3}
+                          />
 
-                    <Text
-                      style={
-                        styles.otherInfoTitle
-                      }>
-                      Bu belirtiyi daha ayrıntılı
-                      açıklayabilirsin.
-                    </Text>
+                          <Text style={styles.followUpGroupTitleText}>
+                            Diğer durum
+                          </Text>
+                        </View>
 
-                    <Text
-                      style={
-                        styles.otherInfoText
-                      }>
-                      Diğer seçeneği seçtiğinde
-                      değerlendirme mevcut
-                      bilgilerin üzerinden yapılır.
-                    </Text>
+                        <View style={styles.followUpQuestionCard}>
+                          <Text style={styles.followUpQuestionTitle}>
+                            Ne fark ettin?
+                          </Text>
 
+                          <Text style={styles.followUpQuestionSubtitle}>
+                            Evcil hayvanında gözlemlediğin durumu kendi cümlelerinle
+                            kısaca yaz.
+                          </Text>
+
+                          <TextInput
+                            value={followUpAnswers.otherDetails || ''}
+                            onChangeText={text => {
+                              setFollowUpAnswers(prev => ({
+                                ...prev,
+                                otherDetails: text,
+                              }));
+
+                              setResult(null);
+                              setAiMessage('');
+                            }}
+                            placeholder="Gözlemlediğin durumu yaz..."
+                            placeholderTextColor="#9AA3B8"
+                            multiline
+                            textAlignVertical="top"
+                            maxLength={500}
+                            style={styles.otherDetailsInput}
+                          />
+
+                          <Text style={styles.characterCount}>
+                            {(followUpAnswers.otherDetails || '').length}/500
+                          </Text>
+                        </View>
+                      </>
+                    )}
                   </View>
                 )}
-
-              </View>
-            )}
 
             {/* =================================================
                 DURATION + URGENCY
@@ -2080,7 +2221,7 @@ const AssistantScreen = () => {
                         style={
                           styles.aiButtonText
                         }>
-                        AI Tanı Başlat
+                        AI Ön Değerlendirme
                       </Text>
 
                     </View>
@@ -3172,6 +3313,40 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  otherDetailsInput: {
+    minHeight: 120,
+    marginTop: 10,
+
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+
+    borderRadius: 14,
+
+    borderWidth: 1,
+    borderColor: '#E1E5EF',
+
+    backgroundColor: '#FFFFFF',
+
+    color: COLORS.navy,
+
+    fontSize: 12,
+    lineHeight: 18,
+
+    fontFamily: 'Quicksand-Medium',
+  },
+
+  characterCount: {
+    marginTop: 5,
+
+    color: '#8A94AA',
+
+    fontSize: 10,
+
+    fontFamily: 'Quicksand-Medium',
+
+    textAlign: 'right',
+  },
+
   followUpOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -3242,6 +3417,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Medium',
     marginTop: 4,
   },
+
 
   /* =======================================================
      DURATION / URGENCY

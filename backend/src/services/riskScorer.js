@@ -26,7 +26,7 @@ function calculateRisk(data) {
   };
 
   // ------------------------------------------------
-  // 3. KULLANICININ ACİLİYET DEĞERLENDİRMESİ
+  // 3. ACİLİYET
   // ------------------------------------------------
 
   const urgencyScores = {
@@ -37,8 +37,6 @@ function calculateRisk(data) {
 
   // ------------------------------------------------
   // 4. HAYVAN TÜRÜ
-  // Tür tek başına güçlü bir risk belirleyicisi değildir.
-  // Bu nedenle yalnızca küçük bir ek katkı yapar.
   // ------------------------------------------------
 
   const petScores = {
@@ -51,15 +49,7 @@ function calculateRisk(data) {
   };
 
   // ------------------------------------------------
-  // 5. ÇOKLU SEMPTOM DESTEĞİ
-  //
-  // Yeni sistem:
-  // data.problemTypes = ['Kusma', 'Halsizlik']
-  //
-  // Eski sistem:
-  // data.problemType = 'Kusma'
-  //
-  // İkisini de destekliyoruz.
+  // 5. PROBLEM TÜRLERİ
   // ------------------------------------------------
 
   const problemTypes = Array.isArray(data.problemTypes)
@@ -69,14 +59,41 @@ function calculateRisk(data) {
       : [];
 
   // ------------------------------------------------
-  // 6. SEMPTOM PUANLAMA
+  // 6. "DİĞER" İÇİN GİRİLEN AÇIKLAMA
+  // ------------------------------------------------
+
+  const otherDetails =
+    typeof data.followUpAnswers?.otherDetails === 'string'
+      ? data.followUpAnswers.otherDetails.trim()
+      : '';
+
+  // ------------------------------------------------
+  // 7. DİĞER + ANLAMSIZ AÇIKLAMA
   //
-  // İlk semptom     -> %100
-  // İkinci semptom  -> %50
-  // Diğerleri       -> %25
-  //
-  // Böylece birden fazla semptom skoru artırır ama
-  // skor kontrolsüz şekilde yükselmez.
+  // Sadece "Diğer" seçilmiş ve anlamlı bir açıklama
+  // verilmemişse risk hesabı yapılmaz.
+  // ------------------------------------------------
+
+  const onlyOtherSelected =
+    problemTypes.length === 1 &&
+    problemTypes[0] === 'Diğer';
+
+  const hasMeaningfulOtherDetails =
+    otherDetails.length >= 3;
+
+  if (onlyOtherSelected && !hasMeaningfulOtherDetails) {
+    return {
+      riskScore: null,
+      riskLevel: 'Hesaplanamadı',
+      action:
+        'Anlamlı bir belirti veya gözlem girilmesi gerekiyor.',
+      canEvaluate: false,
+      reason: 'OTHER_DETAILS_REQUIRED',
+    };
+  }
+
+  // ------------------------------------------------
+  // 8. SEMPTOM PUANLAMA
   // ------------------------------------------------
 
   problemTypes.forEach((problemType, index) => {
@@ -92,27 +109,24 @@ function calculateRisk(data) {
   });
 
   // ------------------------------------------------
-  // 7. SEMPTOM KOMBİNASYONLARI
+  // 9. SEMPTOM KOMBİNASYONLARI
   // ------------------------------------------------
 
-  const has = symptom => problemTypes.includes(symptom);
+  const has = symptom =>
+    problemTypes.includes(symptom);
 
-  // Kusma + Halsizlik
   if (has('Kusma') && has('Halsizlik')) {
     score += 10;
   }
 
-  // Kusma + İştahsızlık
   if (has('Kusma') && has('İştahsızlık')) {
     score += 7;
   }
 
-  // Halsizlik + İştahsızlık
   if (has('Halsizlik') && has('İştahsızlık')) {
     score += 7;
   }
 
-  // Üç önemli semptom birlikte
   if (
     has('Kusma') &&
     has('Halsizlik') &&
@@ -122,31 +136,34 @@ function calculateRisk(data) {
   }
 
   // ------------------------------------------------
-  // 8. SÜRE
+  // 10. SÜRE
   // ------------------------------------------------
 
   score += durationScores[data.duration] || 0;
 
   // ------------------------------------------------
-  // 9. KULLANICININ ACİLİYET DEĞERLENDİRMESİ
+  // 11. ACİLİYET
   // ------------------------------------------------
 
   score += urgencyScores[data.urgency] || 0;
 
   // ------------------------------------------------
-  // 10. HAYVAN TÜRÜ
+  // 12. HAYVAN TÜRÜ
   // ------------------------------------------------
 
   score += petScores[data.petType] || 0;
 
   // ------------------------------------------------
-  // 11. SKORU 0-100 ARASINDA TUT
+  // 13. SKORU 0-100 ARASINDA TUT
   // ------------------------------------------------
 
-  score = Math.min(Math.max(score, 0), 100);
+  score = Math.min(
+    Math.max(score, 0),
+    100,
+  );
 
   // ------------------------------------------------
-  // 12. RİSK SEVİYESİ
+  // 14. RİSK SEVİYESİ
   // ------------------------------------------------
 
   let riskLevel = 'Düşük';
@@ -154,10 +171,12 @@ function calculateRisk(data) {
 
   if (score >= 80) {
     riskLevel = 'Acil';
-    action = 'Derhal veterinere başvurman önerilir.';
+    action =
+      'Derhal veterinere başvurman önerilir.';
   } else if (score >= 55) {
     riskLevel = 'Yüksek';
-    action = 'En kısa sürede veterinere görünmen önerilir.';
+    action =
+      'En kısa sürede veterinere görünmen önerilir.';
   } else if (score >= 30) {
     riskLevel = 'Orta';
     action =
@@ -165,14 +184,17 @@ function calculateRisk(data) {
   }
 
   // ------------------------------------------------
-  // 13. SONUÇ
+  // 15. SONUÇ
   // ------------------------------------------------
 
   return {
     riskScore: score,
     riskLevel,
     action,
+    canEvaluate: true,
   };
 }
 
-module.exports = { calculateRisk };
+module.exports = {
+  calculateRisk,
+};

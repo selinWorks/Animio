@@ -5,522 +5,886 @@ const openai = new OpenAI({
 });
 
 // =======================================================
+// TAKİP SORULARI İÇİN KULLANICI DOSTU İSİMLER
+// =======================================================
+
+const followUpLabels = {
+  vomitingFrequency: 'Son 24 saatte kusma sayısı',
+  vomitAppearance: 'Kusmuğun görünümü',
+  canKeepWater: 'Suyu tutabilme durumu',
+  abdominalPain: 'Karın ağrısı veya şişlik',
+
+  foodIntake: 'Yemek tüketimi',
+  waterIntake: 'Su tüketimi',
+  weightLoss: 'Kilo kaybı',
+
+  energyLevel: 'Enerji seviyesi',
+  canWalkNormally: 'Normal yürüyebilme',
+
+  foodChange: 'Beslenme değişikliği',
+  unusualFood: 'Alışık olmadığı yiyecek veya ödül',
+  foreignBodyRisk: 'Yabancı cisim yutma ihtimali',
+
+  careType: 'Aşı veya bakım işleminin türü',
+  careTiming: 'Aşı veya bakım işleminin zamanı',
+  careProblem: 'İşlemle ilişkili gözlenen sorun',
+
+  otherDetails: 'Kullanıcının bildirdiği ek belirti veya durum',
+};
+
+// =======================================================
+// DİĞER ALANI İÇİN AÇIKÇA ANLAMSIZ GİRİŞ KONTROLÜ
+// =======================================================
+
+const isClearlyMeaninglessOther = value => {
+  if (!value || typeof value !== 'string') {
+    return true;
+  }
+
+  const text = value
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/\s+/g, ' ');
+
+  if (!text) {
+    return true;
+  }
+
+  // Açıkça test / rastgele giriş olduğu bilinen ifadeler.
+  // Bu liste SADECE kesin anlamsız örnekleri yakalamak için kullanılır.
+  // Sağlıkla ilgili olabilecek kelimeler burada kesinlikle bulunmaz.
+  const meaninglessValues = [
+    'asdf',
+    'asdfg',
+    'asdfgh',
+    'qwe',
+    'qwer',
+    'qwerty',
+    'xxx',
+    'xxxx',
+    'xxxxx',
+    'test',
+    'deneme',
+    'deneme123',
+    'abc',
+    'abc123',
+    'zxc',
+    'zxcv',
+    'qaz',
+    'wsx',
+  ];
+
+  if (meaninglessValues.includes(text)) {
+    return true;
+  }
+
+  // Sadece rakam
+  if (/^\d+$/.test(text)) {
+    return true;
+  }
+
+  // Aynı karakterin anlamsız şekilde tekrar edilmesi
+  if (
+    text.length >= 4 &&
+    /^(.)(\1)+$/u.test(text)
+  ) {
+    return true;
+  }
+
+  // Çok kısa anlamsız girişler.
+  // "ağrı", "ateş", "kan", "yara" gibi gerçek kelimeleri
+  // yanlışlıkla elememek için burada agresif kontrol yapılmaz.
+  if (text.length <= 1) {
+    return true;
+  }
+
+  return false;
+};
+
+// =======================================================
+// "DİĞER" ALANINDAKİ METNİN ANLAMLI OLUP OLMADIĞINI KONTROL ET
+// =======================================================
+
+const isMeaningfulOtherDetails = async (
+  text,
+  petType,
+) => {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+
+  const value = text.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  // Kesin olarak anlamsız olduğu bilinen girişlerde
+  // gereksiz AI çağrısı yapma.
+  if (isClearlyMeaninglessOther(value)) {
+    return false;
+  }
+
+  try {
+    const response = await openai.responses.create({
+      model: 'gpt-4o-mini',
+
+      input: `
+Sen bir evcil hayvan sağlık uygulamasında çalışan
+METİN ANLAMLILIK DEĞERLENDİRİCİSİSİN.
+
+Aşağıdaki metin, ${petType || 'bir evcil hayvan'} hakkında
+kullanıcının "Diğer" alanına kendi yazdığı ifadedir.
+
+Görevin yalnızca şu kararı vermektir:
+
+Bu metin, evcil hayvan hakkında gerçek bir sağlık durumu,
+belirti, fiziksel değişiklik, davranış değişikliği,
+rahatsızlık, olağandışı durum, bakım sonrası sorun veya
+kullanıcının gözlemlediği anlamlı bir durum bildiriyor mu?
+
+Eğer EVET ise:
+meaningful = true
+
+Eğer metin açıkça anlamsız, rastgele, test amaçlı,
+konu dışı veya herhangi bir anlamlı gözlem içermiyorsa:
+meaningful = false
+
+=======================================================
+ÇOK ÖNEMLİ KARAR KURALLARI
+=======================================================
+
+Bir metnin "meaningful" olması için belirli bir belirti
+kelimesini önceden tanıyor olman gerekmez.
+
+Yeni veya daha önce örneğini görmediğin bir sağlık
+ifadesi de anlamlı olabilir.
+
+Metni kelime listesine göre değil, ANLAMINA göre değerlendir.
+
+Örneğin aşağıdakiler anlamlıdır:
+
+"kanama var"
+"kan gördüm"
+"karnı şiş"
+"nefes alırken zorlanıyor"
+"çok fazla uyuyor"
+"normalden farklı davranıyor"
+"ayağında şişlik fark ettim"
+"gözünün içinde bir şey var"
+"yürürken dengesini kaybediyor"
+"birdenbire çok huzursuz oldu"
+"burnundan sıvı geliyor"
+"tuvaletini yaparken zorlanıyor"
+"derisinde değişiklik fark ettim"
+"yemek yemeyi bıraktı"
+"çok su içmeye başladı"
+"bugün normalden farklı"
+
+Bunların hepsi belirli bir kelime listesinde bulunmasa
+bile anlamlı kullanıcı gözlemleridir.
+
+=======================================================
+ANLAMSIZ METİNLER
+=======================================================
+
+Aşağıdaki türler anlamlı değildir:
+
+"asdf"
+"qwerty"
+"xxx"
+"12345"
+"deneme"
+"test"
+"abc123"
+
+Ayrıca:
+
+- tamamen rastgele karakterler,
+- yalnızca anlamsız harf dizileri,
+- açıkça test amaçlı yazılmış ifadeler,
+- sağlıkla veya evcil hayvanla hiçbir anlamlı bağlantısı
+  olmayan ifadeler
+
+false olmalıdır.
+
+=======================================================
+BELİRSİZLİK KURALI
+=======================================================
+
+Bir ifade biraz belirsiz olsa bile gerçek bir gözlem veya
+durum bildirdiği açıkça anlaşılıyorsa meaningful = true.
+
+Örneğin:
+
+"garip davranıyor"
+
+ifadesi yeterince belirsiz olsa da bir davranış değişikliği
+bildirdiği için anlamlı kabul edilebilir.
+
+Ancak:
+
+"garip"
+
+tek başına anlamlı bir sağlık gözlemi oluşturmayabilir.
+
+Bu nedenle zorla bir belirti tahmin etme.
+
+=======================================================
+YAZIM HATALARI
+=======================================================
+
+Açık bir yazım hatası varsa ve cümlenin gerçek anlamı
+kolayca anlaşılabiliyorsa meaningful = true olabilir.
+
+Ancak bir kelimeyi yalnızca başka bir sağlık belirtisine
+benziyor diye değiştirme.
+
+Örneğin:
+
+"kufur ediyor"
+
+ifadesini "kusuyor" olarak varsayma.
+
+Çünkü kullanıcının gerçek anlamı kesin olarak bilinmiyor.
+
+=======================================================
+ÖNEMLİ
+=======================================================
+
+Burada belirti teşhisi yapma.
+
+Metnin hangi hastalığa işaret ettiğini değerlendirme.
+
+Sadece kullanıcının metninin anlamlı bir evcil hayvan
+gözlemi olup olmadığına karar ver.
+
+SADECE şu JSON formatında cevap ver:
+
+{
+  "meaningful": true
+}
+
+veya:
+
+{
+  "meaningful": false
+}
+
+Kullanıcı metni:
+"${value.replace(/"/g, '\\"')}"
+`,
+    });
+
+    const output =
+      response.output_text?.trim() || '';
+
+    try {
+      const parsed = JSON.parse(output);
+
+      return parsed.meaningful === true;
+    } catch (parseError) {
+      console.error(
+        'isMeaningfulOtherDetails JSON parse error:',
+        parseError,
+      );
+
+      return false;
+    }
+  } catch (error) {
+    console.error(
+      'isMeaningfulOtherDetails error:',
+      error,
+    );
+
+    return false;
+  }
+};
+
+// =======================================================
 // PETCARE AI ÖN DEĞERLENDİRME
 // =======================================================
 
-async function generatePetAdvice(data, risk) {
-  // -------------------------------------------------------
-  // PROBLEM TÜRLERİ
-  // -------------------------------------------------------
+const generatePetAdvice = async (
+  data,
+  riskResult,
+) => {
+  try {
+    const {
+      petType,
+      problemTypes,
+      problemType,
+      duration,
+      urgency,
+      followUpAnswers,
+    } = data;
 
-  const problemTypes = Array.isArray(data.problemTypes)
-    ? data.problemTypes
-    : data.problemType
-      ? [data.problemType]
-      : [];
+    // ===================================================
+    // AKTİF PROBLEM TÜRLERİ
+    // ===================================================
 
-  const problemText = problemTypes.length
-    ? problemTypes.join(', ')
-    : 'Belirtilmedi';
+    const activeProblemTypes =
+      Array.isArray(problemTypes)
+        ? problemTypes
+        : problemType
+          ? [problemType]
+          : [];
 
-  // -------------------------------------------------------
-  // DİNAMİK TAKİP SORULARI
-  // -------------------------------------------------------
-  //
-  // Frontend artık cevapları:
-  //
-  // data.followUpAnswers
-  //
-  // şeklinde gönderiyor.
-  //
+    // ===================================================
+    // TAKİP CEVAPLARI
+    // ===================================================
 
-  const followUpAnswers = data.followUpAnswers || {};
+    const followUp = followUpAnswers || {};
 
-  // -------------------------------------------------------
-  // TAKİP SORULARININ TEKNİK İSİMLERİNİ
-  // AI'NİN ANLAYACAĞI TÜRKÇE İSİMLERE ÇEVİR
-  // -------------------------------------------------------
+    // ===================================================
+    // DİĞER ALANI
+    // ===================================================
 
-  const followUpLabels = {
-    vomitingFrequency:
-      'Son 24 saatte kusma sıklığı',
+    const otherDetails =
+      typeof followUp.otherDetails === 'string'
+        ? followUp.otherDetails.trim()
+        : '';
 
-    vomitAppearance:
-      'Kusmuğun görünümü',
+    const onlyOtherSelected =
+      activeProblemTypes.length === 1 &&
+      activeProblemTypes[0] === 'Diğer';
 
-    canKeepWater:
-      'Su içtiğinde suyunu tutabilme durumu',
+    // ===================================================
+    // DİĞER ALANININ ANLAMLILIK KONTROLÜ
+    // ===================================================
 
-    abdominalPain:
-      'Karın ağrısı veya belirgin karın şişliği',
+    if (onlyOtherSelected) {
+      const meaningful =
+        await isMeaningfulOtherDetails(
+          otherDetails,
+          petType,
+        );
 
-    foodIntake:
-      'Son 24 saatte yemek tüketimi',
+      if (!meaningful) {
+        return `DİĞER
 
-    waterIntake:
-      'Su tüketimi',
+Girdiğiniz ifade evcil hayvanınızla ilgili anlaşılır bir belirti, gözlem veya durum içermiyor. Lütfen gözlemlediğiniz durumu daha açık şekilde yazın.
 
-    weightLoss:
-      'Son günlerde kilo kaybı',
+Bu değerlendirme veteriner muayenesinin yerine geçmez.`;
+      }
+    }
 
-    energyLevel:
-      'Enerji seviyesi',
+    // ===================================================
+    // TAKİP CEVAPLARINI AI İÇİN HAZIRLA
+    // ===================================================
 
-    canWalkNormally:
-      'Normal şekilde yürüyebilme',
+    const followUpText =
+      Object.keys(followUp).length > 0
+        ? Object.entries(followUp)
+            .map(([key, value]) => {
+              const label =
+                followUpLabels[key] || key;
 
-    foodChange:
-      'Mama veya beslenme düzenindeki değişiklik',
-
-    unusualFood:
-      'Alışık olmadığı yiyecek veya ödül tüketimi',
-
-    foreignBodyRisk:
-      'Yabancı cisim yutma ihtimali',
-  };
-
-  // -------------------------------------------------------
-  // SADECE GERÇEKTEN CEVAPLANMIŞ SORULARI AL
-  // -------------------------------------------------------
-
-  const followUpEntries = Object.entries(followUpAnswers)
-    .filter(([key, value]) => {
-      return (
-        followUpLabels[key] &&
-        value !== undefined &&
-        value !== null &&
-        String(value).trim() !== ''
-      );
-    })
-    .map(([key, value]) => {
-      return `- ${followUpLabels[key]}: ${value}`;
-    });
-
-  const followUpText =
-    followUpEntries.length > 0
-      ? followUpEntries.join('\n')
-      : 'Kullanıcı ek takip sorularına henüz cevap vermedi.';
-
-  // -------------------------------------------------------
-  // PROMPT
-  // -------------------------------------------------------
-
-  const prompt = `
-Sen PetCare adlı evcil hayvan destek uygulamasının
-veterinerlik alanında ön değerlendirme yapan AI asistanısın.
-
-Görevin kullanıcıya genel internet tavsiyesi vermek değil,
-kullanıcının verdiği bilgileri birlikte yorumlamaktır.
-
-Kesin teşhis koyma.
-
-Ancak kullanıcı tarafından verilen belirtiler ve takip
-sorularının cevapları üzerinden:
-
-- durumun ne anlama gelebileceğini,
-- hangi olası nedenlerle ilişkili olabileceğini,
-- hangi bulguların daha önemli olduğunu,
-- hangi belirtilerin kötüleşme işareti olduğunu,
-- kullanıcının şu anda neyi takip etmesi gerektiğini
-
-açık ve anlaşılır şekilde anlat.
-
+              if (key === 'otherDetails') {
+                return `
 =======================================================
-HAYVAN BİLGİLERİ
+KULLANICININ "DİĞER" ALANINDAKİ DOĞRUDAN BEYANI
 =======================================================
 
-Hayvan türü:
-${data.petType || 'Belirtilmedi'}
+"${value}"
 
-Seçilen belirtiler / problemler:
-${problemText}
+BU ALAN ÇOK ÖNEMLİDİR.
 
-Belirtilerin süresi:
-${data.duration || 'Belirtilmedi'}
+Yukarıdaki ifade kullanıcının kendi gözlemidir.
 
-Kullanıcının aciliyet değerlendirmesi:
-${data.urgency || 'Belirtilmedi'}
+Eğer ifade anlamlı bir sağlık belirtisi, fiziksel
+değişiklik, davranış değişikliği, rahatsızlık,
+olağandışı durum veya bakım problemi bildiriyorsa,
+bu bilgi MEVCUT KULLANICI BELİRTİSİ olarak kabul edilmelidir.
+
+Bu bilgiyi görmezden gelme.
+
+Bu bilgiyi yalnızca "Diğer alanında yazılmış" şeklinde
+geçiştirme.
+
+Bu bilgiyi DURUMUN DEĞERLENDİRMESİ bölümünde dikkate al.
+
+Uygunsa DİKKAT EDİLMESİ GEREKENLER bölümünde ele al.
+
+Uygunsa RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR bölümünde
+risk açısından değerlendir.
+
+Uygunsa SONRAKİ ADIMLAR bölümünde dikkate al.
+
+Metinde açıkça belirtilmeyen ayrıntıları uydurma.
+
+Örneğin kullanıcı yalnızca "kanama var" dediyse:
+- kanamanın miktarını tahmin etme,
+- ne zamandır olduğunu tahmin etme,
+- nereden geldiğini tahmin etme,
+- nedenini kesin olarak söyleme.
+
+Ancak "kanama var" bilgisini kesinlikle yok sayma.
+
+Aynı şekilde kullanıcı daha önce görülmemiş farklı
+bir belirti veya gözlem yazarsa, bunu sadece önceden
+tanımlanmış bir kelime listesinde olmadığı için yok sayma.
+
+Metnin anlamını değerlendir ve gerçek bir kullanıcı
+gözlemi ise değerlendirmeye dahil et.
+`;
+              }
+
+              return `- ${label}: ${value}`;
+            })
+            .join('\n')
+        : 'Ek takip bilgisi verilmedi.';
+
+    // ===================================================
+    // ANA AI PROMPT
+    // ===================================================
+
+    const prompt = `
+Sen PetCare uygulamasında çalışan bir evcil hayvan sağlık
+ön değerlendirme asistanısın.
+
+Görevin, kullanıcının verdiği bilgilerden yola çıkarak
+evcil hayvanın mevcut durumunu anlaşılır ve kişiye özel
+şekilde değerlendirmektir.
+
+Kesin tanı koyma.
+
+Ama kullanıcının açıkça bildirdiği gerçek belirtileri,
+özellikle "Diğer" alanında yazılanları, kesinlikle yok sayma.
 
 =======================================================
-DİNAMİK TAKİP SORULARININ CEVAPLARI
+1. EN ÖNEMLİ KURAL: KULLANICININ GERÇEK BİLGİLERİ
 =======================================================
 
-Aşağıdaki bilgiler kullanıcı tarafından doğrudan verilmiştir.
+Kullanıcının verdiği bilgiler değerlendirmedeki temel
+veridir.
 
-Bu bilgiler değerlendirmede ÇOK ÖNEMLİDİR.
+Kullanıcı bir belirtiyi açıkça yazdıysa o belirtiyi
+değerlendir.
 
-Genel cevap vermeden önce bu cevapları yorumla.
-
-${followUpText}
-
-=======================================================
-RİSK ANALİZİ
-=======================================================
-
-Risk skoru:
-${risk.riskScore}/100
-
-Risk seviyesi:
-${risk.riskLevel}
-
-Önerilen aksiyon:
-${risk.action}
-
-ÖNEMLİ:
-
-Risk skorunu yeniden hesaplama.
-
-Risk seviyesini değiştirme.
-
-Verilen risk seviyesini kullan ve neden bu seviyeye
-ulaşıldığını kullanıcıya açıkla.
-
-=======================================================
-TAKİP CEVAPLARINI GERÇEKTEN YORUMLA
-=======================================================
-
-Kullanıcının takip sorularına verdiği cevapları yalnızca
-tekrar etme.
-
-Bu cevapların ne anlama gelebileceğini açıkla.
+Belirti önceden tanımlanmış bir listede bulunmasa bile,
+anlamlı bir sağlık gözlemi olduğu anlaşılıyorsa dikkate al.
 
 Örneğin kullanıcı:
 
-- 4+ kez kusma
-- Sarı-yeşil sıvı
-- Suyu tutamıyor
-- Neredeyse hiç yemedi
-- Çok halsiz
+"kanama var"
 
-cevaplarını verdiyse:
+derse, bunu gerçek bir kullanıcı belirtisi olarak kabul et.
 
-"Evcil hayvanınız kusuyor ve iştahsız."
+Kullanıcı:
 
-gibi basit bir cevap verme.
+"karnında şişlik fark ettim"
 
-Bunun yerine bu bulguların birlikte neden önemli
-olabileceğini açıkla.
+derse, bunu gerçek bir kullanıcı gözlemi olarak kabul et.
+
+Kullanıcı:
+
+"nefes alırken zorlanıyor"
+
+derse, bunu gerçek bir kullanıcı belirtisi olarak kabul et.
+
+Kullanıcı:
+
+"normalden farklı davranıyor"
+
+derse, bunu davranış değişikliği olarak dikkate al.
+
+Kullanıcının yazdığı anlamlı bir belirtiyi sırf sistemde
+önceden özel bir kategorisi olmadığı için yok sayma.
+
+=======================================================
+2. "DİĞER" ALANI ÖZEL KURALI
+=======================================================
+
+"Diğer" alanındaki metin kullanıcının serbest biçimde
+yazdığı doğrudan gözlemdir.
+
+Bu nedenle:
+
+- anlamlıysa gerçek kullanıcı verisidir,
+- değerlendirmeye dahil edilmelidir,
+- diğer belirtilerle birlikte yorumlanmalıdır,
+- yalnızca "Diğer" olarak adlandırıldığı için önemsiz
+  kabul edilmemelidir.
+
+"Diğer" alanı bir belirti kategorisi değildir.
+
+Kullanıcının kendi cümlesini yazdığı serbest metin alanıdır.
+
+Bu nedenle bu alandaki anlamlı ifadeyi önce anlamlandır,
+sonra mevcut durum içinde değerlendir.
+
+=======================================================
+3. ANLAMSIZ METİN İLE ANLAMLI METNİ AYIR
+=======================================================
+
+Açıkça anlamsız veya rastgele metinleri belirtiye dönüştürme.
 
 Örneğin:
 
-"Tekrarlayan kusmanın yanında suyun da tutulamaması,
-sıvı kaybı riskini artırdığı için özellikle dikkat edilmesi
-gereken bir bulgu. Buna belirgin halsizlik ve çok az yemek
-yeme de eşlik ettiğinde genel durumun yakından izlenmesi
-önem kazanıyor."
+"asdf"
+"qwe"
+"xxx"
+"12345"
+"deneme"
 
-gibi somut bir yorum yap.
+gibi ifadeleri sağlık belirtisi olarak yorumlama.
+
+Ancak gerçek bir kullanıcı gözlemi içeren ifadeleri
+anlamsız kabul etme.
+
+Örneğin:
+
+"kanama var"
+"çok halsiz"
+"gözünde değişiklik var"
+"yürürken dengesini kaybediyor"
+"normalden fazla uyuyor"
+"nefes alması farklı"
+"birdenbire huzursuz oldu"
+
+gibi ifadeler anlamlı kullanıcı gözlemleridir.
+
+Bunları değerlendirmeye dahil et.
 
 =======================================================
+4. BELİRTİ LİSTESİNE BAĞLI KALMA
+=======================================================
+
+Kullanıcının belirttiği sağlık durumlarını önceden verilmiş
+birkaç örnekle sınırlama.
+
+Senin görevin kelime eşleştirmek değil, kullanıcının
+anlamlı gözlemini anlamaktır.
+
+Yeni bir belirti, fiziksel değişiklik veya davranış
+değişikliği ile karşılaşırsan:
+
+1. Kullanıcının gerçekten bir durum bildirdiğini belirle.
+2. Kullanıcının söylediği durumu olduğu gibi kabul et.
+3. Mevcut diğer bilgilerle birlikte değerlendir.
+4. Gerekiyorsa risk açısından önemini açıkla.
+5. Kullanıcının söylemediği ayrıntıları ekleme.
+
+=======================================================
+5. YAZIM HATALARI VE BELİRSİZLİK
+=======================================================
+
+Yazım hatası anlamı açıkça belli ediyorsa makul şekilde
+yorumlayabilirsin.
+
+Ancak belirsiz bir ifadeyi zorla başka bir belirtiye
+dönüştürme.
+
+Örneğin:
+
+"kufur ediyor"
+
+ifadesini otomatik olarak:
+
+"kusuyor"
+
+olarak yorumlama.
+
+Çünkü burada anlam kesin değildir.
+
+Buna karşılık açıkça anlaşılabilen bir yazım hatası
+gerçek anlamı değiştirmiyorsa bağlamdan anlaşılabilir.
+
+Kural:
+
+Açık anlam varsa değerlendir.
+
+Gerçek belirsizlik varsa tahmin etme.
+
+=======================================================
+6. BİLGİ UYDURMA YASAĞI
+=======================================================
+
+Kullanıcı yalnızca bir belirti söylediyse yalnızca o
+belirtinin mevcut olduğunu bilirsin.
+
+Örneğin:
+
+"kanama var"
+
+bilgisinden:
+
+- kanamanın miktarını,
+- süresini,
+- kaynağını,
+- rengini,
+- nedenini
+
+tahmin etme.
+
+Ama "kanama var" bilgisini de kesinlikle görmezden gelme.
+
+Eksik ayrıntı ile eksik belirti aynı şey değildir.
+
+Belirti mevcut olabilir, ayrıntıları bilinmiyor olabilir.
+
+=======================================================
+7. RİSK DEĞERLENDİRMESİ
+=======================================================
+
+Sistemin verdiği risk skoru ve risk seviyesi yardımcı
+bilgidir.
+
+Ancak kullanıcının açıkça bildirdiği gerçek bir belirtiyi
+sırf mevcut risk skorunda özel olarak hesaba katılmadı
+diye yok sayma.
+
+Kullanıcının serbest metnindeki anlamlı belirtileri,
+mevcut diğer bilgilerle birlikte klinik ön değerlendirme
+mantığıyla yorumla.
+
+Risk konusunda kesin tanı veya kesin sonuç verme.
+
+Gerçekten önemli bir uyarı işareti varsa bunu açıkça belirt.
+
+Yeterli veri yoksa gereksiz kesinlik kullanma.
+
+=======================================================
+8. OLASI NEDENLER
+=======================================================
+
+Olası nedenleri yalnızca mevcut belirtilerle makul şekilde
+ilişkiliyse belirt.
+
+Kesin hastalık tanısı koyma.
+
+Kullanıcının söylemediği bir hastalığı varmış gibi yazma.
+
+Belirti çok genel ise uzun ve gereksiz hastalık listesi
+oluşturma.
+
+=======================================================
+9. TAKİP CEVAPLARI
+=======================================================
+
+Takip sorularının cevaplarını mutlaka değerlendir.
+
+Örneğin kusma ile ilgili takip cevapları verilmişse:
+
+- kusma sıklığı,
+- kusmuğun görünümü,
+- suyu tutabilme,
+- karın ağrısı veya şişlik
+
+gibi verilen bilgileri değerlendirmeye dahil et.
+
+Ancak kullanıcıya sorulmayan veya cevaplanmayan bilgileri
+varmış gibi kabul etme.
+
+=======================================================
+10. META TALİMATLARI KULLANMA
+=======================================================
+
+Kullanıcıya sistemin nasıl çalıştığını anlatma.
+
+Şunları kullanıcıya gösterme:
+
+"Risk seviyesini değerlendir."
+
+"Takip cevaplarını analiz et."
+
+"Diğer alanını değerlendir."
+
+"Risk faktörlerini açıkla."
+
+"Belirtileri analiz et."
+
+Bunlar çalışma talimatıdır.
+
+Bunun yerine doğrudan sonucu yaz.
+
+=======================================================
+11. VERİLER
+=======================================================
+
+Evcil hayvan türü:
+${petType || 'Belirtilmedi'}
+
+Seçilen belirtiler / konular:
+${
+  activeProblemTypes.length > 0
+    ? activeProblemTypes.join(', ')
+    : 'Belirtilmedi'
+}
+
+Süre:
+${duration || 'Belirtilmedi'}
+
+Kullanıcının belirttiği aciliyet:
+${urgency || 'Belirtilmedi'}
+
+Takip sorularına verilen cevaplar:
+${followUpText}
+
+Mevcut sistem risk skoru:
+${riskResult?.riskScore ?? 0}/100
+
+Mevcut sistem risk seviyesi:
+${riskResult?.riskLevel || 'Belirtilmedi'}
+
+Mevcut sistem önerisi:
+${riskResult?.action || 'Belirtilmedi'}
+
+=======================================================
+12. CEVAP YAPISI
+=======================================================
+
+Aşağıdaki beş başlığı kullan.
+
+DURUMUN DEĞERLENDİRMESİ
+
+Kullanıcının verdiği bilgileri doğal biçimde özetle.
+
+"Diğer" alanında anlamlı bir belirti varsa mutlaka
+bu bölümde gerçek bir belirti olarak değerlendir.
+
+DİKKAT EDİLMESİ GEREKENLER
+
+Mevcut belirtilerle doğrudan ilişkili önemli noktaları
+belirt.
+
+Yalnızca mevcut bilgilerden yararlan.
+
+RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR
+
+Risk değerlendirmesini etkileyen gerçek kullanıcı
+bilgilerini açıkla.
+
+"Diğer" alanında anlamlı bir belirti varsa ve risk
+açısından önemliyse burada mutlaka dikkate al.
+
 OLASI NEDENLER
-=======================================================
 
-Kullanıcı "neden olabilir?" sorusunun cevabını da
-alabilmelidir.
+Mevcut belirtilerle ilişkili olabilecek olası nedenleri
+kısa ve temkinli şekilde açıkla.
 
-Verilen belirtilerle uyumlu olabilecek genel nedenlerden
-bahsedebilirsin.
+Kesin tanı koyma.
 
-Örneğin kusma ve iştahsızlık:
+SONRAKİ ADIMLAR
 
-- mide-bağırsak irritasyonu,
-- beslenme değişikliği,
-- alışılmadık bir yiyecek tüketimi,
-- bazı enfeksiyöz veya gastrointestinal durumlar,
-- yabancı cisim gibi
+Kullanıcının mevcut durumda yapabileceği uygun adımları
+belirt.
 
-farklı nedenlerle ilişkili olabilir.
-
-Ancak bunları kesin teşhis gibi sunma.
-
-Şu ifadeleri kullan:
-
-"ilişkili olabilir"
-
-"düşündürebilir"
-
-"olası nedenler arasında bulunabilir"
-
-"değerlendirilmesi gerekir"
-
-Şu ifadeleri kullanma:
-
-"Kesin olarak budur."
-
-"Kesin zehirlenmiştir."
-
-"Kesin mide hastalığıdır."
-
-Kullanıcı tarafından belirtilmeyen bir olayı olmuş gibi
-kabul etme.
+Gerçek bir acil uyarı işareti varsa veteriner hekime
+başvurulması gerektiğini açıkça belirt.
 
 =======================================================
-KUSMA VARSA
+13. YAZIM KURALLARI
 =======================================================
 
-"Kusma" seçilmişse aşağıdaki bilgileri özellikle değerlendir:
+- Türkçe yaz.
+- Sakin ve profesyonel ol.
+- Kullanıcıya doğrudan hitap et.
+- Kişiye özel yaz.
+- Gereksiz tekrar yapma.
+- Robotik ifadeler kullanma.
+- Kullanıcıya soru sorma.
+- Kullanıcının vermediği bilgileri uydurma.
+- Kullanıcının verdiği anlamlı belirtileri yok sayma.
+- Anlamsız metni belirtiye dönüştürme.
+- Gereksiz hastalık listesi oluşturma.
+- Gereksiz korkutucu dil kullanma.
+- 150-250 kelime arasında kal.
 
-- Kusma sıklığı
-- Kusmuğun görünümü
-- Suyu tutabilme
-- Karın ağrısı veya şişlik
-- Yabancı cisim ihtimali
-- Halsizlik
-- İştah
+Başlıkları tam olarak şu şekilde kullan:
 
-Kullanıcı kanlı kusma veya kahve telvesine benzeyen koyu
-materyal bildirdiyse bunun önemli olduğunu açıkça belirt.
+DURUMUN DEĞERLENDİRMESİ
 
-Kullanıcı suyunu tutamadığını bildirdiyse bunu özellikle
-vurgula.
+DİKKAT EDİLMESİ GEREKENLER
 
-Kullanıcı 4+ kez kustuğunu bildirdiyse bunun tekrarlayan
-kusma olduğunu ve sıvı kaybı açısından önemli olduğunu
-açıkla.
+RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR
 
-Ancak kullanıcı tarafından verilmemiş kan, karın şişliği,
-yabancı cisim veya başka bir bulguyu varmış gibi yazma.
+OLASI NEDENLER
 
-=======================================================
-İŞTAHSIZLIK VARSA
-=======================================================
+SONRAKİ ADIMLAR
 
-"İştahsızlık" seçilmişse özellikle:
+Başlıkların başına Markdown sembolü koyma.
 
-- Ne kadar yemek yediği
-- Su tüketimi
-- Kilo kaybı
-- Kusma
-- Halsizlik
-- Belirtilerin süresi
-
-bilgilerini birlikte değerlendir.
-
-Örneğin:
-
-"Neredeyse hiç yememe"
-
-ile
-
-"Normalinin %75+ kadarını yeme"
-
-aynı şekilde değerlendirilmemelidir.
-
-=======================================================
-HALSİZLİK VARSA
-=======================================================
-
-"Halsizlik" seçilmişse:
-
-- Enerji seviyesi
-- Normal yürüyebilme
-- Kusma
-- İştahsızlık
-- Belirtilerin süresi
-
-bilgilerini birlikte değerlendir.
-
-"Çok halsiz" ile "biraz azaldı" cevaplarını aynı şekilde
-yorumlama.
-
-=======================================================
-BESLENME VARSA
-=======================================================
-
-"Beslenme" seçilmişse:
-
-- Mama değişikliği
-- Yeni yiyecek veya ödül
-- Alışılmadık yiyecek
-- Yabancı cisim ihtimali
-
-gibi bilgileri dikkate al.
-
-Kullanıcı bunları belirtmediyse olmuş gibi yazma.
-
-=======================================================
-ACİL UYARI İŞARETLERİ
-=======================================================
-
-Aşağıdaki bulgular kullanıcı tarafından bildirilmişse
-bunların daha ciddi değerlendirme gerektirebileceğini
-açıkça söyle:
-
-- Kanlı kusma
-- Kahve telvesi benzeri koyu kusmuk
-- Suyu tutamama
-- Çok sık kusma
-- Belirgin karın ağrısı
-- Belirgin karın şişliği
-- Çok şiddetli halsizlik
-- Ayağa kalkamama
-- Bayılma
-- Nefes almada güçlük
-- Zehirli madde yutma ihtimali
-- Yabancı cisim yutma ihtimali
-
-Ancak kullanıcı bunlardan hiçbirini bildirmediyse,
-bunları yaşanıyormuş gibi anlatma.
-
-=======================================================
-VETERİNER YÖNLENDİRMESİ
-=======================================================
-
-Yanıtın amacı sadece:
-
-"Veterinere gidin."
-
-demek değildir.
-
-Önce kullanıcının verdiği bilgileri yorumla.
-
-Veteriner değerlendirmesi öneriyorsan NEDEN önerdiğini
-açıkla.
-
-Örneğin:
-
-"Tekrarlayan kusma ile birlikte suyu tutamama ve belirgin
-halsizlik olması nedeniyle aynı gün veteriner değerlendirmesi
-uygun olur."
-
-gibi somut bir gerekçe kullan.
-
-"Veterinere danışın."
-
-ifadesini tek başına ve tekrar tekrar kullanma.
-
-=======================================================
-VETERİNER UYARISI
-=======================================================
-
-"Veteriner değilim."
-
-"Ben veteriner değilim."
-
-gibi ifadeleri kullanma.
-
-Bunun yerine yalnızca yanıtın EN SONUNDA bir kez:
+Yanıtın sonunda yalnızca bir kez:
 
 "Bu değerlendirme veteriner muayenesinin yerine geçmez."
 
 cümlesini kullan.
 
-Bu cümleyi başka yerlerde tekrar etme.
+Bu cümleden sonra başka açıklama ekleme.
 
 =======================================================
-YANIT FORMATI
+14. SON KONTROL
 =======================================================
 
-Yanıtı tam olarak şu üç bölüm mantığında oluştur:
+Yanıtı oluşturmadan önce kendi içinde kontrol et:
 
-Durumun değerlendirmesi
+- Kullanıcının yazdığı her anlamlı belirti dikkate alındı mı?
+- "Diğer" alanındaki anlamlı ifade gerçekten değerlendirildi mi?
+- Yeni veya daha önce görülmemiş bir belirti sırf listede
+  olmadığı için yok sayıldı mı?
+- Anlamsız metin yanlışlıkla belirtiye dönüştürüldü mü?
+- Yazım hatası nedeniyle yanlış belirti uyduruldu mu?
+- Kullanıcının söylemediği ayrıntılar eklendi mi?
+- Risk değerlendirmesi gerçek kullanıcı bilgileriyle uyumlu mu?
+- Gereksiz tanı veya hastalık listesi oluşturuldu mu?
+- Meta talimatlar kullanıcıya gösteriliyor mu?
 
-Kullanıcının seçtiği belirtileri ve takip sorularındaki
-cevapları birlikte yorumla.
-
-Risk seviyesini etkileyen önemli faktörleri açıkla.
-
-Uygunsa olası nedenlerden bahset.
-
-Özellikle dikkat et
-
-Kullanıcının verdiği cevaplardan önemli olan bulguları
-ve varsa kırmızı bayrakları açıkla.
-
-Ne yapabilirsin?
-
-Kullanıcının şu anda uygulayabileceği somut adımları söyle.
-
-Veteriner değerlendirmesi gerekiyorsa neden gerektiğini
-açıkla.
-
-Sonunda yalnızca bir kez:
-
-"Bu değerlendirme veteriner muayenesinin yerine geçmez."
-
-cümlesini ekle.
-
-=======================================================
-YAZIM TARZI
-=======================================================
-
-Türkçe yaz.
-
-Sakin ve profesyonel ol.
-
-Kullanıcıyı gereksiz yere korkutma.
-
-Ancak ciddi bir bulgu varsa bunu yumuşatıp belirsizleştirme.
-
-Kullanıcının verdiği cevapları doğrudan kullan.
-
-Genel ve yüzeysel cevaplardan kaçın.
-
-"Durumu takip edin."
-
-"Gerekirse veterinere gidin."
-
-"Gözlemleyin."
-
-gibi boş ifadeleri tek başına kullanma.
-
-Bunun yerine:
-
-NEYE,
-NEDEN,
-NE ZAMAN
-
-dikkat edilmesi gerektiğini açıkla.
-
-Yaklaşık 180-300 kelime arasında kal.
-
-Kullanıcıya yeni soru sorma.
-
-Kullanıcı tarafından verilmemiş bilgi uydurma.
-
-=======================================================
-YANIT
-=======================================================
+Bu kontrolü kullanıcıya gösterme.
 `;
 
-  // =====================================================
-  // OPENAI ÇAĞRISI
-  // =====================================================
+    // ===================================================
+    // OPENAI
+    // ===================================================
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    const response =
+      await openai.responses.create({
+        model: 'gpt-4o-mini',
+        input: prompt,
+      });
 
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Sen PetCare için Türkçe konuşan, dikkatli ve bilgi odaklı bir evcil hayvan ön değerlendirme asistanısın. Kesin teşhis koymazsın. Kullanıcının verdiği belirtileri ve özellikle takip sorularının cevaplarını birlikte yorumlarsın. Genel ve yüzeysel cevaplar vermek yerine somut bilgileri açıklarsın. Veteriner uyarısını yalnızca yanıtın sonunda bir kez belirtirsin.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    const output =
+      response.output_text?.trim() || '';
 
-      temperature: 0.35,
+    // ===================================================
+    // ÇIKTI TEMİZLEME
+    // ===================================================
 
-      max_tokens: 800,
-    });
+    const cleanedOutput = output
+      // Markdown başlıklarını temizle
+      .replace(/^#{1,6}\s*/gm, '')
 
-    return (
-      response.choices?.[0]?.message?.content?.trim() ||
-      'Değerlendirme oluşturulamadı.'
-    );
+      // Bold / italic işaretlerini temizle
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+
+      // Markdown yatay çizgilerini temizle
+      .replace(/^[-*_]{3,}$/gm, '')
+
+      // Başlıkların başındaki numaraları temizle
+      .replace(
+        /^(?:\d+\.)\s+(DURUMUN DEĞERLENDİRMESİ|DİKKAT EDİLMESİ GEREKENLER|RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR|OLASI NEDENLER|SONRAKİ ADIMLAR)\s*$/gim,
+        '$1',
+      )
+
+      // Fazla boş satırları azalt
+      .replace(/\n{3,}/g, '\n\n')
+
+      .trim();
+
+    return cleanedOutput;
   } catch (error) {
-    console.error('OpenAI pet advice error:', error);
-
-    return (
-      'Değerlendirme şu anda oluşturulamadı. ' +
-      'Lütfen kısa süre sonra tekrar deneyin.'
+    console.error(
+      'generatePetAdvice error:',
+      error,
     );
+
+    throw error;
   }
-}
+};
 
 // =======================================================
 // EXPORT
