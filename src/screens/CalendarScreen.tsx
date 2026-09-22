@@ -7,7 +7,6 @@ import {
   Pressable,
   TextInput,
   Modal,
-  Alert,
   Animated,
 } from 'react-native';
 
@@ -25,6 +24,17 @@ import notifee, {
 } from '@notifee/react-native';
 
 import {useAuth} from '../data/AuthContext';
+
+import {
+  FileText,
+  PawPrint,
+  LockKeyhole,
+  Clock3,
+  CalendarX2,
+  TriangleAlert,
+  Save,
+  Trash2,
+} from 'lucide-react-native';
 
 type CareEventType =
   | 'Vaccination'
@@ -85,9 +95,32 @@ export default function CalendarScreen() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  /* =========================================================
+     TOAST
+  ========================================================= */
+
   const [toastTitle, setToastTitle] = useState('Başarılı');
   const [toastDescription, setToastDescription] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+
+  /* =========================================================
+     ERROR POPUP
+  ========================================================= */
+
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalTitle, setErrorModalTitle] = useState('');
+  const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [errorModalType, setErrorModalType] =
+    useState<
+      | 'title'
+      | 'pet'
+      | 'login'
+      | 'time'
+      | 'date'
+      | 'load'
+      | 'save'
+      | 'delete'
+    >('title');
 
   /* =========================================================
      REFS
@@ -98,6 +131,29 @@ export default function CalendarScreen() {
 
   const toastTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* =========================================================
+     ERROR POPUP HELPER
+  ========================================================= */
+
+  const showErrorModal = (
+    titleText: string,
+    messageText: string,
+    type:
+      | 'title'
+      | 'pet'
+      | 'login'
+      | 'time'
+      | 'date'
+      | 'load'
+      | 'save'
+      | 'delete',
+  ) => {
+    setErrorModalTitle(titleText);
+    setErrorModalMessage(messageText);
+    setErrorModalType(type);
+    setErrorModalVisible(true);
+  };
 
   /* =========================================================
      LOAD EVENTS
@@ -117,11 +173,16 @@ export default function CalendarScreen() {
 
       setEvents(firestoreEvents as CareEvent[]);
     } catch (error: any) {
-      console.log('Takvim verileri alınamadı:', error);
+      console.log(
+        'Takvim verileri alınamadı:',
+        error,
+      );
 
-      Alert.alert(
-        'Hata',
-        error?.message || 'Takvim verileri alınamadı.',
+      showErrorModal(
+        'Takvim yüklenemedi',
+        error?.message ||
+          'Takvim verileri alınırken bir sorun oluştu.',
+        'load',
       );
     } finally {
       setLoading(false);
@@ -362,27 +423,30 @@ export default function CalendarScreen() {
 
   const handleAddEvent = async () => {
     if (!title.trim()) {
-      Alert.alert(
-        'Hata',
-        'Görev başlığı girmen gerekiyor.',
+      showErrorModal(
+        'Görev başlığı eksik',
+        'Bakım görevini kaydetmek için önce görev başlığını girmen gerekiyor.',
+        'title',
       );
 
       return;
     }
 
     if (!petName.trim()) {
-      Alert.alert(
-        'Hata',
-        'Pet adı girmen gerekiyor.',
+      showErrorModal(
+        'Pet adı eksik',
+        'Bu bakım görevinin hangi pet için olduğunu belirtmek için pet adını gir.',
+        'pet',
       );
 
       return;
     }
 
     if (!user?.uid) {
-      Alert.alert(
-        'Hata',
-        'Görev eklemek için giriş yapmalısın.',
+      showErrorModal(
+        'Giriş gerekli',
+        'Bakım görevi eklemek için hesabına giriş yapman gerekiyor.',
+        'login',
       );
 
       return;
@@ -401,9 +465,10 @@ export default function CalendarScreen() {
       minute < 0 ||
       minute > 59
     ) {
-      Alert.alert(
+      showErrorModal(
         'Geçersiz saat',
-        'Lütfen 00-23 arasında bir saat ve 00-59 arasında bir dakika gir.',
+        'Lütfen 00-23 arasında bir saat ve 00-59 arasında bir dakika seç.',
+        'time',
       );
 
       return;
@@ -421,9 +486,10 @@ export default function CalendarScreen() {
       );
 
     if (selectedDateTime.getTime() <= Date.now()) {
-      Alert.alert(
+      showErrorModal(
         'Geçersiz tarih veya saat',
         'Hatırlatma için gelecekte bir tarih ve saat seçmelisin.',
+        'date',
       );
 
       return;
@@ -480,10 +546,11 @@ export default function CalendarScreen() {
         error,
       );
 
-      Alert.alert(
-        'Hata',
+      showErrorModal(
+        'Görev kaydedilemedi',
         error?.message ||
-          'Görev kaydedilemedi.',
+          'Bakım görevi kaydedilirken bir sorun oluştu.',
+        'save',
       );
     } finally {
       setSaving(false);
@@ -532,9 +599,10 @@ export default function CalendarScreen() {
         error,
       );
 
-      Alert.alert(
-        'Hata',
-        'Görev silinemedi.',
+      showErrorModal(
+        'Görev silinemedi',
+        'Bakım görevi silinirken bir sorun oluştu. Lütfen tekrar dene.',
+        'delete',
       );
     } finally {
       setDeleting(false);
@@ -576,6 +644,95 @@ export default function CalendarScreen() {
 
     return marked;
   }, [events, selectedDate]);
+
+  /* =========================================================
+     ERROR ICON
+  ========================================================= */
+
+  const renderErrorIcon = () => {
+    switch (errorModalType) {
+      case 'title':
+        return (
+          <FileText
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'pet':
+        return (
+          <PawPrint
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'login':
+        return (
+          <LockKeyhole
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'time':
+        return (
+          <Clock3
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'date':
+        return (
+          <CalendarX2
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'load':
+        return (
+          <TriangleAlert
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'save':
+        return (
+          <Save
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      case 'delete':
+        return (
+          <Trash2
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+
+      default:
+        return (
+          <TriangleAlert
+            size={42}
+            color="#9B87F5"
+            strokeWidth={1.8}
+          />
+        );
+    }
+  };
 
   /* =========================================================
      UI
@@ -1322,6 +1479,59 @@ export default function CalendarScreen() {
       </Modal>
 
       {/* =====================================================
+          ERROR POPUP
+      ===================================================== */}
+
+      <Modal
+        visible={errorModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setErrorModalVisible(false)
+        }>
+
+        <View style={styles.modalOverlay}>
+
+          <View style={styles.errorModalCard}>
+
+            <View style={styles.errorIconCircle}>
+              {renderErrorIcon()}
+            </View>
+
+            <Text style={styles.errorModalTitle}>
+              {errorModalTitle}
+            </Text>
+
+            <Text style={styles.errorModalText}>
+              {errorModalMessage}
+            </Text>
+
+            <Pressable
+              onPress={() =>
+                setErrorModalVisible(false)
+              }
+              style={({pressed}) => [
+                styles.errorModalButton,
+                pressed &&
+                  styles.errorModalButtonPressed,
+              ]}>
+
+              <Text
+                style={
+                  styles.errorModalButtonText
+                }>
+                Tamam
+              </Text>
+
+            </Pressable>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+      {/* =====================================================
           TOAST
       ===================================================== */}
 
@@ -1917,6 +2127,103 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+
+  /* =========================================================
+     ERROR POPUP
+  ========================================================= */
+
+  errorModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    paddingBottom: 22,
+    alignItems: 'center',
+    elevation: 12,
+
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+
+    borderWidth: 1,
+    borderColor: '#F0EBFF',
+  },
+
+  errorIconCircle: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+
+    backgroundColor: '#F6F2FF',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginBottom: 16,
+
+    borderWidth: 1,
+    borderColor: '#E9E1FF',
+  },
+
+  errorModalTitle: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#11163A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  errorModalText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#687492',
+    textAlign: 'center',
+
+    paddingHorizontal: 8,
+
+    marginBottom: 22,
+  },
+
+  errorModalButton: {
+    width: '100%',
+    backgroundColor: '#A78BFA',
+
+    borderRadius: 16,
+
+    paddingVertical: 14,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    shadowColor: '#8B5CF6',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+
+    elevation: 3,
+  },
+
+  errorModalButtonPressed: {
+    opacity: 0.88,
+    transform: [{scale: 0.98}],
+  },
+
+  errorModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  /* =========================================================
+     SUCCESS TOAST
+  ========================================================= */
 
   successToast: {
     position: 'absolute',
