@@ -295,6 +295,20 @@ function getPetHero(type: string) {
   return petDetailCatHero;
 }
 
+function getDisplayAge(pet: {
+  birthYear?: number;
+  age?: number;
+}) {
+  if (pet.birthYear) {
+    return Math.max(
+      new Date().getFullYear() - pet.birthYear,
+      0,
+    );
+  }
+
+  return pet.age ?? 0;
+}
+
 function getStatusLabel(pet: {
   vaccines?: string;
   lastVetVisit?: string;
@@ -439,6 +453,8 @@ export default function PetDetailScreen({
 
     navigation.goBack();
   };
+
+  const displayAge = getDisplayAge(pet);
 
   const vaccineStatus =
     getVaccineStatus(pet.vaccines);
@@ -601,7 +617,7 @@ export default function PetDetailScreen({
                 {getPetEmoji(pet.type)}{' '}
                 {pet.type}
                 {'  |  '}
-                {pet.age} yaş
+                {displayAge} yaş
                 {'  |  '}
                 {pet.weight || '-'}
               </Text>
@@ -767,7 +783,7 @@ export default function PetDetailScreen({
 
               <InfoRow
                 label="Yaş"
-                value={`${pet.age || '-'} yaş`}
+                value={`${displayAge} yaş`}
               />
 
               <InfoRow
@@ -980,67 +996,6 @@ export default function PetDetailScreen({
 
           </Pressable>
 
-          {/* =====================================================
-              ACTIONS
-          ===================================================== */}
-
-          <View style={styles.actionsRow}>
-
-            <Pressable
-              style={({pressed}) => [
-                styles.deleteButton,
-                pressed &&
-                  styles.actionPressed,
-              ]}
-              onPress={() =>
-                setDeleteModalVisible(true)
-              }>
-
-              <Trash2
-                size={22}
-                color="#E31B23"
-                strokeWidth={2.2}
-              />
-
-              <Text
-                style={
-                  styles.deleteButtonText
-                }>
-                Profili Sil
-              </Text>
-
-            </Pressable>
-
-            <Pressable
-              style={({pressed}) => [
-                styles.editButton,
-                pressed &&
-                  styles.actionPressed,
-              ]}
-              onPress={() =>
-                navigation.navigate(
-                  'EditPet',
-                  {pet},
-                )
-              }>
-
-              <Pencil
-                size={22}
-                color="#FFFFFF"
-                strokeWidth={2.2}
-              />
-
-              <Text
-                style={
-                  styles.editButtonText
-                }>
-                Profili Düzenle
-              </Text>
-
-            </Pressable>
-
-          </View>
-
         </ScrollView>
       </Animated.View>
 
@@ -1143,7 +1098,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: 42,
+    paddingBottom: 24,
   },
 
   /* HERO */
@@ -1670,60 +1625,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  /* ACTIONS */
-
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 18,
-    marginTop: 2,
-  },
-
-  deleteButton: {
-    flex: 1,
-    height: 58,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.4,
-    borderColor: '#FF9DA6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-  },
-
-  deleteButtonText: {
-    color: '#E31B23',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  editButton: {
-    flex: 1,
-    height: 58,
-    borderRadius: 20,
-    backgroundColor: '#7658F5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-
-    shadowColor: '#6547DD',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-
-  editButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
   actionPressed: {
     opacity: 0.78,
     transform: [{scale: 0.98}],
@@ -1822,3 +1723,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+

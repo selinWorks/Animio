@@ -6,22 +6,26 @@ import React, {
   useState,
 } from 'react';
 import {Pet} from '../types/Pet';
-import {getPetsFromFirestore, deletePetFromFirestore} from '../services/firestore';
+import {
+  getPetsFromFirestore,
+  deletePetFromFirestore,
+  updatePetInFirestore,
+} from '../services/firestore';
 import {useAuth} from './AuthContext';
 
 type PetContextType = {
   pets: Pet[];
   addPet: (pet: Pet) => void;
-  removePet: (id: string) => void;
-  updatePet: (updatedPet: Pet) => void;
+  removePet: (id: string) => Promise<void>;
+  updatePet: (updatedPet: Pet) => Promise<void>;
   reloadPets: () => Promise<void>;
 };
 
 const PetContext = createContext<PetContextType | undefined>(undefined);
 
 export const PetProvider: React.FC<{children: React.ReactNode}> = ({
-                                                                     children,
-                                                                   }) => {
+  children,
+}) => {
   const {user} = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
 
@@ -49,19 +53,34 @@ export const PetProvider: React.FC<{children: React.ReactNode}> = ({
 
   const removePet = async (id: string) => {
     try {
-      if (!user?.uid) return;
+      if (!user?.uid) {
+        return;
+      }
 
-      await deletePetFromFirestore(id, user.uid);
+      await deletePetFromFirestore(id);
       setPets(prev => prev.filter(p => p.id !== id));
     } catch (error) {
       console.log('Silme hatası:', error);
     }
   };
 
-  const updatePet = (updatedPet: Pet) => {
-    setPets(prev =>
-      prev.map(p => (p.id === updatedPet.id ? updatedPet : p)),
-    );
+  const updatePet = async (updatedPet: Pet) => {
+    try {
+      if (!user?.uid) {
+        return;
+      }
+
+      await updatePetInFirestore(updatedPet, user.uid);
+
+      setPets(prev =>
+        prev.map(p =>
+          p.id === updatedPet.id ? updatedPet : p,
+        ),
+      );
+    } catch (error) {
+      console.log('Güncelleme hatası:', error);
+      throw error;
+    }
   };
 
   return (

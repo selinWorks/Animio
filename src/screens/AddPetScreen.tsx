@@ -86,8 +86,8 @@ export default function AddPetScreen({navigation}: any) {
   const [name, setName] = useState('');
   const [type, setType] = useState('Kedi');
   const [customType, setCustomType] = useState('');
-  const [age, setAge] = useState('');
-  const [ageUnit, setAgeUnit] = useState<'Yaş' | 'Yıl'>('Yıl');
+  const [birthYear, setBirthYear] = useState('');
+  const currentYear = new Date().getFullYear();
   const [gender, setGender] = useState('Dişi');
   const [weight, setWeight] = useState('');
   const [vaccines, setVaccines] = useState('');
@@ -145,8 +145,18 @@ export default function AddPetScreen({navigation}: any) {
   };
 
   const goNextFromStepTwo = () => {
-    if (!age.trim() || isNaN(Number(age))) {
-      return Alert.alert('Eksik bilgi', 'Geçerli bir yaş gir.');
+    const numericBirthYear = Number(birthYear);
+
+    if (
+      !birthYear.trim() ||
+      isNaN(numericBirthYear) ||
+      numericBirthYear < 1900 ||
+      numericBirthYear > currentYear
+    ) {
+      return Alert.alert(
+        'Eksik bilgi',
+        `Geçerli bir doğum yılı gir. Örn. ${currentYear - 2}`,
+      );
     }
 
     if (!gender) {
@@ -154,20 +164,6 @@ export default function AddPetScreen({navigation}: any) {
     }
 
     setStep(3);
-  };
-
-  const resetForm = () => {
-    setStep(1);
-    setPhotoUrl('');
-    setName('');
-    setType('Kedi');
-    setCustomType('');
-    setAge('');
-    setGender('Dişi');
-    setWeight('');
-    setVaccines('');
-    setLastVetVisit('');
-    setNotes('');
   };
 
   const handleSave = async () => {
@@ -184,7 +180,7 @@ export default function AddPetScreen({navigation}: any) {
       const petData = {
         name: name.trim(),
         type: finalType,
-        age: Number(age),
+        birthYear: Number(birthYear),
         gender,
         weight: weight.trim(),
         vaccines: vaccines.trim(),
@@ -209,7 +205,9 @@ export default function AddPetScreen({navigation}: any) {
         [
           {
             text: 'Tamam',
-            onPress: resetForm,
+            onPress: () => {
+              navigation.navigate('Pets');
+            },
           },
         ],
       );
@@ -547,7 +545,7 @@ export default function AddPetScreen({navigation}: any) {
             </View>
 
             <Text style={styles.label}>
-              Yaşı
+              Doğum Yılı
             </Text>
 
             <View style={styles.ageInputContainer}>
@@ -558,52 +556,21 @@ export default function AddPetScreen({navigation}: any) {
               />
 
               <TextInput
-                value={age}
+                value={birthYear}
                 onChangeText={text =>
-                  setAge(text.replace(/[^0-9]/g, ''))
+                  setBirthYear(text.replace(/[^0-9]/g, ''))
                 }
                 keyboardType="numeric"
-                placeholder="0"
+                maxLength={4}
+                placeholder="Örn. 2026"
                 placeholderTextColor="#A0A5B5"
                 style={styles.ageInput}
               />
-
-              <View style={styles.unitChipGroup}>
-                <Pressable
-                  onPress={() => setAgeUnit('Yaş')}
-                  style={[
-                    styles.unitChip,
-                    ageUnit === 'Yaş' &&
-                      styles.unitChipSelected,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.unitChipText,
-                      ageUnit === 'Yaş' &&
-                        styles.unitChipTextSelected,
-                    ]}>
-                    Yaş
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setAgeUnit('Yıl')}
-                  style={[
-                    styles.unitChip,
-                    ageUnit === 'Yıl' &&
-                      styles.unitChipSelected,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.unitChipText,
-                      ageUnit === 'Yıl' &&
-                        styles.unitChipTextSelected,
-                    ]}>
-                    Yıl
-                  </Text>
-                </Pressable>
-              </View>
             </View>
+
+            <Text style={styles.birthYearHelper}>
+              Tam olarak bilmiyorsan yaklaşık yılı girebilirsin.
+            </Text>
 
             <Text style={styles.label}>
               Cinsiyeti
@@ -1254,6 +1221,15 @@ const styles = StyleSheet.create({
     color: '#1E2022',
   },
 
+  birthYearHelper: {
+    marginTop: 7,
+    marginBottom: 2,
+    color: '#8A91A8',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
   genderRow: {
     flexDirection: 'row',
     gap: 12,
@@ -1393,4 +1369,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Bold',
   },
 });
+
 

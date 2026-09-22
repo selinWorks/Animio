@@ -1,5 +1,5 @@
 import firestore from '@react-native-firebase/firestore';
-import notifee, { TriggerType, AndroidImportance } from '@notifee/react-native';
+import notifee, {TriggerType, AndroidImportance} from '@notifee/react-native';
 
 export const addPetToFirestore = async (pet, uid) => {
   const docRef = await firestore()
@@ -8,7 +8,7 @@ export const addPetToFirestore = async (pet, uid) => {
       ownerId: uid,
       name: pet.name,
       type: pet.type,
-      age: pet.age,
+      birthYear: pet.birthYear,
       gender: pet.gender || '',
       weight: pet.weight || '',
       vaccines: pet.vaccines || '',
@@ -19,6 +19,25 @@ export const addPetToFirestore = async (pet, uid) => {
     });
 
   return docRef.id;
+};
+
+export const updatePetInFirestore = async (pet, uid) => {
+  await firestore()
+    .collection('pets')
+    .doc(pet.id)
+    .update({
+      ownerId: uid,
+      name: pet.name,
+      type: pet.type,
+      birthYear: pet.birthYear || null,
+      gender: pet.gender || '',
+      weight: pet.weight || '',
+      vaccines: pet.vaccines || '',
+      lastVetVisit: pet.lastVetVisit || '',
+      notes: pet.notes || '',
+      photoUrl: pet.photoUrl || '',
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
 };
 
 export const getPetsFromFirestore = async uid => {
@@ -35,7 +54,14 @@ export const getPetsFromFirestore = async uid => {
       id: doc.id,
       name: data.name || '',
       type: data.type || '',
-      age: data.age || 0,
+      birthYear:
+        typeof data.birthYear === 'number'
+          ? data.birthYear
+          : undefined,
+      age:
+        typeof data.age === 'number'
+          ? data.age
+          : undefined,
       gender: data.gender || '',
       weight: data.weight || '',
       vaccines: data.vaccines || '',
@@ -144,34 +170,23 @@ export const addAssistantChatToFirestore = async (
     .add({
       ownerId: uid,
       email: email || '',
-
       petType: chat.petType || '',
-
-      // Eski kayıtlarla uyumlu olması için
       problemType: chat.problemType || '',
-
-      // Yeni çoklu semptom sistemi
       problemTypes: Array.isArray(chat.problemTypes)
         ? chat.problemTypes
         : chat.problemType
           ? [chat.problemType]
           : [],
-
       duration: chat.duration || '',
       urgency: chat.urgency || '',
-
-      // Dinamik takip sorularının cevapları
       followUpAnswers: chat.followUpAnswers || {},
-
       result: chat.result || '',
       aiMessage: chat.aiMessage || '',
-
       title: `${chat.petType || ''} - ${
         Array.isArray(chat.problemTypes)
           ? chat.problemTypes.join(', ')
           : chat.problemType || ''
       }`,
-
       createdAt: firestore.FieldValue.serverTimestamp(),
     });
 

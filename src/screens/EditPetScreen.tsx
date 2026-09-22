@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {
   View,
   TextInput,
@@ -9,6 +9,7 @@ import {
   Alert,
   StatusBar,
   Platform,
+  GestureResponderEvent,
 } from 'react-native';
 
 import {RouteProp, useNavigation} from '@react-navigation/native';
@@ -60,10 +61,24 @@ type PetTypeOption = {
   icon: React.ReactNode;
 };
 
+function getPetAge(pet: {
+  birthYear?: number;
+  age?: number;
+}) {
+  if (pet.birthYear) {
+    return Math.max(
+      new Date().getFullYear() - pet.birthYear,
+      0,
+    );
+  }
+
+  return pet.age ?? 0;
+}
+
 export default function EditPetScreen({route}: Props) {
   const {pet} = route.params;
 
-  const {updatePet} = usePets();
+  const {updatePet, removePet} = usePets();
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -72,7 +87,8 @@ export default function EditPetScreen({route}: Props) {
 
   const [name, setName] = useState(pet.name);
   const [type, setType] = useState(pet.type);
-  const [age, setAge] = useState(String(pet.age));
+  const currentYear = new Date().getFullYear();
+  const [age, setAge] = useState(String(getPetAge(pet)));
   const [gender, setGender] = useState(pet.gender || '');
   const [weight, setWeight] = useState(pet.weight || '');
   const [vaccines] = useState(pet.vaccines || '');
@@ -235,11 +251,59 @@ export default function EditPetScreen({route}: Props) {
     1,
   );
 
+  const weightSliderRef = useRef<View>(null);
+  const weightSliderPageX = useRef(0);
+  const weightSliderWidth = useRef(0);
+
+  const updateWeightFromPageX = (pageX: number) => {
+    if (weightSliderWidth.current <= 0) {
+      return;
+    }
+
+    const localX = Math.min(
+      Math.max(
+        pageX - weightSliderPageX.current,
+        0,
+      ),
+      weightSliderWidth.current,
+    );
+
+    const rawWeight =
+      (localX / weightSliderWidth.current) * 20;
+
+    const steppedWeight =
+      Math.round(rawWeight * 4) / 4;
+
+    setWeight(
+      steppedWeight
+        .toFixed(2)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1'),
+    );
+  };
+
+  const measureWeightSlider = () => {
+    weightSliderRef.current?.measure(
+      (_x, _y, width, _height, pageX) => {
+        weightSliderWidth.current = width;
+        weightSliderPageX.current = pageX;
+      },
+    );
+  };
+
+  const handleWeightTouch = (
+    event: GestureResponderEvent,
+  ) => {
+    updateWeightFromPageX(
+      event.nativeEvent.pageX,
+    );
+  };
+
   /*
    * SAVE
    */
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert(
         'Hata',
@@ -270,33 +334,86 @@ export default function EditPetScreen({route}: Props) {
       return;
     }
 
-    updatePet({
-      ...pet,
+    try {
+      await updatePet({
+        ...pet,
+        name: name.trim(),
+        type: type.trim(),
+        birthYear: Math.max(
+          currentYear - Number(age),
+          1900,
+        ),
 
-      name: name.trim(),
+        // Eski kayıtlarla geçiş döneminde uyumluluk için.
+        // Ekranlarda esas kaynak birthYear'dır.
+        age: Number(age),
 
-      type: type.trim(),
+        gender: gender.trim(),
+        weight: weight.trim(),
+        vaccines: vaccines.trim(),
+        lastVetVisit: lastVetVisit.trim(),
+        notes: notes.trim(),
+      });
 
-      age: Number(age),
+      Alert.alert(
+        'Başarılı',
+        'Pet bilgileri güncellendi.',
+        [
+          {
+            text: 'Tamam',
+            onPress: () => navigation.goBack(),
+          },
+        ],
+      );
+    } catch (error) {
+      console.log('Pet güncelleme hatası:', error);
 
-      gender: gender.trim(),
+      Alert.alert(
+        'Hata',
+        'Pet bilgileri güncellenirken bir sorun oluştu.',
+      );
+    }
+  };
 
-      weight: weight.trim(),
-
-      vaccines: vaccines.trim(),
-
-      lastVetVisit:
-        lastVetVisit.trim(),
-
-      notes: notes.trim(),
-    });
-
+  const handleDelete = () => {
     Alert.alert(
-      'Başarılı',
-      'Pet bilgileri güncellendi.',
-    );
+      'Profili Sil',
+      `${pet.name} profilini silmek istediğine emin misin?`,
+      [
+        {
+          text: 'Vazgeç',
+          style: 'cancel',
+        },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removePet(pet.id);
 
-    navigation.goBack();
+              navigation.reset({
+                index: 0,
+                routes: [
+                  {
+                    name: 'MainTabs',
+                    params: {
+                      screen: 'Pets',
+                    },
+                  },
+                ],
+              });
+            } catch (error) {
+              console.log('Pet silme hatası:', error);
+
+              Alert.alert(
+                'Hata',
+                'Pet silinirken bir sorun oluştu.',
+              );
+            }
+          },
+        },
+      ],
+    );
   };
 
   /*
@@ -470,7 +587,7 @@ export default function EditPetScreen({route}: Props) {
               label="Genel"
               icon={
                 <Cat
-                  size={24}
+                  size={21}
                   color={
                     activeMenu ===
                     'general'
@@ -501,7 +618,7 @@ export default function EditPetScreen({route}: Props) {
               label="Sağlık"
               icon={
                 <Heart
-                  size={25}
+                  size={21}
                   color={
                     activeMenu ===
                     'health'
@@ -532,7 +649,7 @@ export default function EditPetScreen({route}: Props) {
               label="Aşılar"
               icon={
                 <Syringe
-                  size={24}
+                  size={21}
                   color={
                     activeMenu ===
                     'vaccines'
@@ -563,7 +680,7 @@ export default function EditPetScreen({route}: Props) {
               label="Randevular"
               icon={
                 <CalendarDays
-                  size={24}
+                  size={21}
                   color={
                     activeMenu ===
                     'appointments'
@@ -851,19 +968,12 @@ export default function EditPetScreen({route}: Props) {
 
               </View>
 
-              {/* AGE / GENDER */}
+              {/* AGE */}
 
               <View
                 style={
-                  styles.doubleColumn
+                  styles.ageSection
                 }>
-
-                {/* AGE */}
-
-                <View
-                  style={
-                    styles.ageSection
-                  }>
 
                   <Text
                     style={
@@ -949,14 +1059,14 @@ export default function EditPetScreen({route}: Props) {
                     yıl
                   </Text>
 
-                </View>
+              </View>
 
-                {/* GENDER */}
+              {/* GENDER */}
 
-                <View
-                  style={
-                    styles.genderSection
-                  }>
+              <View
+                style={
+                  styles.genderSection
+                }>
 
                   <Text
                     style={
@@ -1073,8 +1183,6 @@ export default function EditPetScreen({route}: Props) {
 
                   </View>
 
-                </View>
-
               </View>
 
               {/* WEIGHT */}
@@ -1137,35 +1245,58 @@ export default function EditPetScreen({route}: Props) {
                   </View>
 
                   <View
+                    ref={weightSliderRef}
                     style={
-                      styles.slider
+                      styles.sliderTouchArea
+                    }
+                    onLayout={
+                      measureWeightSlider
+                    }
+                    onStartShouldSetResponder={() =>
+                      true
+                    }
+                    onMoveShouldSetResponder={() =>
+                      true
+                    }
+                    onResponderGrant={
+                      handleWeightTouch
+                    }
+                    onResponderMove={
+                      handleWeightTouch
                     }>
 
                     <View
-                      style={[
-                        styles.sliderProgress,
+                      style={
+                        styles.slider
+                      }>
 
-                        {
-                          width: `${
-                            weightPercent *
-                            100
-                          }%`,
-                        },
-                      ]}
-                    />
+                      <View
+                        style={[
+                          styles.sliderProgress,
 
-                    <View
-                      style={[
-                        styles.sliderThumb,
+                          {
+                            width: `${
+                              weightPercent *
+                              100
+                            }%`,
+                          },
+                        ]}
+                      />
 
-                        {
-                          left: `${
-                            weightPercent *
-                            100
-                          }%`,
-                        },
-                      ]}
-                    />
+                      <View
+                        style={[
+                          styles.sliderThumb,
+
+                          {
+                            left: `${
+                              weightPercent *
+                              100
+                            }%`,
+                          },
+                        ]}
+                      />
+
+                    </View>
 
                   </View>
 
@@ -1320,6 +1451,17 @@ export default function EditPetScreen({route}: Props) {
             Değişiklikleri Kaydet
           </Text>
 
+        </Pressable>
+
+        <Pressable
+          onPress={handleDelete}
+          style={({pressed}) => [
+            styles.deleteButton,
+            pressed && styles.pressed,
+          ]}>
+          <Text style={styles.deleteButtonText}>
+            Profili Sil
+          </Text>
         </Pressable>
 
         <View
@@ -1659,11 +1801,11 @@ const styles = StyleSheet.create({
    */
 
   sideMenu: {
-    width: 96,
+    width: 76,
 
-    marginRight: 12,
+    marginRight: 9,
 
-    paddingHorizontal: 7,
+    paddingHorizontal: 5,
 
     paddingTop: 11,
 
@@ -1672,7 +1814,7 @@ const styles = StyleSheet.create({
     backgroundColor:
       'rgba(255,255,255,0.90)',
 
-    borderRadius: 31,
+    borderRadius: 27,
 
     borderWidth: 1,
 
@@ -1720,9 +1862,9 @@ const styles = StyleSheet.create({
    */
 
   sideMenuButton: {
-    height: 94,
+    height: 88,
 
-    borderRadius: 23,
+    borderRadius: 20,
 
     justifyContent: 'center',
 
@@ -1764,13 +1906,13 @@ const styles = StyleSheet.create({
   activeMenuIndicator: {
     position: 'absolute',
 
-    left: -10,
+    left: -8,
 
-    top: 25,
+    top: 23,
 
     width: 4,
 
-    height: 44,
+    height: 40,
 
     borderRadius: 4,
 
@@ -1795,11 +1937,11 @@ const styles = StyleSheet.create({
    */
 
   sideMenuIconBox: {
-    width: 45,
+    width: 39,
 
-    height: 45,
+    height: 39,
 
-    borderRadius: 16,
+    borderRadius: 14,
 
     alignItems: 'center',
 
@@ -1838,11 +1980,11 @@ const styles = StyleSheet.create({
   sideMenuLabel: {
     color: '#7481A4',
 
-    fontSize: 11,
+    fontSize: 9,
 
     fontWeight: '600',
 
-    marginTop: 7,
+    marginTop: 6,
 
     textAlign: 'center',
 
@@ -2203,20 +2345,12 @@ const styles = StyleSheet.create({
    * AGE + GENDER
    */
 
-  doubleColumn: {
-    flexDirection: 'row',
-
+  ageSection: {
     marginTop: 4,
   },
 
-  ageSection: {
-    flex: 1.08,
-
-    paddingRight: 10,
-  },
-
   genderSection: {
-    flex: 1,
+    marginTop: 16,
   },
 
   ageControls: {
@@ -2293,6 +2427,7 @@ const styles = StyleSheet.create({
 
   genderRow: {
     flexDirection: 'row',
+    width: '100%',
   },
 
   genderButton: {
@@ -2459,6 +2594,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+  sliderTouchArea: {
+    height: 29,
+
+    justifyContent: 'center',
+  },
+
   slider: {
     height: 5,
 
@@ -2522,7 +2663,7 @@ const styles = StyleSheet.create({
 
     paddingHorizontal: 2,
 
-    marginTop: 11,
+    marginTop: -1,
   },
 
   sliderTick: {
@@ -2709,6 +2850,19 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
+  deleteButton: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+
+  deleteButtonText: {
+    color: '#D65C72',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
   pressed: {
     opacity: 0.75,
   },
@@ -2717,3 +2871,5 @@ const styles = StyleSheet.create({
     height: 30,
   },
 });
+
+
