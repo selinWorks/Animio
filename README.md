@@ -738,69 +738,17 @@ If a pet appears seriously ill, injured, or in immediate danger, users should co
 
 ---
 
-# 👩‍💻 Development Team
-
-Animio is a collaborative project developed by **Selin** and **Betül Kızılkaya**, bringing together mobile development, UI/UX, backend systems, cloud services, and AI-assisted functionality.
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### 💜 Selin
-
-**Mobile Development & UI/UX**
-
-- React Native application development
-- TypeScript-based mobile architecture
-- Interface design and UI/UX implementation
-- Navigation and screen flows
-- Pet profile and care management interfaces
-- Calendar and reminder interfaces
-- Application-wide visual design and user experience
-
-**GitHub:** [@selinWorks](https://github.com/selinWorks)
-
-</td>
-<td width="50%" valign="top">
-
-### 🤖 Betül Kızılkaya
-
-**Backend & AI Systems**
-
-- Node.js and Express.js backend development
-- AI Assistant backend integration
-- OpenAI API communication
-- Rule-based risk assessment logic
-- Request validation and server-side processing
-- AI response flow and supporting backend services
-
-**GitHub:** [@betulkizilkaya](https://github.com/betulkizilkaya)
-
-</td>
-</tr>
-</table>
-
-### Technology Responsibilities
-
-```text
-Mobile & UI/UX       → React Native + TypeScript
-Backend              → Node.js + Express.js
-Cloud                → Firebase
-AI Integration       → OpenAI API
-Risk Assessment      → Custom Rule-Based Risk Scoring
-```
-
 ---
 
-# 📄 License & Copyright
+# ©️ Copyright
 
-Copyright © 2026 **Selin Ş & Betül Kızılkaya**. All rights reserved.
+**Copyright © 2026 Selin & Betül Kızılkaya. All rights reserved.**
 
-The source code, design, documentation, and other original materials in this repository are the intellectual property of the project authors unless otherwise stated.
+The source code, application design, documentation, and original materials contained in this repository are the intellectual property of the project authors unless otherwise stated.
 
-Permission is not granted to copy, modify, redistribute, publish, sublicense, or use substantial portions of this project for commercial purposes without prior permission from the authors.
+Unauthorized copying, modification, redistribution, publication, sublicensing, or commercial use of substantial portions of this project is not permitted without prior permission from the authors.
 
-Third-party libraries, frameworks, services, trademarks, and other external materials used by Animio remain subject to their respective licenses and terms.
+Third-party libraries, frameworks, APIs, trademarks, and other external materials remain subject to their respective licenses and terms.
 
 ---
 
@@ -820,7 +768,7 @@ Developed with care by **[Selin](https://github.com/selinWorks)** & **[Betül K�
 
 <br/>
 
-Built using **React Native, TypeScript, Firebase, Node.js & Express.js**
+Built with **React Native, TypeScript, Firebase, Node.js & Express.js**
 
 <br/>
 
