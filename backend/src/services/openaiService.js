@@ -361,11 +361,15 @@ const generatePetAdvice = async (
         );
 
       if (!meaningful) {
-        return `DİĞER
+        return {
+          success: true,
+          evaluated: false,
+          message: `DİĞER
 
-Girdiğiniz ifade evcil hayvanınızla ilgili anlaşılır bir belirti, gözlem veya durum içermiyor. Lütfen gözlemlediğiniz durumu daha açık şekilde yazın.
+      Girdiğiniz ifade evcil hayvanınızla ilgili anlaşılır bir belirti, gözlem veya durum içermiyor. Lütfen gözlemlediğiniz durumu daha açık şekilde yazın.
 
-Bu değerlendirme veteriner muayenesinin yerine geçmez.`;
+      Bu değerlendirme veteriner muayenesinin yerine geçmez.`,
+        };
       }
     }
 
@@ -723,7 +727,17 @@ Takip sorularına verilen cevaplar:
 ${followUpText}
 
 Mevcut sistem risk skoru:
-${riskResult?.riskScore ?? 0}/100
+${
+  riskResult?.riskScore != null
+    ? `${riskResult.riskScore}/100`
+    : 'Hesaplanmadı'
+}
+
+Mevcut sistem risk seviyesi:
+${riskResult?.riskLevel || 'Hesaplanmadı'}
+
+Mevcut sistem önerisi:
+${riskResult?.action || 'Hesaplanmadı'}
 
 Mevcut sistem risk seviyesi:
 ${riskResult?.riskLevel || 'Belirtilmedi'}
@@ -875,7 +889,11 @@ Bu kontrolü kullanıcıya gösterme.
 
       .trim();
 
-    return cleanedOutput;
+    return {
+      success: true,
+      evaluated: true,
+      message: cleanedOutput,
+    };
   } catch (error) {
     console.error(
       'generatePetAdvice error:',

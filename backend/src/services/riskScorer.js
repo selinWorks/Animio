@@ -1,4 +1,18 @@
-function calculateRisk(data) {
+function calculateRisk(data, aiEvaluationAvailable = true) {
+  // ------------------------------------------------
+  // AI DEĞERLENDİRMESİ YOKSA RİSK HESAPLANMAZ
+  // ------------------------------------------------
+
+  if (!aiEvaluationAvailable) {
+    return {
+      riskScore: null,
+      riskLevel: null,
+      action: null,
+      canEvaluate: false,
+      reason: 'AI_EVALUATION_UNAVAILABLE',
+    };
+  }
+
   let score = 0;
 
   // ------------------------------------------------
@@ -59,7 +73,7 @@ function calculateRisk(data) {
       : [];
 
   // ------------------------------------------------
-  // 6. "DİĞER" İÇİN GİRİLEN AÇIKLAMA
+  // 6. "DİĞER" AÇIKLAMASI
   // ------------------------------------------------
 
   const otherDetails =
@@ -68,25 +82,21 @@ function calculateRisk(data) {
       : '';
 
   // ------------------------------------------------
-  // 7. DİĞER + ANLAMSIZ AÇIKLAMA
+  // 7. SADECE "DİĞER" SEÇİLMİŞSE
   //
-  // Sadece "Diğer" seçilmiş ve anlamlı bir açıklama
-  // verilmemişse risk hesabı yapılmaz.
+  // Burada sadece uzunluk kontrolü yapılmaz.
+  // Anlamlılık kontrolünü openaiService.js yapar.
   // ------------------------------------------------
 
   const onlyOtherSelected =
     problemTypes.length === 1 &&
     problemTypes[0] === 'Diğer';
 
-  const hasMeaningfulOtherDetails =
-    otherDetails.length >= 3;
-
-  if (onlyOtherSelected && !hasMeaningfulOtherDetails) {
+  if (onlyOtherSelected && !otherDetails) {
     return {
       riskScore: null,
-      riskLevel: 'Hesaplanamadı',
-      action:
-        'Anlamlı bir belirti veya gözlem girilmesi gerekiyor.',
+      riskLevel: null,
+      action: null,
       canEvaluate: false,
       reason: 'OTHER_DETAILS_REQUIRED',
     };
