@@ -36,6 +36,9 @@ import {
   User,
 } from 'lucide-react-native';
 
+import PetInviteScreen from '../screens/PetInviteScreen';
+import PetJoinScreen from '../screens/PetJoinScreen';
+
 /* =========================================================
    NAVIGATION TYPES
 ========================================================= */
@@ -52,11 +55,10 @@ export type RootStackParamList = {
   MainTabs: undefined;
   PetDetail: {pet: Pet};
   EditPet: {pet: Pet};
+  PetInvite: {pet: Pet};
+  PetJoin: undefined;
   Calendar: undefined;
-
-  // Bildirim ekranı
   Notifications: undefined;
-
   AboutApp: undefined;
   UpcomingFeatures: undefined;
   FirestoreTest: undefined;
@@ -422,6 +424,20 @@ function MainAppNavigator() {
         options={{
           headerShown: false,
         }}
+      />
+
+      <Stack.Screen
+        name="PetInvite"
+        component={PetInviteScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="PetJoin"
+        component={PetJoinScreen}
+        options={{headerShown: false}}
       />
 
       {/* =====================================================

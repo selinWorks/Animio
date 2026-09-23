@@ -30,6 +30,7 @@ import {
   Scale,
   Trash2,
   Venus,
+  Users,
 } from 'lucide-react-native';
 
 import {RootStackParamList} from '../navigation/AppNavigator';
@@ -1003,6 +1004,38 @@ export default function PetDetailScreen({
         </ScrollView>
       </Animated.View>
 
+      <View style={styles.familyCard}>
+        <View style={styles.familyHeader}>
+          <View style={styles.familyIconBox}>
+            <Users size={22} color="#8B6FC7" />
+          </View>
+
+          <View style={styles.familyHeaderText}>
+            <Text style={styles.familyTitle}>
+              Aileyle Birlikte Takip Et
+            </Text>
+
+            <Text style={styles.familyDescription}>
+              Bu hayvanın bakımını aile üyelerinle paylaş.
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          style={styles.familyButton}
+          onPress={() =>
+            navigation.navigate('PetInvite', {
+              pet,
+            })
+          }>
+          <Users size={18} color="#FFFFFF" />
+
+          <Text style={styles.familyButtonText}>
+            Aile Üyesi Davet Et
+          </Text>
+        </Pressable>
+      </View>
+
       {/* =====================================================
           DELETE MODAL
       ===================================================== */}
@@ -1725,6 +1758,65 @@ const styles = StyleSheet.create({
     color: '#B8325A',
     fontSize: 15,
     fontWeight: '800',
+  },
+
+  familyCard: {
+    backgroundColor: '#FAF7FF',
+    borderRadius: 24,
+    padding: 18,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#E9DFFF',
+  },
+
+  familyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  familyIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#EEE6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  familyHeaderText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  familyTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 16,
+    color: '#3D3157',
+  },
+
+  familyDescription: {
+    marginTop: 4,
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: '#8A8098',
+  },
+
+  familyButton: {
+    marginTop: 16,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#8B6FC7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  familyButtonText: {
+    marginLeft: 8,
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
 });
 

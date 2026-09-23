@@ -53,18 +53,7 @@ export const updatePetInFirestore = async (
     .collection('pets')
     .doc(pet.id)
     .update({
-      /*
-       * Eski sistemle uyumluluk
-       */
       ownerId: pet.ownerId || uid,
-
-      /*
-       * Mevcut üyeleri korur.
-       *
-       * Kullanıcı zaten üyeyse tekrar eklenmez.
-       */
-      petMembers:
-        firestore.FieldValue.arrayUnion(uid),
 
       name: pet.name || '',
       type: pet.type || '',
@@ -293,10 +282,13 @@ export const deletePetFromFirestore = async (
       }
 
       transaction.update(petRef, {
-        ownerId: nextOwnerId,
-
         petMembers:
-          remainingMembers,
+          firestore.FieldValue.arrayUnion(
+            uid,
+          ),
+
+        lastAcceptedInvitationCode:
+          normalizedCode,
 
         updatedAt:
           firestore.FieldValue.serverTimestamp(),
@@ -523,4 +515,286 @@ export const deleteAssistantChatFromFirestore = async chatId => {
     .collection('assistantChats')
     .doc(chatId)
     .delete();
+};
+
+/* =========================================================
+   PET INVITATIONS
+========================================================= */
+
+/*
+ * 6 haneli davet kodu üretir.
+ */
+const generateInviteCode = () => {
+  const characters =
+    'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  let code = '';
+
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(
+      Math.random() * characters.length,
+    );
+
+    code += characters[randomIndex];
+  }
+
+  return code;
+};
+
+
+/*
+ * Pet için aile üyesi daveti oluşturur.
+ */
+export const createPetInvitation = async (
+  pet,
+  inviterId,
+  inviteeEmail,
+) => {
+  if (!pet?.id || !inviterId) {
+    throw new Error(
+      'Davet oluşturmak için pet ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  const normalizedEmail =
+    (inviteeEmail || '').trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new Error(
+      'Davet edilecek e-posta adresi gerekli.',
+    );
+  }
+
+  const code = generateInviteCode();
+
+  const invitationRef = firestore()
+    .collection('petInvitations')
+    .doc(code);
+
+  const now =
+    firestore.FieldValue.serverTimestamp();
+
+  const expiresAt =
+    firestore.Timestamp.fromDate(
+      new Date(
+        Date.now() +
+          7 * 24 * 60 * 60 * 1000,
+      ),
+    );
+
+  await invitationRef.set({
+    petId: pet.id,
+    petName: pet.name || '',
+    inviterId,
+    inviteeEmail: normalizedEmail,
+    code,
+    status: 'pending',
+    createdAt: now,
+    expiresAt,
+  });
+
+  return {
+    code,
+    invitationId: code,
+  };
+};
+
+/* =========================================================
+   GET PET INVITATION
+========================================================= */
+
+/*
+ * 6 haneli davet koduna göre daveti getirir.
+ */
+export const getPetInvitationByCode = async code => {
+  const normalizedCode =
+    (code || '')
+      .trim()
+      .toUpperCase();
+
+  if (!normalizedCode) {
+    throw new Error(
+      'Davet kodu gerekli.',
+    );
+  }
+
+  const invitationRef = firestore()
+    .collection('petInvitations')
+    .doc(normalizedCode);
+
+  const snapshot =
+    await invitationRef.get();
+
+  if (!snapshot.exists) {
+    throw new Error(
+      'Bu kodla eşleşen bir davet bulunamadı.',
+    );
+  }
+
+  const data = snapshot.data() || {};
+
+  /*
+   * Davetin süresi dolmuş mu?
+   */
+  if (
+    data.expiresAt &&
+    data.expiresAt.toDate &&
+    data.expiresAt.toDate().getTime() <
+      Date.now()
+  ) {
+    throw new Error(
+      'Bu davetin süresi dolmuş.',
+    );
+  }
+
+  /*
+   * Daha önce kullanılmış davet tekrar
+   * kullanılamaz.
+   */
+  if (data.status !== 'pending') {
+    throw new Error(
+      'Bu davet artık geçerli değil.',
+    );
+  }
+
+  return {
+    id: snapshot.id,
+    ...data,
+  };
+};
+
+
+/* =========================================================
+   ACCEPT PET INVITATION
+========================================================= */
+
+/*
+ * Daveti kabul eder ve mevcut kullanıcıyı
+ * petMembers içerisine ekler.
+ */
+export const acceptPetInvitation = async (
+  code,
+  uid,
+) => {
+  const normalizedCode =
+    (code || '').trim().toUpperCase();
+
+  if (!normalizedCode || !uid) {
+    throw new Error(
+      'Davet kodu ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  const invitationRef = firestore()
+    .collection('petInvitations')
+    .doc(normalizedCode);
+
+  /*
+   * Önce daveti okuyoruz.
+   * Kullanıcı davet edilen e-posta hesabıyla
+   * giriş yaptıysa güvenlik kuralları buna izin veriyor.
+   */
+  const invitationSnapshot =
+    await invitationRef.get();
+
+  if (!invitationSnapshot.exists) {
+    throw new Error(
+      'Bu kodla eşleşen bir davet bulunamadı.',
+    );
+  }
+
+  const invitation =
+    invitationSnapshot.data() || {};
+
+  if (invitation.status !== 'pending') {
+    throw new Error(
+      'Bu davet artık geçerli değil.',
+    );
+  }
+
+  if (
+    invitation.expiresAt &&
+    invitation.expiresAt.toDate &&
+    invitation.expiresAt
+      .toDate()
+      .getTime() < Date.now()
+  ) {
+    throw new Error(
+      'Bu davetin süresi dolmuş.',
+    );
+  }
+
+  if (!invitation.petId) {
+    throw new Error(
+      'Bu davet geçerli bir pet profiline bağlı değil.',
+    );
+  }
+
+  /*
+   * Kullanıcının davet edilen e-posta adresiyle
+   * eşleşmesini kontrol ediyoruz.
+   */
+  const currentUserEmail =
+    (firestore().app.auth().currentUser?.email || '')
+      .trim()
+      .toLowerCase();
+
+  const invitedEmail =
+    (invitation.inviteeEmail || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    invitedEmail &&
+    currentUserEmail &&
+    invitedEmail !== currentUserEmail
+  ) {
+    throw new Error(
+      'Bu davet farklı bir e-posta adresine gönderilmiş.',
+    );
+  }
+
+  /*
+   * PET DOKÜMANINI OKUMUYORUZ.
+   *
+   * Kullanıcı henüz pet üyesi olmadığı için
+   * pet'i okumaya çalışmak PERMISSION_DENIED
+   * oluşturuyordu.
+   *
+   * Bunun yerine batch kullanıyoruz.
+   */
+
+  const petRef = firestore()
+    .collection('pets')
+    .doc(invitation.petId);
+
+  const batch = firestore().batch();
+
+  batch.update(petRef, {
+    petMembers:
+      firestore.FieldValue.arrayUnion(uid),
+
+    lastAcceptedInvitationCode:
+      normalizedCode,
+
+    updatedAt:
+      firestore.FieldValue.serverTimestamp(),
+  });
+
+  batch.update(invitationRef, {
+    status: 'accepted',
+
+    inviteeUid: uid,
+
+    acceptedAt:
+      firestore.FieldValue.serverTimestamp(),
+  });
+
+  await batch.commit();
+
+  return {
+    success: true,
+    code: normalizedCode,
+    petId: invitation.petId,
+  };
 };

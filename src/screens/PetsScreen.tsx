@@ -20,6 +20,7 @@ import {
   CalendarDays,
   Images,
   ChevronRight,
+  Users,
 } from 'lucide-react-native';
 
 import {
@@ -337,6 +338,9 @@ export default function PetsScreen() {
               onAdd={() =>
                 navigation.navigate('AddPet')
               }
+              onJoin={() =>
+                navigation.navigate('PetJoin')
+              }
             />
 
             <WhyAddPet />
@@ -362,28 +366,54 @@ export default function PetsScreen() {
                 </Text>
               </View>
 
-              <Pressable
-                onPress={() =>
-                  navigation.navigate('AddPet')
-                }
-                style={({pressed}) => [
-                  styles.smallAddButton,
+              <View style={styles.petHeaderActions}>
 
-                  pressed &&
-                    styles.smallAddButtonPressed,
-                ]}>
+                <Pressable
+                  onPress={() =>
+                    navigation.navigate('PetJoin')
+                  }
+                  style={({pressed}) => [
+                    styles.joinSmallButton,
+                    pressed &&
+                      styles.joinSmallButtonPressed,
+                  ]}>
 
-                <Plus
-                  size={18}
-                  color={C.white}
-                  strokeWidth={2.2}
-                />
+                  <Users
+                    size={17}
+                    color={C.purple}
+                    strokeWidth={2.1}
+                  />
 
-                <Text style={styles.smallAddText}>
-                  Dost Ekle
-                </Text>
+                  <Text style={styles.joinSmallText}>
+                    Kodla Katıl
+                  </Text>
 
-              </Pressable>
+                </Pressable>
+
+                <Pressable
+                  onPress={() =>
+                    navigation.navigate('AddPet')
+                  }
+                  style={({pressed}) => [
+                    styles.smallAddButton,
+
+                    pressed &&
+                      styles.smallAddButtonPressed,
+                  ]}>
+
+                  <Plus
+                    size={18}
+                    color={C.white}
+                    strokeWidth={2.2}
+                  />
+
+                  <Text style={styles.smallAddText}>
+                    Ekle
+                  </Text>
+
+                </Pressable>
+
+              </View>
 
             </View>
 
@@ -439,8 +469,10 @@ export default function PetsScreen() {
 
 function EmptyState({
   onAdd,
+  onJoin,
 }: {
   onAdd: () => void;
+  onJoin: () => void;
 }) {
   return (
     <View style={styles.emptyCard}>
@@ -501,6 +533,26 @@ function EmptyState({
 
         <Text style={styles.addButtonText}>
           İlk Dostunu Ekle
+        </Text>
+
+      </Pressable>
+
+      <Pressable
+        onPress={onJoin}
+        style={({pressed}) => [
+          styles.joinEmptyButton,
+          pressed &&
+            styles.joinEmptyButtonPressed,
+        ]}>
+
+        <Users
+          size={20}
+          color={C.purple}
+          strokeWidth={2}
+        />
+
+        <Text style={styles.joinEmptyButtonText}>
+          Davet Kodu ile Katıl
         </Text>
 
       </Pressable>
@@ -1024,6 +1076,42 @@ const styles = StyleSheet.create({
     color: C.white,
   },
 
+  joinEmptyButton: {
+    width: '68%',
+    minWidth: 240,
+    height: 52,
+    borderRadius: 26,
+
+    backgroundColor: C.purpleSoft,
+
+    borderWidth: 1,
+    borderColor: C.purpleSoft2,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    gap: 9,
+
+    marginTop: 10,
+  },
+
+  joinEmptyButtonPressed: {
+    opacity: 0.75,
+
+    transform: [
+      {
+        scale: 0.97,
+      },
+    ],
+  },
+
+  joinEmptyButtonText: {
+    fontSize: 14.5,
+    fontFamily: F.semiBold,
+    color: C.purple,
+  },
+
   /* =====================================================
      WHY SECTION
   ===================================================== */
@@ -1198,6 +1286,40 @@ const styles = StyleSheet.create({
     fontFamily: F.semiBold,
 
     color: C.white,
+  },
+
+  petHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+
+  joinSmallButton: {
+    height: 43,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    backgroundColor: C.purpleSoft,
+    borderWidth: 1,
+    borderColor: C.purpleSoft2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+
+  joinSmallButtonPressed: {
+    opacity: 0.78,
+    transform: [
+      {
+        scale: 0.96,
+      },
+    ],
+  },
+
+  joinSmallText: {
+    fontSize: 11.5,
+    fontFamily: F.semiBold,
+    color: C.purple,
   },
 
   /* =====================================================
