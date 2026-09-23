@@ -1,5 +1,20 @@
 export type Pet = {
   id: string;
+
+  /**
+   * Eski sistemde profil sahibinin UID'si.
+   * Geriye dönük uyumluluk için tutuluyor.
+   */
+  ownerId?: string;
+
+  /**
+   * Bu pet profiline erişebilen kullanıcıların UID'leri.
+   *
+   * Örnek:
+   * petMembers: ['uid1', 'uid2', 'uid3']
+   */
+  petMembers?: string[];
+
   name: string;
   type: string;
 
@@ -21,4 +36,7 @@ export type Pet = {
   lastVetVisit?: string;
   notes?: string;
   photoUrl?: string;
+
+  createdAt?: any;
+  updatedAt?: any;
 };

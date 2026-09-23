@@ -10,7 +10,18 @@ export const addPetToFirestore = async (pet, uid) => {
   const docRef = await firestore()
     .collection('pets')
     .add({
+      /*
+       * Eski sistemle uyumluluk
+       */
       ownerId: uid,
+
+      /*
+       * Yeni çok kullanıcılı sistem
+       *
+       * İlk oluşturan kullanıcı otomatik olarak
+       * petMembers içerisine eklenir.
+       */
+      petMembers: [uid],
 
       name: pet.name || '',
       type: pet.type || '',
@@ -29,12 +40,31 @@ export const addPetToFirestore = async (pet, uid) => {
   return docRef.id;
 };
 
-export const updatePetInFirestore = async (pet, uid) => {
+
+/* =========================================================
+   UPDATE PET
+========================================================= */
+
+export const updatePetInFirestore = async (
+  pet,
+  uid,
+) => {
   await firestore()
     .collection('pets')
     .doc(pet.id)
     .update({
-      ownerId: uid,
+      /*
+       * Eski sistemle uyumluluk
+       */
+      ownerId: pet.ownerId || uid,
+
+      /*
+       * Mevcut üyeleri korur.
+       *
+       * Kullanıcı zaten üyeyse tekrar eklenmez.
+       */
+      petMembers:
+        firestore.FieldValue.arrayUnion(uid),
 
       name: pet.name || '',
       type: pet.type || '',
@@ -46,52 +76,136 @@ export const updatePetInFirestore = async (pet, uid) => {
       notes: pet.notes || '',
       photoUrl: pet.photoUrl || '',
 
-      updatedAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt:
+        firestore.FieldValue.serverTimestamp(),
     });
 };
 
+
+/* =========================================================
+   GET PETS
+========================================================= */
+
 export const getPetsFromFirestore = async uid => {
-  const snapshot = await firestore()
+  if (!uid) {
+    return [];
+  }
+
+  /*
+   * Yeni sistem:
+   *
+   * Kullanıcının petMembers içerisinde bulunduğu
+   * tüm profilleri getirir.
+   */
+  const memberSnapshot = await firestore()
     .collection('pets')
-    .where('ownerId', '==', uid)
+    .where(
+      'petMembers',
+      'array-contains',
+      uid,
+    )
     .get();
 
-  const pets = snapshot.docs
+  /*
+   * Eski kayıtlar:
+   *
+   * Henüz petMembers alanı olmayan eski profiller
+   * ownerId üzerinden de getiriliyor.
+   */
+  const ownerSnapshot = await firestore()
+    .collection('pets')
+    .where(
+      'ownerId',
+      '==',
+      uid,
+    )
+    .get();
+
+  /*
+   * Aynı pet iki sorguda da bulunabilir.
+   * Bu nedenle Map kullanarak ID üzerinden
+   * tekilleştiriyoruz.
+   */
+  const petMap = new Map();
+
+  memberSnapshot.docs.forEach(doc => {
+    petMap.set(doc.id, doc);
+  });
+
+  ownerSnapshot.docs.forEach(doc => {
+    petMap.set(doc.id, doc);
+  });
+
+  const pets = Array.from(petMap.values())
     .map(doc => {
       const data = doc.data();
+
+      /*
+       * Eski kayıtların petMembers alanı yoksa
+       * ownerId otomatik olarak üye kabul edilir.
+       */
+      const petMembers = Array.isArray(
+        data.petMembers,
+      )
+        ? data.petMembers
+        : data.ownerId
+          ? [data.ownerId]
+          : [];
 
       return {
         id: doc.id,
 
-        ownerId: data.ownerId || '',
+        ownerId:
+          data.ownerId || '',
 
-        name: data.name || '',
-        type: data.type || '',
+        petMembers,
+
+        name:
+          data.name || '',
+
+        type:
+          data.type || '',
 
         birthYear:
           typeof data.birthYear === 'number'
             ? data.birthYear
             : undefined,
 
-        gender: data.gender || '',
-        weight: data.weight || '',
-        vaccines: data.vaccines || '',
-        lastVetVisit: data.lastVetVisit || '',
-        notes: data.notes || '',
-        photoUrl: data.photoUrl || '',
+        gender:
+          data.gender || '',
 
-        createdAt: data.createdAt || null,
-        updatedAt: data.updatedAt || null,
+        weight:
+          data.weight || '',
+
+        vaccines:
+          data.vaccines || '',
+
+        lastVetVisit:
+          data.lastVetVisit || '',
+
+        notes:
+          data.notes || '',
+
+        photoUrl:
+          data.photoUrl || '',
+
+        createdAt:
+          data.createdAt || null,
+
+        updatedAt:
+          data.updatedAt || null,
       };
     })
     .sort((a, b) => {
-      const aTime = a.createdAt?.toMillis
-        ? a.createdAt.toMillis()
-        : 0;
+      const aTime =
+        a.createdAt?.toMillis
+          ? a.createdAt.toMillis()
+          : 0;
 
-      const bTime = b.createdAt?.toMillis
-        ? b.createdAt.toMillis()
-        : 0;
+      const bTime =
+        b.createdAt?.toMillis
+          ? b.createdAt.toMillis()
+          : 0;
 
       return bTime - aTime;
     });
@@ -99,11 +213,96 @@ export const getPetsFromFirestore = async uid => {
   return pets;
 };
 
-export const deletePetFromFirestore = async id => {
-  await firestore()
+
+/* =========================================================
+   DELETE PET
+========================================================= */
+
+export const deletePetFromFirestore = async (
+  id,
+  uid,
+) => {
+  if (!id || !uid) {
+    return;
+  }
+
+  const petRef = firestore()
     .collection('pets')
-    .doc(id)
-    .delete();
+    .doc(id);
+
+  await firestore().runTransaction(
+    async transaction => {
+      const snapshot =
+        await transaction.get(petRef);
+
+      if (!snapshot.exists) {
+        return;
+      }
+
+      const data = snapshot.data() || {};
+
+      /*
+       * Eski kayıt için üyelik listesi oluştur.
+       */
+      const currentMembers =
+        Array.isArray(data.petMembers)
+          ? data.petMembers
+          : data.ownerId
+            ? [data.ownerId]
+            : [];
+
+      /*
+       * Silmek isteyen kullanıcı listede yoksa
+       * herhangi bir işlem yapma.
+       */
+      if (!currentMembers.includes(uid)) {
+        return;
+      }
+
+      const remainingMembers =
+        currentMembers.filter(
+          memberId => memberId !== uid,
+        );
+
+      /*
+       * Son kullanıcı da ayrılıyorsa
+       * profil tamamen silinir.
+       */
+      if (remainingMembers.length === 0) {
+        transaction.delete(petRef);
+        return;
+      }
+
+      /*
+       * Kullanıcı ayrılıyor ama başka üyeler
+       * profil üzerinde kalmaya devam ediyor.
+       */
+      const currentOwnerId =
+        data.ownerId || '';
+
+      let nextOwnerId =
+        currentOwnerId;
+
+      /*
+       * Eski sahibi ayrıldıysa kalan ilk kullanıcı
+       * yeni owner olarak atanır.
+       */
+      if (currentOwnerId === uid) {
+        nextOwnerId =
+          remainingMembers[0];
+      }
+
+      transaction.update(petRef, {
+        ownerId: nextOwnerId,
+
+        petMembers:
+          remainingMembers,
+
+        updatedAt:
+          firestore.FieldValue.serverTimestamp(),
+      });
+    },
+  );
 };
 
 /* =========================================================
