@@ -10,10 +10,16 @@ import {
   StatusBar,
   Platform,
   GestureResponderEvent,
+  Image,
 } from 'react-native';
 
 import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+
+import {
+  launchCamera,
+  launchImageLibrary,
+} from 'react-native-image-picker';
 
 import {
   ArrowLeft,
@@ -94,6 +100,10 @@ export default function EditPetScreen({route}: Props) {
   const [vaccines] = useState(pet.vaccines || '');
   const [lastVetVisit] = useState(pet.lastVetVisit || '');
   const [notes, setNotes] = useState(pet.notes || '');
+
+  const initialPhotoUri =
+    (pet as typeof pet & {photoUri?: string}).photoUri || '';
+  const [photoUri, setPhotoUri] = useState(initialPhotoUri);
 
   /*
    * PET TYPE
@@ -300,6 +310,111 @@ export default function EditPetScreen({route}: Props) {
   };
 
   /*
+   * PHOTO
+   */
+
+  const openGallery = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 0.9,
+      });
+
+      if (result.didCancel) {
+        return;
+      }
+
+      if (result.errorCode) {
+        Alert.alert(
+          'Fotoğraf seçilemedi',
+          result.errorMessage ||
+            'Galeriden fotoğraf seçilirken bir sorun oluştu.',
+        );
+        return;
+      }
+
+      const uri = result.assets?.[0]?.uri;
+
+      if (uri) {
+        setPhotoUri(uri);
+      }
+    } catch (error) {
+      console.log('Galeri hatası:', error);
+      Alert.alert(
+        'Hata',
+        'Galeriden fotoğraf seçilirken bir sorun oluştu.',
+      );
+    }
+  };
+
+  const openCamera = async () => {
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        cameraType: 'back',
+        saveToPhotos: true,
+        quality: 0.9,
+      });
+
+      if (result.didCancel) {
+        return;
+      }
+
+      if (result.errorCode) {
+        Alert.alert(
+          'Kamera açılamadı',
+          result.errorMessage ||
+            'Kamera açılırken bir sorun oluştu.',
+        );
+        return;
+      }
+
+      const uri = result.assets?.[0]?.uri;
+
+      if (uri) {
+        setPhotoUri(uri);
+      }
+    } catch (error) {
+      console.log('Kamera hatası:', error);
+      Alert.alert(
+        'Hata',
+        'Kamera açılırken bir sorun oluştu.',
+      );
+    }
+  };
+
+  const handlePhotoPress = () => {
+    Alert.alert(
+      'Pet Fotoğrafı',
+      'Fotoğrafı nasıl eklemek istersin?',
+      [
+        {
+          text: 'Fotoğraf Çek',
+          onPress: openCamera,
+        },
+        {
+          text: 'Galeriden Seç',
+          onPress: openGallery,
+        },
+        ...(photoUri
+          ? [
+              {
+                text: 'Fotoğrafı Kaldır',
+                style: 'destructive' as const,
+                onPress: () => setPhotoUri(''),
+              },
+            ]
+          : []),
+        {
+          text: 'Vazgeç',
+          style: 'cancel',
+        },
+      ],
+    );
+  };
+
+  /*
    * SAVE
    */
 
@@ -353,7 +468,8 @@ export default function EditPetScreen({route}: Props) {
         vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
         notes: notes.trim(),
-      });
+        photoUri,
+      } as Parameters<typeof updatePet>[0]);
 
       Alert.alert(
         'Başarılı',
@@ -448,20 +564,7 @@ export default function EditPetScreen({route}: Props) {
           styles.backgroundBlobRight
         }
       />
-
-      <View
-        style={
-          styles.backgroundBlobBottomLeft
-        }
-      />
-
-      <View
-        style={
-          styles.backgroundBlobBottomRight
-        }
-      />
-
-      <ScrollView
+<ScrollView
         showsVerticalScrollIndicator={
           false
         }
@@ -469,336 +572,147 @@ export default function EditPetScreen({route}: Props) {
           styles.scrollContent
         }>
 
-        {/* HEADER */}
+        {/* EDIT PROFILE HERO */}
 
-        <View style={styles.header}>
-          <Pressable
-            style={({pressed}) => [
-              styles.backButton,
+        <View style={styles.editHero}>
+          <View style={styles.editHeroTopRow}>
+            <Pressable
+              style={({pressed}) => [
+                styles.backButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => navigation.goBack()}>
+              <ArrowLeft size={25} color="#172554" strokeWidth={2.4} />
+            </Pressable>
 
-              pressed &&
-                styles.pressed,
-            ]}
-            onPress={() =>
-              navigation.goBack()
-            }>
+            <Text style={styles.editHeroTitle}>Profili Düzenle</Text>
 
-            <ArrowLeft
-              size={25}
-              color="#172554"
-              strokeWidth={2.4}
-            />
-          </Pressable>
-
-          <View
-            style={
-              styles.headerCenter
-            }>
-
-            <View
-              style={
-                styles.titleRow
-              }>
-
-              <Text
-                style={
-                  styles.headerTitle
-                }>
-                {name}’i Düzenliyorsun
-              </Text>
-
-              <Text
-                style={
-                  styles.headerHeart
-                }>
-                ♥
-              </Text>
-
-            </View>
-
-            <Text
-              style={
-                styles.headerSubtitle
-              }>
-              Küçük detaylar, büyük
-              mutluluklar.
-            </Text>
-
+            <Pressable
+              onPress={handleSave}
+              style={({pressed}) => [
+                styles.headerSaveButton,
+                pressed && styles.saveButtonPressed,
+              ]}>
+              <Check size={18} color="#FFFFFF" strokeWidth={2.7} />
+              <Text style={styles.headerSaveText}>Kaydet</Text>
+            </Pressable>
           </View>
 
-          <View
-            style={
-              styles.headerRightSpace
-            }
-          />
+          <View style={styles.heroProfileArea}>
+
+            <View style={styles.heroPhotoWrapper}>
+              <Pressable
+                onPress={handlePhotoPress}
+                style={({pressed}) => [
+                  styles.heroPhoto,
+                  pressed && styles.photoPressed,
+                ]}>
+                {photoUri ? (
+                  <Image
+                    source={{uri: photoUri}}
+                    style={styles.heroPhotoImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Cat size={68} color="#7A6B9C" strokeWidth={1.6} />
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={handlePhotoPress}
+                hitSlop={8}
+                style={({pressed}) => [
+                  styles.heroCameraButton,
+                  pressed && styles.cameraButtonPressed,
+                ]}>
+                <Camera size={21} color="#FFFFFF" strokeWidth={2.4} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.heroPetName}>{name || 'Pet'}</Text>
+
+            <Text style={styles.heroPetMeta}>
+              {selectedType}  |  {currentAge} yaş
+              {safeWeight > 0 ? `  |  ${safeWeight} kg` : ''}
+            </Text>
+
+            <Pressable
+              onPress={handlePhotoPress}
+              style={({pressed}) => [
+                styles.changePhotoButton,
+                pressed && styles.pressed,
+              ]}>
+              <Camera size={18} color="#8067E8" strokeWidth={2.3} />
+              <Text style={styles.changePhotoText}>Fotoğrafı Değiştir</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* HEADER DECORATION */}
+        {/* TOP NAVIGATION */}
 
-        <View
-          style={
-            styles.headerDecorations
-          }>
-
-          <Text
-            style={styles.sparkle}>
-            ✦
-          </Text>
-
-          <View
-            style={
-              styles.decorDot
+        <View style={styles.topMenu}>
+          <SideMenuButton
+            active={activeMenu === 'general'}
+            label="Genel"
+            icon={
+              <Cat
+                size={21}
+                color={activeMenu === 'general' ? '#8067E8' : '#7481A4'}
+                strokeWidth={2.1}
+              />
             }
+            onPress={() => handleMenuPress('general')}
           />
 
-          <Text
-            style={[
-              styles.sparkle,
-              styles.sparkleRight,
-            ]}>
-            ✦
-          </Text>
+          <SideMenuButton
+            active={activeMenu === 'health'}
+            label="Sağlık"
+            icon={
+              <Heart
+                size={21}
+                color={activeMenu === 'health' ? '#8067E8' : '#7481A4'}
+                strokeWidth={2.1}
+              />
+            }
+            onPress={() => handleMenuPress('health')}
+          />
 
+          <SideMenuButton
+            active={activeMenu === 'vaccines'}
+            label="Aşılar"
+            icon={
+              <Syringe
+                size={21}
+                color={activeMenu === 'vaccines' ? '#8067E8' : '#7481A4'}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => handleMenuPress('vaccines')}
+          />
+
+          <SideMenuButton
+            active={activeMenu === 'appointments'}
+            label="Randevular"
+            icon={
+              <CalendarDays
+                size={21}
+                color={activeMenu === 'appointments' ? '#8067E8' : '#7481A4'}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => handleMenuPress('appointments')}
+          />
         </View>
 
         {/* WORKSPACE */}
 
-        <View
-          style={styles.workspace}>
-
-          {/* ===================== */}
-          {/* NEW LEFT NAVIGATION */}
-          {/* ===================== */}
-
-          <View
-            style={styles.sideMenu}>
-
-            <View
-              style={
-                styles.sideMenuTopGlow
-              }
-            />
-
-            <SideMenuButton
-              active={
-                activeMenu ===
-                'general'
-              }
-              label="Genel"
-              icon={
-                <Cat
-                  size={21}
-                  color={
-                    activeMenu ===
-                    'general'
-                      ? '#FFFFFF'
-                      : '#7481A4'
-                  }
-                  strokeWidth={2.1}
-                />
-              }
-              onPress={() =>
-                handleMenuPress(
-                  'general',
-                )
-              }
-            />
-
-            <View
-              style={
-                styles.menuConnector
-              }
-            />
-
-            <SideMenuButton
-              active={
-                activeMenu ===
-                'health'
-              }
-              label="Sağlık"
-              icon={
-                <Heart
-                  size={21}
-                  color={
-                    activeMenu ===
-                    'health'
-                      ? '#FFFFFF'
-                      : '#7481A4'
-                  }
-                  strokeWidth={2.1}
-                />
-              }
-              onPress={() =>
-                handleMenuPress(
-                  'health',
-                )
-              }
-            />
-
-            <View
-              style={
-                styles.menuConnector
-              }
-            />
-
-            <SideMenuButton
-              active={
-                activeMenu ===
-                'vaccines'
-              }
-              label="Aşılar"
-              icon={
-                <Syringe
-                  size={21}
-                  color={
-                    activeMenu ===
-                    'vaccines'
-                      ? '#FFFFFF'
-                      : '#7481A4'
-                  }
-                  strokeWidth={2}
-                />
-              }
-              onPress={() =>
-                handleMenuPress(
-                  'vaccines',
-                )
-              }
-            />
-
-            <View
-              style={
-                styles.menuConnector
-              }
-            />
-
-            <SideMenuButton
-              active={
-                activeMenu ===
-                'appointments'
-              }
-              label="Randevular"
-              icon={
-                <CalendarDays
-                  size={21}
-                  color={
-                    activeMenu ===
-                    'appointments'
-                      ? '#FFFFFF'
-                      : '#7481A4'
-                  }
-                  strokeWidth={2}
-                />
-              }
-              onPress={() =>
-                handleMenuPress(
-                  'appointments',
-                )
-              }
-            />
-
-            <View
-              style={
-                styles.sideMenuBottomDot
-              }
-            />
-
-          </View>
-
-          {/* RIGHT CONTENT */}
-
-          <View
-            style={
-              styles.rightContent
-            }>
+        <View style={styles.workspace}>
+          <View style={styles.rightContent}>
 
             {/* BASIC INFO */}
 
             <View
               style={styles.mainCard}>
-
-              {/* CARD HEADER */}
-
-              <View
-                style={
-                  styles.cardHeader
-                }>
-
-                <View
-                  style={
-                    styles.cardHeaderLeft
-                  }>
-
-                  <View
-                    style={
-                      styles.cardHeaderIcon
-                    }>
-
-                    <Cat
-                      size={26}
-                      color="#8167E8"
-                      strokeWidth={2.2}
-                    />
-
-                  </View>
-
-                  <View>
-
-                    <Text
-                      style={
-                        styles.cardTitle
-                      }>
-                      Temel Bilgiler
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.cardSubtitle
-                      }>
-                      Patinin temel
-                      bilgilerini güncelle.
-                    </Text>
-
-                  </View>
-
-                </View>
-
-                {/* PHOTO */}
-
-                <View
-                  style={
-                    styles.petPhotoWrapper
-                  }>
-
-                  <View
-                    style={
-                      styles.petPhoto
-                    }>
-
-                    <Cat
-                      size={43}
-                      color="#7A6B9C"
-                      strokeWidth={1.7}
-                    />
-
-                  </View>
-
-                  <Pressable
-                    style={
-                      styles.cameraButton
-                    }>
-
-                    <Camera
-                      size={18}
-                      color="#FFFFFF"
-                      strokeWidth={2.4}
-                    />
-
-                  </Pressable>
-
-                </View>
-
-              </View>
 
               {/* NAME */}
 
@@ -934,40 +848,6 @@ export default function EditPetScreen({route}: Props) {
 
               </ScrollView>
 
-              {/* PAGINATION */}
-
-              <View
-                style={
-                  styles.pagination
-                }>
-
-                <View
-                  style={[
-                    styles.paginationDot,
-                    styles.paginationActive,
-                  ]}
-                />
-
-                <View
-                  style={
-                    styles.paginationDot
-                  }
-                />
-
-                <View
-                  style={
-                    styles.paginationDot
-                  }
-                />
-
-                <View
-                  style={
-                    styles.paginationDot
-                  }
-                />
-
-              </View>
-
               {/* AGE */}
 
               <View
@@ -982,82 +862,63 @@ export default function EditPetScreen({route}: Props) {
                     Yaş
                   </Text>
 
-                  <View
-                    style={
-                      styles.ageControls
-                    }>
-
-                    <View
-                      style={
-                        styles.ageCalendar
-                      }>
-
-                      <CalendarDays
-                        size={20}
-                        color="#66769B"
-                        strokeWidth={2}
-                      />
-
-                    </View>
-
+                  <View style={styles.ageStepper}>
                     <Pressable
-                      style={
-                        styles.ageButton
-                      }
-                      onPress={
-                        decreaseAge
-                      }>
-
+                      onPress={decreaseAge}
+                      style={({pressed}) => [
+                        styles.ageStepperButton,
+                        pressed && styles.ageStepperButtonPressed,
+                      ]}>
                       <Minus
-                        size={20}
-                        color="#14234A"
-                        strokeWidth={
-                          2.4
-                        }
+                        size={21}
+                        color="#6F61C9"
+                        strokeWidth={2.5}
                       />
-
                     </Pressable>
 
-                    <View
-                      style={
-                        styles.ageValueBox
-                      }>
+                    <View style={styles.ageInputArea}>
+                      <TextInput
+                        value={age}
+                        onChangeText={value => {
+                          const numericValue = value.replace(/[^0-9]/g, '');
+                          setAge(numericValue);
+                        }}
+                        onBlur={() => {
+                          if (!age.trim()) {
+                            setAge('0');
+                            return;
+                          }
 
-                      <Text
-                        style={
-                          styles.ageValue
-                        }>
-                        {age}
-                      </Text>
+                          const numericAge = Math.min(
+                            Math.max(Number(age), 0),
+                            99,
+                          );
 
+                          setAge(String(numericAge));
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        selectTextOnFocus
+                        style={styles.ageInput}
+                        placeholder="0"
+                        placeholderTextColor="#A7A0C8"
+                      />
+                      <Text style={styles.ageUnit}>yaş</Text>
                     </View>
 
                     <Pressable
-                      style={
-                        styles.ageButton
-                      }
-                      onPress={
-                        increaseAge
-                      }>
-
+                      onPress={increaseAge}
+                      style={({pressed}) => [
+                        styles.ageStepperButton,
+                        pressed && styles.ageStepperButtonPressed,
+                      ]}>
                       <Plus
-                        size={20}
-                        color="#14234A"
-                        strokeWidth={
-                          2.4
-                        }
+                        size={21}
+                        color="#6F61C9"
+                        strokeWidth={2.5}
                       />
-
                     </Pressable>
-
                   </View>
-
-                  <Text
-                    style={
-                      styles.yearText
-                    }>
-                    yıl
-                  </Text>
 
               </View>
 
@@ -1425,6 +1286,7 @@ export default function EditPetScreen({route}: Props) {
 
           </View>
 
+
         </View>
 
         {/* SAVE */}
@@ -1464,11 +1326,13 @@ export default function EditPetScreen({route}: Props) {
           </Text>
         </Pressable>
 
+        {/* BOTTOM DECORATION */}
         <View
-          style={
-            styles.bottomSpace
-          }
-        />
+          pointerEvents="none"
+          style={styles.bottomDecoration}>
+          <View style={styles.bottomDecorationLeft} />
+          <View style={styles.bottomDecorationRight} />
+        </View>
 
       </ScrollView>
     </View>
@@ -1505,25 +1369,7 @@ function SideMenuButton({
           styles.pressed,
       ]}>
 
-      {active && (
-        <View
-          style={
-            styles.activeMenuIndicator
-          }
-        />
-      )}
-
-      <View
-        style={[
-          styles.sideMenuIconBox,
-
-          active &&
-            styles.sideMenuIconBoxActive,
-        ]}>
-
-        {icon}
-
-      </View>
+      {icon}
 
       <Text
         numberOfLines={1}
@@ -1557,9 +1403,7 @@ const styles = StyleSheet.create({
         ? 20
         : 12,
 
-    paddingBottom: 30,
-
-    minHeight: '100%',
+    paddingBottom: 0,
   },
 
   /*
@@ -1610,431 +1454,303 @@ const styles = StyleSheet.create({
     ],
   },
 
-  backgroundBlobBottomLeft: {
+
+  bottomDecoration: {
+    height: 56,
+    marginTop: -2,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+
+  bottomDecorationLeft: {
     position: 'absolute',
-
     width: 250,
-    height: 160,
-
+    height: 150,
     borderRadius: 120,
-
     backgroundColor: '#E9F1FF',
-
-    bottom: -90,
+    top: 0,
     left: -70,
-
     opacity: 0.75,
   },
 
-  backgroundBlobBottomRight: {
+  bottomDecorationRight: {
     position: 'absolute',
-
     width: 230,
-    height: 170,
-
+    height: 160,
     borderRadius: 120,
-
     backgroundColor: '#FBE6F3',
-
-    bottom: -100,
+    top: 0,
     right: -80,
-
     opacity: 0.8,
   },
 
   /*
-   * HEADER
+   * EDIT PROFILE HERO
    */
 
-  header: {
-    minHeight: 150,
-
+  editHero: {
     paddingHorizontal: 18,
-
+    paddingTop: 35,
+    paddingBottom: 8,
     position: 'relative',
+  },
 
+  editHeroTopRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
 
   backButton: {
     position: 'absolute',
-
-    left: 18,
-    top: 18,
-
-    width: 52,
-    height: 52,
-
-    borderRadius: 26,
-
+    left: 0,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#FFFFFF',
-
     justifyContent: 'center',
     alignItems: 'center',
-
     shadowColor: '#6C63A8',
-
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
+    shadowOffset: {width: 0, height: 5},
     shadowOpacity: 0.12,
-
     shadowRadius: 10,
+    elevation: 5,
+    zIndex: 3,
+  },
 
+  editHeroTitle: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: '#152349',
+    letterSpacing: -0.45,
+  },
+
+  headerSaveButton: {
+    position: 'absolute',
+    right: 0,
+    minWidth: 102,
+    height: 48,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    backgroundColor: '#8264EE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7766D0',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
     elevation: 5,
   },
 
-  headerCenter: {
-    alignItems: 'center',
-
-    paddingHorizontal: 62,
-
-    marginTop: 12,
-  },
-
-  titleRow: {
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-  },
-
-  headerTitle: {
-    fontSize: 25,
-
+  headerSaveText: {
+    marginLeft: 7,
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '800',
+  },
 
-    color: '#152349',
+  heroProfileArea: {
+    alignItems: 'center',
+    paddingTop: 15,
+    paddingBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+  },
 
+  heroPhotoWrapper: {
+    width: 132,
+    height: 132,
+    position: 'relative',
+    zIndex: 4,
+  },
+
+  heroPhoto: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    backgroundColor: '#F3EDF9',
+    borderWidth: 7,
+    borderColor: '#D9CCFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    shadowColor: '#776AA6',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+
+  heroPhotoImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  heroCameraButton: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    right: -4,
+    bottom: 1,
+    backgroundColor: '#7E5DEA',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+
+  heroPetName: {
+    marginTop: 13,
+    color: '#132144',
+    fontSize: 26,
+    fontWeight: '800',
     letterSpacing: -0.5,
   },
 
-  headerHeart: {
-    marginLeft: 8,
-
-    fontSize: 29,
-
-    color: '#8C72E8',
-  },
-
-  headerSubtitle: {
-    marginTop: 6,
-
+  heroPetMeta: {
+    marginTop: 3,
+    color: '#7180A2',
     fontSize: 13.5,
-
-    fontWeight: '500',
-
-    color: '#7080A3',
+    fontWeight: '600',
   },
 
-  headerRightSpace: {
-    width: 50,
-  },
-
-  headerDecorations: {
-    position: 'absolute',
-
-    top: 135,
-
-    left: 0,
-    right: 0,
-
-    height: 70,
-  },
-
-  sparkle: {
-    position: 'absolute',
-
-    left: 84,
-
-    top: 3,
-
-    color: '#A88DEA',
-
-    fontSize: 22,
-  },
-
-  sparkleRight: {
-    left: undefined,
-
-    right: 70,
-
-    top: 10,
-
-    color: '#C29BE7',
-  },
-
-  decorDot: {
-    position: 'absolute',
-
-    width: 9,
-    height: 9,
-
-    borderRadius: 5,
-
-    backgroundColor: '#D7E3FF',
-
-    left: 110,
-
-    top: 38,
-  },
-
-  /*
-   * WORKSPACE
-   */
-
-  workspace: {
+  changePhotoButton: {
+    marginTop: 13,
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 21,
+    backgroundColor: '#F0ECFF',
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-    paddingHorizontal: 14,
+  changePhotoText: {
+    marginLeft: 8,
+    color: '#8067E8',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
-    marginTop: 12,
+  heroDecorLeft: {
+    position: 'absolute',
+    left: 68,
+    top: 42,
+    transform: [{rotate: '-18deg'}],
+    opacity: 0.75,
+  },
 
-    alignItems: 'flex-start',
+  heroDecorMark: {
+    color: '#7F70D8',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+
+
+  photoPressed: {
+    opacity: 0.88,
+  },
+
+  cameraButtonPressed: {
+    opacity: 0.82,
+    transform: [{scale: 0.94}],
   },
 
   /*
-   * NEW SIDE NAVIGATION
+   * TOP NAVIGATION + WORKSPACE
    */
 
-  sideMenu: {
-    width: 76,
-
-    marginRight: 9,
-
-    paddingHorizontal: 5,
-
-    paddingTop: 11,
-
-    paddingBottom: 15,
-
-    backgroundColor:
-      'rgba(255,255,255,0.90)',
-
-    borderRadius: 27,
-
+  topMenu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginTop: 6,
+    marginBottom: 18,
+    padding: 6,
+    height: 64,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 30,
     borderWidth: 1,
-
     borderColor: '#ECE9F8',
-
-    position: 'relative',
-
-    overflow: 'visible',
-
     shadowColor: '#716A9A',
-
     shadowOffset: {
       width: 0,
       height: 8,
     },
-
-    shadowOpacity: 0.11,
-
-    shadowRadius: 17,
-
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
   },
 
-  /*
-   * SUBTLE DECORATION AT TOP
-   */
-
-  sideMenuTopGlow: {
-    position: 'absolute',
-
-    top: 11,
-
-    alignSelf: 'center',
-
-    width: 35,
-    height: 6,
-
-    borderRadius: 10,
-
-    backgroundColor: '#EEEAFE',
+  workspace: {
+    paddingHorizontal: 18,
+    marginTop: 0,
   },
-
-  /*
-   * BUTTON
-   */
 
   sideMenuButton: {
-    height: 88,
-
-    borderRadius: 20,
-
+    flex: 1,
+    height: 50,
+    borderRadius: 24,
+    flexDirection: 'row',
     justifyContent: 'center',
-
     alignItems: 'center',
-
     position: 'relative',
-
-    backgroundColor:
-      'transparent',
-
-    zIndex: 2,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 4,
   },
 
   sideMenuButtonActive: {
     backgroundColor: '#F0ECFF',
-
     borderWidth: 1,
-
     borderColor: '#DDD5FA',
-
     shadowColor: '#8777CE',
-
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    shadowOpacity: 0.13,
-
-    shadowRadius: 9,
-
-    elevation: 3,
-  },
-
-  /*
-   * ACTIVE LEFT MARK
-   */
-
-  activeMenuIndicator: {
-    position: 'absolute',
-
-    left: -8,
-
-    top: 23,
-
-    width: 4,
-
-    height: 40,
-
-    borderRadius: 4,
-
-    backgroundColor: '#8E7CE5',
-
-    shadowColor: '#8E7CE5',
-
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-
-    shadowOpacity: 0.3,
-
-    shadowRadius: 4,
-
-    elevation: 2,
-  },
-
-  /*
-   * ICON BOX
-   */
-
-  sideMenuIconBox: {
-    width: 39,
-
-    height: 39,
-
-    borderRadius: 14,
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-
-    backgroundColor: '#F5F6FB',
-
-    borderWidth: 1,
-
-    borderColor: '#EEF0F7',
-  },
-
-  sideMenuIconBoxActive: {
-    backgroundColor: '#9382E8',
-
-    borderColor: '#9382E8',
-
-    shadowColor: '#7969C8',
-
     shadowOffset: {
       width: 0,
       height: 4,
     },
-
-    shadowOpacity: 0.22,
-
-    shadowRadius: 7,
-
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
 
-  /*
-   * LABEL
-   */
 
   sideMenuLabel: {
     color: '#7481A4',
-
-    fontSize: 9,
-
+    marginLeft: 5,
+    fontSize: 10.5,
     fontWeight: '600',
-
-    marginTop: 6,
-
     textAlign: 'center',
-
-    width: '100%',
+    flexShrink: 1,
   },
 
   sideMenuLabelActive: {
     color: '#6C5DBD',
-
     fontWeight: '800',
   },
 
-  /*
-   * CONNECTING LINE
-   */
+  sideMenu: {
+    display: 'none',
+  },
+
+  sideMenuTopGlow: {
+    display: 'none',
+  },
 
   menuConnector: {
-    alignSelf: 'center',
-
-    width: 1,
-
-    height: 10,
-
-    backgroundColor: '#E6E4F2',
+    display: 'none',
   },
-
-  /*
-   * BOTTOM DECORATIVE DOT
-   */
 
   sideMenuBottomDot: {
-    alignSelf: 'center',
-
-    width: 6,
-
-    height: 6,
-
-    borderRadius: 3,
-
-    backgroundColor: '#D9D4F2',
-
-    marginTop: 7,
+    display: 'none',
   },
 
-  /*
-   * RIGHT CONTENT
-   */
-
   rightContent: {
-    flex: 1,
+    width: '100%',
   },
 
   /*
@@ -2085,7 +1801,7 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    paddingRight: 82,
+    paddingRight: 0,
   },
 
   cardHeaderIcon: {
@@ -2118,73 +1834,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
 
     lineHeight: 17,
-  },
-
-  /*
-   * PHOTO
-   */
-
-  petPhotoWrapper: {
-    position: 'absolute',
-
-    top: -7,
-
-    right: 0,
-  },
-
-  petPhoto: {
-    width: 82,
-
-    height: 82,
-
-    borderRadius: 20,
-
-    backgroundColor: '#F3EDF9',
-
-    borderWidth: 4,
-
-    borderColor: '#FFFFFF',
-
-    justifyContent: 'center',
-
-    alignItems: 'center',
-
-    shadowColor: '#776AA6',
-
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    shadowOpacity: 0.16,
-
-    shadowRadius: 8,
-
-    elevation: 4,
-  },
-
-  cameraButton: {
-    position: 'absolute',
-
-    width: 37,
-
-    height: 37,
-
-    borderRadius: 13,
-
-    right: -5,
-
-    bottom: -5,
-
-    backgroundColor: '#8D77E9',
-
-    borderWidth: 3,
-
-    borderColor: '#FFFFFF',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
   },
 
   /*
@@ -2353,76 +2002,72 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  ageControls: {
+  ageStepper: {
+    height: 62,
+    width: '100%',
+    borderRadius: 19,
+    backgroundColor: '#F4F1FF',
+    borderWidth: 1,
+    borderColor: '#E6DFFF',
     flexDirection: 'row',
-
     alignItems: 'center',
+    paddingHorizontal: 7,
   },
 
-  ageCalendar: {
-    width: 43,
-
-    height: 52,
-
-    backgroundColor: '#F3F6FB',
-
-    borderRadius: 14,
-
+  ageStepperButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
-
     justifyContent: 'center',
-
-    marginRight: 5,
+    borderWidth: 1,
+    borderColor: '#E8E3F8',
+    shadowColor: '#7766D0',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 1,
   },
 
-  ageButton: {
-    width: 42,
+  ageStepperButtonPressed: {
+    opacity: 0.72,
+    transform: [{scale: 0.96}],
+  },
 
-    height: 52,
-
-    borderRadius: 14,
-
-    backgroundColor: '#F3F6FB',
-
+  ageInputArea: {
+    flex: 1,
+    height: 48,
+    marginHorizontal: 8,
+    borderRadius: 15,
+    backgroundColor: '#ECE7FF',
+    flexDirection: 'row',
     alignItems: 'center',
-
     justifyContent: 'center',
-
-    marginHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#D9CFFF',
   },
 
-  ageValueBox: {
-    width: 43,
-
-    height: 52,
-
-    borderRadius: 14,
-
-    backgroundColor: '#F3F6FB',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-
-    marginHorizontal: 2,
-  },
-
-  ageValue: {
-    color: '#14234A',
-
-    fontSize: 17,
-
-    fontWeight: '700',
-  },
-
-  yearText: {
-    fontSize: 12,
-
-    color: '#7482A0',
-
+  ageInput: {
+    minWidth: 36,
+    maxWidth: 64,
+    height: 48,
+    paddingVertical: 0,
+    paddingHorizontal: 3,
+    color: '#372A78',
+    fontSize: 20,
+    fontWeight: '800',
     textAlign: 'center',
+  },
 
-    marginTop: 5,
+  ageUnit: {
+    marginLeft: 2,
+    color: '#786BAA',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   genderRow: {
@@ -2457,9 +2102,17 @@ const styles = StyleSheet.create({
   },
 
   maleSelected: {
-    backgroundColor: '#DCEFFF',
-
-    borderColor: '#72B7EA',
+    backgroundColor: '#CFEAFF',
+    borderColor: '#3594DC',
+    borderWidth: 2,
+    shadowColor: '#3594DC',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    elevation: 3,
   },
 
   femaleButton: {
@@ -2473,10 +2126,18 @@ const styles = StyleSheet.create({
   },
 
   femaleSelected: {
-    backgroundColor: '#FFDEE6',
-
-    borderColor: '#E99AAF',
-  },
+      backgroundColor: '#FFD6E0',
+      borderColor: '#D96B89',
+      borderWidth: 2,
+      shadowColor: '#D96B89',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.18,
+      shadowRadius: 7,
+      elevation: 3,
+    },
 
   maleText: {
     marginLeft: 5,
@@ -2867,9 +2528,8 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
 
-  bottomSpace: {
-    height: 30,
-  },
 });
+
+
 
 

@@ -571,16 +571,20 @@ export default function PetDetailScreen({
               <View style={styles.avatarOuter}>
 
                 <Image
-                  source={getDefaultPetAvatar(
-                    pet.type,
-                  )}
+                  source={
+                    (pet as typeof pet & {photoUri?: string}).photoUri
+                      ? {uri: (pet as typeof pet & {photoUri?: string}).photoUri}
+                      : getDefaultPetAvatar(pet.type)
+                  }
                   style={[
                     styles.avatarImage,
-                    (
-                      normalizePetType(pet.type).includes('diğer') ||
-                      normalizePetType(pet.type).includes('diger') ||
-                      normalizePetType(pet.type).includes('other')
-                    ) && styles.otherAvatarImage,
+                    !(pet as typeof pet & {photoUri?: string}).photoUri &&
+                      (
+                        normalizePetType(pet.type).includes('diğer') ||
+                        normalizePetType(pet.type).includes('diger') ||
+                        normalizePetType(pet.type).includes('other')
+                      ) &&
+                      styles.otherAvatarImage,
                   ]}
                   resizeMode="cover"
                 />

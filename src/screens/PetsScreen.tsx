@@ -660,11 +660,23 @@ function PetCard({
 
       <View style={styles.petAvatar}>
 
-        <View style={styles.petAvatarBlob} />
+        {(pet as Pet & {photoUri?: string}).photoUri ? (
+          <Image
+            source={{
+              uri: (pet as Pet & {photoUri?: string}).photoUri,
+            }}
+            style={styles.petAvatarImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <>
+            <View style={styles.petAvatarBlob} />
 
-        <Text style={styles.petEmoji}>
-          {getPetEmoji(pet.type)}
-        </Text>
+            <Text style={styles.petEmoji}>
+              {getPetEmoji(pet.type)}
+            </Text>
+          </>
+        )}
 
       </View>
 
@@ -1264,6 +1276,11 @@ const styles = StyleSheet.create({
 
     right: -15,
     bottom: -15,
+  },
+
+  petAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
 
   petEmoji: {

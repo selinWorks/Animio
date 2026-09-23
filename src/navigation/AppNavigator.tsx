@@ -420,7 +420,7 @@ function MainAppNavigator() {
         name="EditPet"
         component={EditPetScreen}
         options={{
-          title: 'Dostu Düzenle',
+          headerShown: false,
         }}
       />
 
