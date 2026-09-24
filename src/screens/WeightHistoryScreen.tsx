@@ -1,8 +1,8 @@
+
 import React, {useMemo, useState} from 'react';
 import Svg, {Path} from 'react-native-svg';
 
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -17,9 +17,12 @@ import {
 } from 'react-native';
 
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   Check,
+  CheckCircle2,
+  Info,
   Pencil,
   Plus,
   Trash2,
@@ -69,6 +72,21 @@ type ChartPoint = {
   x: number;
   y: number;
   record: WeightRecord;
+};
+
+type PopupType =
+  | 'error'
+  | 'warning'
+  | 'weight'
+  | 'date'
+  | 'success'
+  | 'delete'
+  | 'info';
+
+type PopupButton = {
+  text: string;
+  variant: 'primary' | 'secondary' | 'danger';
+  onPress?: () => void | Promise<void>;
 };
 
 
@@ -432,6 +450,36 @@ export default function WeightHistoryScreen({
   ] = useState(false);
 
   const [
+    popupVisible,
+    setPopupVisible,
+  ] = useState(false);
+
+  const [
+    popupTitle,
+    setPopupTitle,
+  ] = useState('');
+
+  const [
+    popupMessage,
+    setPopupMessage,
+  ] = useState('');
+
+  const [
+    popupType,
+    setPopupType,
+  ] = useState<PopupType>('info');
+
+  const [
+    popupButtons,
+    setPopupButtons,
+  ] = useState<PopupButton[]>([
+    {
+      text: 'Tamam',
+      variant: 'primary',
+    },
+  ]);
+
+  const [
     chartWidth,
     setChartWidth,
   ] = useState(0);
@@ -563,6 +611,126 @@ export default function WeightHistoryScreen({
   };
 
 
+  const showPopup = (
+    title: string,
+    message: string,
+    type: PopupType = 'info',
+    buttons: PopupButton[] = [
+      {
+        text: 'Tamam',
+        variant: 'primary',
+      },
+    ],
+  ) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setPopupButtons(buttons);
+    setPopupVisible(true);
+  };
+
+  const closePopup = () => {
+    setPopupVisible(false);
+  };
+
+  const handlePopupButtonPress = async (
+    button: PopupButton,
+  ) => {
+    setPopupVisible(false);
+
+    if (button.onPress) {
+      await button.onPress();
+    }
+  };
+
+  const renderPopupIcon = () => {
+    if (popupType === 'weight') {
+      return (
+        <Weight
+          size={28}
+          color="#8067E8"
+          strokeWidth={2.2}
+        />
+      );
+    }
+
+    if (popupType === 'date') {
+      return (
+        <CalendarDays
+          size={28}
+          color="#8067E8"
+          strokeWidth={2.2}
+        />
+      );
+    }
+
+    if (popupType === 'success') {
+      return (
+        <CheckCircle2
+          size={28}
+          color="#5C9D78"
+          strokeWidth={2.3}
+        />
+      );
+    }
+
+    if (popupType === 'delete') {
+      return (
+        <Trash2
+          size={28}
+          color="#D96B73"
+          strokeWidth={2.2}
+        />
+      );
+    }
+
+    if (popupType === 'warning') {
+      return (
+        <AlertTriangle
+          size={28}
+          color="#C58A32"
+          strokeWidth={2.2}
+        />
+      );
+    }
+
+    if (popupType === 'error') {
+      return (
+        <AlertTriangle
+          size={28}
+          color="#D96B73"
+          strokeWidth={2.2}
+        />
+      );
+    }
+
+    return (
+      <Info
+        size={28}
+        color="#8067E8"
+        strokeWidth={2.2}
+      />
+    );
+  };
+
+  const getPopupIconStyle = () => {
+    switch (popupType) {
+      case 'success':
+        return styles.popupIconSuccess;
+      case 'weight':
+      case 'date':
+      case 'info':
+        return styles.popupIconInfo;
+      case 'delete':
+      case 'error':
+        return styles.popupIconDanger;
+      case 'warning':
+        return styles.popupIconWarning;
+      default:
+        return styles.popupIconInfo;
+    }
+  };
+
   /* ---------------------------------------------------------
      SAVE RECORD
   --------------------------------------------------------- */
@@ -582,9 +750,10 @@ export default function WeightHistoryScreen({
         ) ||
         parsedWeight <= 0
       ) {
-        Alert.alert(
+        showPopup(
           'Geçersiz kilo',
           'Lütfen geçerli bir kilo değeri gir.',
+          'weight',
         );
 
         return;
@@ -594,9 +763,10 @@ export default function WeightHistoryScreen({
       if (
         parsedWeight > 200
       ) {
-        Alert.alert(
+        showPopup(
           'Kilo değerini kontrol et',
           'Girilen kilo değeri 200 kg üzerinde görünüyor.',
+          'warning',
         );
 
         return;
@@ -609,9 +779,10 @@ export default function WeightHistoryScreen({
         );
 
       if (!isoDate) {
-        Alert.alert(
+        showPopup(
           'Geçersiz tarih',
           'Tarihi YYYY-AA-GG biçiminde gir. Örneğin: 2026-09-23',
+          'date',
         );
 
         return;
@@ -714,9 +885,10 @@ export default function WeightHistoryScreen({
           error,
         );
 
-        Alert.alert(
+        showPopup(
           'Kayıt başarısız',
           'Kilo kaydı güncellenirken bir sorun oluştu.',
+          'error',
         );
       } finally {
         setSaving(false);
@@ -731,20 +903,20 @@ export default function WeightHistoryScreen({
   const deleteRecord = (
     record: WeightRecord,
   ) => {
-    Alert.alert(
+    showPopup(
       'Kilo kaydını sil',
       `${formatWeight(
         record.weight,
       )} kg olan bu kayıt silinsin mi?`,
+      'delete',
       [
         {
           text: 'Vazgeç',
-          style: 'cancel',
+          variant: 'secondary',
         },
         {
           text: 'Sil',
-          style: 'destructive',
-
+          variant: 'danger',
           onPress: async () => {
             const nextRecords =
               sortAscending(
@@ -755,24 +927,18 @@ export default function WeightHistoryScreen({
                 ),
               );
 
-
             const newestRecord =
-              nextRecords.length >
-              0
+              nextRecords.length > 0
                 ? nextRecords[
-                    nextRecords.length -
-                      1
+                    nextRecords.length - 1
                   ]
                 : null;
-
 
             try {
               await updatePet({
                 ...pet,
-
                 weightHistory:
                   nextRecords,
-
                 weight:
                   newestRecord
                     ? String(
@@ -786,9 +952,10 @@ export default function WeightHistoryScreen({
                 error,
               );
 
-              Alert.alert(
+              showPopup(
                 'Silinemedi',
                 'Kilo kaydı silinirken bir sorun oluştu.',
+                'error',
               );
             }
           },
@@ -796,7 +963,6 @@ export default function WeightHistoryScreen({
       ],
     );
   };
-
 
   /* ---------------------------------------------------------
      CHART
@@ -1903,6 +2069,79 @@ export default function WeightHistoryScreen({
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ===================================================
+          CUSTOM POPUPS
+      =================================================== */}
+      <Modal
+        visible={popupVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closePopup}>
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+            <View
+              style={[
+                styles.popupIcon,
+                getPopupIconStyle(),
+              ]}>
+              {renderPopupIcon()}
+            </View>
+
+            <Text style={styles.popupTitle}>
+              {popupTitle}
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              {popupMessage}
+            </Text>
+
+            <View style={styles.popupActions}>
+              {popupButtons.map(
+                (button, index) => (
+                  <Pressable
+                    key={`${button.text}-${index}`}
+                    onPress={() =>
+                      handlePopupButtonPress(
+                        button,
+                      )
+                    }
+                    style={({pressed}) => [
+                      styles.popupButton,
+                      button.variant ===
+                        'secondary' &&
+                        styles.popupButtonSecondary,
+                      button.variant ===
+                        'danger' &&
+                        styles.popupButtonDanger,
+                      pressed &&
+                        styles.popupButtonPressed,
+                    ]}>
+                    {button.variant === 'danger' && (
+                      <Trash2
+                        size={17}
+                        color="#FFFFFF"
+                        strokeWidth={2.2}
+                      />
+                    )}
+
+                    <Text
+                      style={[
+                        styles.popupButtonText,
+                        button.variant ===
+                          'secondary' &&
+                          styles.popupButtonTextSecondary,
+                      ]}>
+                      {button.text}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -2946,6 +3185,119 @@ const styles =
     },
 
 
+    /* POPUPS */
+
+    popupOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(28, 25, 48, 0.48)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+
+    popupCard: {
+      width: '100%',
+      maxWidth: 360,
+      borderRadius: 28,
+      backgroundColor: '#FFFFFF',
+      paddingHorizontal: 22,
+      paddingTop: 24,
+      paddingBottom: 18,
+      alignItems: 'center',
+      shadowColor: '#27203D',
+      shadowOffset: {
+        width: 0,
+        height: 14,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 26,
+      elevation: 16,
+    },
+
+    popupIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+
+    popupIconInfo: {
+      backgroundColor: '#EEE9FF',
+    },
+
+    popupIconWarning: {
+      backgroundColor: '#FFF3DA',
+    },
+
+    popupIconDanger: {
+      backgroundColor: '#FFF0F1',
+    },
+
+    popupIconSuccess: {
+      backgroundColor: '#EAF7EF',
+    },
+
+    popupTitle: {
+      color: '#252844',
+      fontSize: 18,
+      fontFamily: 'Quicksand-Bold',
+      textAlign: 'center',
+    },
+
+    popupMessage: {
+      color: '#777D91',
+      fontSize: 12.5,
+      lineHeight: 19,
+      fontFamily: 'Quicksand-Medium',
+      textAlign: 'center',
+      marginTop: 8,
+      maxWidth: 305,
+    },
+
+    popupActions: {
+      width: '100%',
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 20,
+    },
+
+    popupButton: {
+      flex: 1,
+      minHeight: 48,
+      borderRadius: 16,
+      backgroundColor: PURPLE,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+    },
+
+    popupButtonSecondary: {
+      backgroundColor: '#F2F0F7',
+    },
+
+    popupButtonDanger: {
+      backgroundColor: '#D96B73',
+    },
+
+    popupButtonText: {
+      color: '#FFFFFF',
+      fontSize: 12.5,
+      fontFamily: 'Quicksand-Bold',
+    },
+
+    popupButtonTextSecondary: {
+      color: '#6E7488',
+    },
+
+    popupButtonPressed: {
+      opacity: 0.78,
+      transform: [{scale: 0.985}],
+    },
+
     /* MODAL */
 
     modalOverlay: {
@@ -3294,3 +3646,5 @@ const styles =
       opacity: 0.72,
     },
   });
+
+

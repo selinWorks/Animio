@@ -943,6 +943,11 @@ export default function PetDetailScreen({
                   strokeWidth={2}
                 />
               }
+              onPress={() =>
+                navigation.navigate('WeightHistory', {
+                  pet: currentPet,
+                })
+              }
             />
 
             <SmallNavigationCard
@@ -1038,7 +1043,7 @@ export default function PetDetailScreen({
               ]}
               onPress={() =>
                 navigation.navigate('PetInvite', {
-                  currentPet,
+                  pet: currentPet,
                 })
               }>
               <Users

@@ -39,8 +39,8 @@ type NavigationProp =
 
 type Props = {
   route: {
-    params: {
-      pet: Pet;
+    params?: {
+      pet?: Pet;
     };
   };
 };
@@ -63,7 +63,12 @@ export default function PetInviteScreen({
 
   const {user} = useAuth();
 
-  const {pet} = route.params;
+  /*
+   * PET BİLGİSİ
+   *
+   * route.params veya pet gelmezse artık uygulama çökmeyecek.
+   */
+  const pet = route?.params?.pet;
 
   const [email, setEmail] =
     useState('');
@@ -85,6 +90,12 @@ export default function PetInviteScreen({
       message: '',
       buttonText: 'Tamam',
     });
+
+  /*
+   * =========================================================
+   * MODAL
+   * =========================================================
+   */
 
   const showModal = (
     type: ModalType,
@@ -108,10 +119,38 @@ export default function PetInviteScreen({
     }));
   };
 
+  /*
+   * =========================================================
+   * CREATE INVITATION
+   * =========================================================
+   */
+
   const handleCreateInvitation =
     async () => {
+
+      /*
+       * PET KONTROLÜ
+       *
+       * Hatanın ana sebebi burasıydı.
+       * pet undefined ise artık pet.name okunmayacak.
+       */
+
+      if (!pet) {
+        showModal(
+          'error',
+          'Pet Bulunamadı',
+          'Davet oluşturulacak pet bilgisi bulunamadı. Lütfen pet profilinden tekrar dene.',
+        );
+
+        return;
+      }
+
       const normalizedEmail =
         email.trim().toLowerCase();
+
+      /*
+       * E-POSTA BOŞ
+       */
 
       if (!normalizedEmail) {
         showModal(
@@ -119,17 +158,30 @@ export default function PetInviteScreen({
           'E-posta Gerekli',
           'Lütfen davet etmek istediğin kişinin e-posta adresini gir.',
         );
+
         return;
       }
 
-      if (!normalizedEmail.includes('@')) {
+      /*
+       * E-POSTA KONTROLÜ
+       */
+
+      if (
+        !normalizedEmail.includes('@') ||
+        !normalizedEmail.includes('.')
+      ) {
         showModal(
           'error',
           'Geçersiz E-posta',
           'Lütfen geçerli bir e-posta adresi gir.',
         );
+
         return;
       }
+
+      /*
+       * KULLANICI KONTROLÜ
+       */
 
       if (!user?.uid) {
         showModal(
@@ -137,12 +189,17 @@ export default function PetInviteScreen({
           'Oturum Bulunamadı',
           'Davet oluşturmak için önce hesabına giriş yapmalısın.',
         );
+
         return;
       }
 
       try {
         setLoading(true);
         setCopied(false);
+
+        /*
+         * DAVET OLUŞTUR
+         */
 
         const result =
           await createPetInvitation(
@@ -151,9 +208,17 @@ export default function PetInviteScreen({
             normalizedEmail,
           );
 
+        /*
+         * KODU EKRANA YAZ
+         */
+
         setInviteCode(
           result.code,
         );
+
+        /*
+         * BAŞARI MODALI
+         */
 
         showModal(
           'success',
@@ -161,6 +226,7 @@ export default function PetInviteScreen({
           `${pet.name || 'Pet'} için davet kodu oluşturuldu. Bu kodu aile üyenle paylaşabilirsin.`,
           'Kodu Gör',
         );
+
       } catch (error) {
         console.log(
           'Davet oluşturma hatası:',
@@ -172,10 +238,17 @@ export default function PetInviteScreen({
           'Davet Oluşturulamadı',
           'Davet oluşturulurken bir sorun oluştu. Lütfen tekrar dene.',
         );
+
       } finally {
         setLoading(false);
       }
     };
+
+  /*
+   * =========================================================
+   * COPY CODE
+   * =========================================================
+   */
 
   const handleCopyCode = () => {
     if (!inviteCode) {
@@ -199,10 +272,18 @@ export default function PetInviteScreen({
     }, 1800);
   };
 
+  /*
+   * =========================================================
+   * RENDER
+   * =========================================================
+   */
+
   return (
     <View style={styles.screen}>
 
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
       <View style={styles.header}>
 
@@ -232,6 +313,11 @@ export default function PetInviteScreen({
 
       </View>
 
+
+      {/* =====================================================
+          CONTENT
+      ===================================================== */}
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={
@@ -247,7 +333,9 @@ export default function PetInviteScreen({
             styles.content
           }>
 
-          {/* PET INFO */}
+          {/* =================================================
+              PET INFO
+          ================================================= */}
 
           <View style={styles.petCard}>
 
@@ -272,14 +360,17 @@ export default function PetInviteScreen({
 
               <Text
                 style={styles.petName}>
-                {pet.name}
+                {pet?.name || 'Pet bilgisi bulunamadı'}
               </Text>
 
             </View>
 
           </View>
 
-          {/* EXPLANATION */}
+
+          {/* =================================================
+              EXPLANATION
+          ================================================= */}
 
           <View style={styles.introCard}>
 
@@ -309,7 +400,10 @@ export default function PetInviteScreen({
 
           </View>
 
-          {/* EMAIL */}
+
+          {/* =================================================
+              EMAIL
+          ================================================= */}
 
           <View style={styles.section}>
 
@@ -345,20 +439,27 @@ export default function PetInviteScreen({
 
           </View>
 
-          {/* CREATE BUTTON */}
+
+          {/* =================================================
+              CREATE BUTTON
+          ================================================= */}
 
           <Pressable
             style={({pressed}) => [
               styles.createButton,
-              loading &&
+
+              (!pet || loading) &&
                 styles.createButtonDisabled,
+
               pressed &&
                 styles.pressed,
             ]}
             onPress={
               handleCreateInvitation
             }
-            disabled={loading}>
+            disabled={
+              loading || !pet
+            }>
 
             <Mail
               size={21}
@@ -377,7 +478,10 @@ export default function PetInviteScreen({
 
           </Pressable>
 
-          {/* INVITE CODE */}
+
+          {/* =================================================
+              INVITE CODE
+          ================================================= */}
 
           {inviteCode ? (
             <View
@@ -450,16 +554,21 @@ export default function PetInviteScreen({
             </View>
           ) : null}
 
-          {/* INFO */}
+
+          {/* =================================================
+              INFO
+          ================================================= */}
 
           <View style={styles.infoBox}>
 
             <View style={styles.infoIcon}>
+
               <Info
                 size={18}
                 color="#8B6FC7"
                 strokeWidth={2}
               />
+
             </View>
 
             <View style={styles.infoContent}>
@@ -492,9 +601,13 @@ export default function PetInviteScreen({
           </View>
 
         </ScrollView>
+
       </KeyboardAvoidingView>
 
-      {/* CUSTOM MODAL */}
+
+      {/* =====================================================
+          CUSTOM MODAL
+      ===================================================== */}
 
       <Modal
         visible={modal.visible}
@@ -507,6 +620,8 @@ export default function PetInviteScreen({
         <View
           style={styles.modalOverlay}>
 
+          {/* MODAL DIŞINA BASINCA KAPAT */}
+
           <Pressable
             style={
               StyleSheet.absoluteFill
@@ -516,20 +631,28 @@ export default function PetInviteScreen({
             }
           />
 
+
+          {/* MODAL CARD */}
+
           <View
             style={styles.modalCard}>
 
-            {/* MODAL ICON */}
+            {/* =================================================
+                MODAL ICON
+            ================================================= */}
 
             <View
               style={[
                 styles.modalIcon,
+
                 modal.type ===
                   'success' &&
                   styles.modalIconSuccess,
+
                 modal.type ===
                   'error' &&
                   styles.modalIconError,
+
                 modal.type ===
                   'info' &&
                   styles.modalIconInfo,
@@ -537,33 +660,43 @@ export default function PetInviteScreen({
 
               {modal.type ===
               'success' ? (
+
                 <CheckCircle2
                   size={30}
                   color="#8B6FC7"
                   strokeWidth={2.2}
                 />
+
               ) : modal.type ===
                 'error' ? (
+
                 <XCircle
                   size={30}
                   color="#A47791"
                   strokeWidth={2.2}
                 />
+
               ) : (
+
                 <AlertCircle
                   size={30}
                   color="#8B6FC7"
                   strokeWidth={2.2}
                 />
+
               )}
 
             </View>
 
-            {/* CLOSE */}
+
+            {/* =================================================
+                CLOSE BUTTON
+            ================================================= */}
 
             <Pressable
               style={({pressed}) => [
                 styles.modalClose,
+
                 pressed &&
                   styles.modalClosePressed,
               ]}
@@ -579,25 +712,35 @@ export default function PetInviteScreen({
 
             </Pressable>
 
-            {/* TITLE */}
+
+            {/* =================================================
+                TITLE
+            ================================================= */}
 
             <Text
               style={styles.modalTitle}>
               {modal.title}
             </Text>
 
-            {/* MESSAGE */}
+
+            {/* =================================================
+                MESSAGE
+            ================================================= */}
 
             <Text
               style={styles.modalMessage}>
               {modal.message}
             </Text>
 
-            {/* BUTTON */}
+
+            {/* =================================================
+                BUTTON
+            ================================================= */}
 
             <Pressable
               style={({pressed}) => [
                 styles.modalButton,
+
                 pressed &&
                   styles.modalButtonPressed,
               ]}
@@ -616,14 +759,22 @@ export default function PetInviteScreen({
             </Pressable>
 
           </View>
+
         </View>
+
       </Modal>
 
     </View>
   );
 }
 
+
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = StyleSheet.create({
+
   screen: {
     flex: 1,
     backgroundColor: '#FAF8FF',
@@ -632,6 +783,10 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+
+  /* =======================================================
+     HEADER
+  ======================================================= */
 
   header: {
     height: 92,
@@ -666,10 +821,18 @@ const styles = StyleSheet.create({
     width: 46,
   },
 
+  /* =======================================================
+     CONTENT
+  ======================================================= */
+
   content: {
     padding: 18,
     paddingBottom: 40,
   },
+
+  /* =======================================================
+     PET CARD
+  ======================================================= */
 
   petCard: {
     backgroundColor: '#F0ECFF',
@@ -711,6 +874,10 @@ const styles = StyleSheet.create({
     fontSize: 19,
   },
 
+  /* =======================================================
+     INTRO
+  ======================================================= */
+
   introCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 25,
@@ -719,10 +886,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
 
     shadowColor: '#4B4271',
+
     shadowOffset: {
       width: 0,
       height: 5,
     },
+
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 2,
@@ -752,6 +921,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#7D7490',
   },
+
+  /* =======================================================
+     INPUT
+  ======================================================= */
 
   section: {
     marginBottom: 14,
@@ -784,6 +957,10 @@ const styles = StyleSheet.create({
     color: '#4C3B69',
   },
 
+  /* =======================================================
+     CREATE BUTTON
+  ======================================================= */
+
   createButton: {
     height: 56,
     borderRadius: 19,
@@ -795,10 +972,12 @@ const styles = StyleSheet.create({
     marginBottom: 18,
 
     shadowColor: '#8B6FC7',
+
     shadowOffset: {
       width: 0,
       height: 6,
     },
+
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 3,
@@ -813,6 +992,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
   },
+
+  /* =======================================================
+     INVITE CODE
+  ======================================================= */
 
   codeCard: {
     backgroundColor: '#F2EEFF',
@@ -874,6 +1057,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
+  /* =======================================================
+     INFO
+  ======================================================= */
+
   infoBox: {
     backgroundColor: '#F3EFF9',
     borderRadius: 21,
@@ -911,18 +1098,27 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
 
+  /* =======================================================
+     PRESSED
+  ======================================================= */
+
   pressed: {
     opacity: 0.78,
-    transform: [{scale: 0.985}],
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
   },
 
-  /* =========================
+  /* =======================================================
      CUSTOM MODAL
-  ========================= */
+  ======================================================= */
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(62, 49, 82, 0.38)',
+    backgroundColor:
+      'rgba(62, 49, 82, 0.38)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -939,10 +1135,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
 
     shadowColor: '#4C3B69',
+
     shadowOffset: {
       width: 0,
       height: 10,
     },
+
     shadowOpacity: 0.16,
     shadowRadius: 25,
     elevation: 8,
@@ -983,7 +1181,12 @@ const styles = StyleSheet.create({
 
   modalClosePressed: {
     opacity: 0.65,
-    transform: [{scale: 0.92}],
+
+    transform: [
+      {
+        scale: 0.92,
+      },
+    ],
   },
 
   modalTitle: {
@@ -1015,7 +1218,12 @@ const styles = StyleSheet.create({
 
   modalButtonPressed: {
     opacity: 0.82,
-    transform: [{scale: 0.985}],
+
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
   },
 
   modalButtonText: {
