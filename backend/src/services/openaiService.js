@@ -406,12 +406,10 @@ Bu bilgiyi görmezden gelme.
 Bu bilgiyi yalnızca "Diğer alanında yazılmış" şeklinde
 geçiştirme.
 
-Bu bilgiyi DURUMUN DEĞERLENDİRMESİ bölümünde dikkate al.
+Bu bilgiyi DİKKAT EDİLMESİ GEREKENLER bölümünde dikkate al.
 
-Uygunsa DİKKAT EDİLMESİ GEREKENLER bölümünde ele al.
-
-Uygunsa RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR bölümünde
-risk açısından değerlendir.
+Risk açısından önemliyse DİKKAT EDİLMESİ GEREKENLER
+bölümünde kısa şekilde değerlendir.
 
 Uygunsa SONRAKİ ADIMLAR bölümünde dikkate al.
 
@@ -734,12 +732,6 @@ ${
 }
 
 Mevcut sistem risk seviyesi:
-${riskResult?.riskLevel || 'Hesaplanmadı'}
-
-Mevcut sistem önerisi:
-${riskResult?.action || 'Hesaplanmadı'}
-
-Mevcut sistem risk seviyesi:
 ${riskResult?.riskLevel || 'Belirtilmedi'}
 
 Mevcut sistem önerisi:
@@ -749,44 +741,64 @@ ${riskResult?.action || 'Belirtilmedi'}
 12. CEVAP YAPISI
 =======================================================
 
-Aşağıdaki beş başlığı kullan.
-
-DURUMUN DEĞERLENDİRMESİ
-
-Kullanıcının verdiği bilgileri doğal biçimde özetle.
-
-"Diğer" alanında anlamlı bir belirti varsa mutlaka
-bu bölümde gerçek bir belirti olarak değerlendir.
+Yanıtı yalnızca aşağıdaki üç başlık altında oluştur.
 
 DİKKAT EDİLMESİ GEREKENLER
 
-Mevcut belirtilerle doğrudan ilişkili önemli noktaları
-belirt.
+Bu bölüm kısa ve doğrudan olmalıdır.
 
-Yalnızca mevcut bilgilerden yararlan.
+Kullanıcının verdiği bilgiler arasından gerçekten
+önemli olan noktaları belirt.
 
-RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR
+Risk seviyesini etkileyen önemli kullanıcı bilgilerini
+de bu bölümün içinde değerlendir.
 
-Risk değerlendirmesini etkileyen gerçek kullanıcı
-bilgilerini açıkla.
+Aynı bilgiyi tekrar tekrar anlatma.
 
-"Diğer" alanında anlamlı bir belirti varsa ve risk
-açısından önemliyse burada mutlaka dikkate al.
+Kullanıcının seçtiği belirtileri veya cevapları uzun
+uzun özetleme.
+
+Yalnızca dikkat edilmesi gereken önemli noktaları,
+risk açısından anlamlı bilgileri ve varsa uyarı işaretlerini
+kısa şekilde belirt.
+
+Gereksiz genel bilgiler verme.
+
 
 OLASI NEDENLER
 
-Mevcut belirtilerle ilişkili olabilecek olası nedenleri
-kısa ve temkinli şekilde açıkla.
+Bu bölüm önemlidir.
 
-Kesin tanı koyma.
+Mevcut belirtiler ve kullanıcı tarafından verilen bilgilerle
+makul şekilde ilişkili olabilecek olası nedenleri belirt.
+
+En fazla birkaç önemli olasılığa yer ver.
+
+Olasılıkları kısa ve anlaşılır şekilde açıkla.
+
+Kesin hastalık tanısı koyma.
+
+Kullanıcının vermediği bir belirtiyi veya durumu varmış gibi
+kabul etme.
+
+Belirti çok genel ise gereksiz uzun hastalık listesi oluşturma.
+
+Olası nedenleri, mevcut belirtilerle bağlantısını açıklayarak
+ver.
+
 
 SONRAKİ ADIMLAR
 
 Kullanıcının mevcut durumda yapabileceği uygun adımları
-belirt.
+kısa ve net şekilde belirt.
+
+Evde gözlem yapılabilecek durumları ve dikkat edilmesi
+gereken değişiklikleri belirt.
 
 Gerçek bir acil uyarı işareti varsa veteriner hekime
 başvurulması gerektiğini açıkça belirt.
+
+Gereksiz tekrar yapma.
 
 =======================================================
 13. YAZIM KURALLARI
@@ -804,21 +816,28 @@ başvurulması gerektiğini açıkça belirt.
 - Anlamsız metni belirtiye dönüştürme.
 - Gereksiz hastalık listesi oluşturma.
 - Gereksiz korkutucu dil kullanma.
-- 150-250 kelime arasında kal.
+- 100-180 kelime arasında kal.
 
 Başlıkları tam olarak şu şekilde kullan:
 
-DURUMUN DEĞERLENDİRMESİ
-
 DİKKAT EDİLMESİ GEREKENLER
-
-RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR
 
 OLASI NEDENLER
 
 SONRAKİ ADIMLAR
 
 Başlıkların başına Markdown sembolü koyma.
+
+Başlıkları numaralandırma.
+
+Aynı bilgiyi farklı başlıklarda tekrar etme.
+
+"DURUMUN DEĞERLENDİRMESİ" başlığını kullanma.
+
+"RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR" başlığını kullanma.
+
+Riskle ilgili önemli noktaları "DİKKAT EDİLMESİ GEREKENLER"
+bölümünün içinde kısa şekilde belirt.
 
 Yanıtın sonunda yalnızca bir kez:
 
@@ -880,7 +899,7 @@ Bu kontrolü kullanıcıya gösterme.
 
       // Başlıkların başındaki numaraları temizle
       .replace(
-        /^(?:\d+\.)\s+(DURUMUN DEĞERLENDİRMESİ|DİKKAT EDİLMESİ GEREKENLER|RİSK SEVİYESİNİ ETKİLEYEN NOKTALAR|OLASI NEDENLER|SONRAKİ ADIMLAR)\s*$/gim,
+        /^(?:\d+\.)\s+(DİKKAT EDİLMESİ GEREKENLER|OLASI NEDENLER|SONRAKİ ADIMLAR)\s*$/gim,
         '$1',
       )
 

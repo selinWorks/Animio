@@ -442,6 +442,27 @@ const AssistantScreen = () => {
       user?.uid,
     );
 
+    // =====================================================
+    // YENİ KULLANICI / YENİ OTURUM
+    // AI FORMUNU TEMİZ BAŞLAT
+    // =====================================================
+
+    setPetType('');
+    setProblemTypes([]);
+    setFollowUpAnswers({});
+    setDuration('');
+    setUrgency('');
+    setResult(null);
+    setAiMessage('');
+    setLoading(false);
+
+    // Modal durumlarını da kapat
+    setValidationModalVisible(false);
+    setConnectionErrorVisible(false);
+    setDeleteConfirmVisible(false);
+    setDeleteChatId(undefined);
+
+    // Geçmiş sohbetleri yükle
     loadChatHistory();
   }, [user?.uid]);
 
