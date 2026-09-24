@@ -223,12 +223,39 @@ export default function AddPetScreen({navigation}: any) {
           ? customType.trim()
           : type;
 
+      const trimmedWeight = weight.trim();
+      const numericWeight = Number(
+        trimmedWeight.replace(',', '.'),
+      );
+
+      const today = new Date();
+      const initialWeightDate = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      const initialWeightHistory =
+        trimmedWeight &&
+        Number.isFinite(numericWeight) &&
+        numericWeight > 0
+          ? [
+              {
+                id: 'initial-' + Date.now(),
+                weight: numericWeight,
+                date: initialWeightDate,
+                note: 'İlk kilo kaydı',
+              },
+            ]
+          : [];
+
       const petData = {
         name: name.trim(),
         type: finalType,
         birthYear: Number(birthYear),
         gender,
-        weight: weight.trim(),
+        weight: trimmedWeight,
+        weightHistory: initialWeightHistory,
         vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
         notes: notes.trim(),

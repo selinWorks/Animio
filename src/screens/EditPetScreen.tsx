@@ -1,4 +1,5 @@
-import React, {useMemo, useRef, useState} from 'react';
+
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   TextInput,
@@ -45,6 +46,12 @@ import {
   CheckCircle2,
   Trash2,
   ImagePlus,
+  Activity,
+  Stethoscope,
+  Pill,
+  ShieldAlert,
+  ChevronRight,
+  Clock3,
 } from 'lucide-react-native';
 
 import {RootStackParamList} from '../navigation/AppNavigator';
@@ -99,28 +106,91 @@ function getPetAge(pet: {
 }
 
 export default function EditPetScreen({route}: Props) {
-  const {pet} = route.params;
+  const routePet = route.params?.pet;
 
-  const {updatePet, removePet} = usePets();
+  const {pets, updatePet, removePet} = usePets();
 
   const navigation = useNavigation<NavigationProp>();
+
+  // Route ile gelen pet sadece başlangıç referansı. Asıl güncel veri PetContext'ten gelir.
+  // Böylece WeightHistory ekranında kilo değiştiğinde EditPet'e dönünce eski değer kalmaz.
+  const contextPet = routePet
+    ? pets.find(item => item.id === routePet.id)
+    : undefined;
+
+  const pet = contextPet ?? routePet;
 
   const [activeMenu, setActiveMenu] =
     useState<MenuKey>('general');
 
-  const [name, setName] = useState(pet.name);
-  const [type, setType] = useState(pet.type);
+  const [name, setName] = useState(pet?.name || '');
+  const [type, setType] = useState(pet?.type || '');
   const currentYear = new Date().getFullYear();
-  const [age, setAge] = useState(String(getPetAge(pet)));
-  const [gender, setGender] = useState(pet.gender || '');
-  const [weight, setWeight] = useState(pet.weight || '');
-  const [vaccines] = useState(pet.vaccines || '');
-  const [lastVetVisit] = useState(pet.lastVetVisit || '');
-  const [notes, setNotes] = useState(pet.notes || '');
+  const [age, setAge] = useState(String(pet ? getPetAge(pet) : 0));
+  const [gender, setGender] = useState(pet?.gender || '');
+  const [weight, setWeight] = useState(pet?.weight || '');
+  const [vaccines] = useState(pet?.vaccines || '');
+  const [lastVetVisit] = useState(pet?.lastVetVisit || '');
+  const [notes, setNotes] = useState(pet?.notes || '');
+
+  const healthPet = (pet ?? {}) as NonNullable<typeof pet> & {
+    healthStatus?: string;
+    medications?: string;
+    allergies?: string;
+    healthNotes?: string;
+  };
+
+  const [healthStatus, setHealthStatus] = useState(
+    healthPet.healthStatus || 'İyi',
+  );
+  const [medications, setMedications] = useState(
+    healthPet.medications || '',
+  );
+  const [allergies, setAllergies] = useState(
+    healthPet.allergies || '',
+  );
+  const [healthNotes, setHealthNotes] = useState(
+    healthPet.healthNotes || '',
+  );
+
+  const healthHistory = [
+    {
+      id: 'observation',
+      date: '23 Eyl 2026',
+      title: 'Gözlem eklendi',
+      detail: healthNotes.trim() || 'Sol kulağında dönemsel kaşıntı gözlemlendi.',
+      color: '#FFF8E8',
+      accent: '#B98A35',
+    },
+    {
+      id: 'vet',
+      date: lastVetVisit || '18 Nisan 2026',
+      title: 'Veteriner kontrolü',
+      detail: 'Rutin sağlık kontrolü tamamlandı.',
+      color: '#EAF4FF',
+      accent: '#4F8EDB',
+    },
+    {
+      id: 'vaccine',
+      date: '02 Ocak 2026',
+      title: 'Karma aşı',
+      detail: 'Karma aşı kaydı oluşturuldu.',
+      color: '#FFF0F4',
+      accent: '#D26983',
+    },
+  ];
 
   const initialPhotoUri =
-    (pet as typeof pet & {photoUri?: string}).photoUri || '';
+    ((pet ?? {}) as NonNullable<typeof pet> & {photoUri?: string}).photoUri || '';
   const [photoUri, setPhotoUri] = useState(initialPhotoUri);
+
+  // WeightHistory ekranında yapılan değişiklik PetContext'e düştüğünde
+  // EditPet içindeki lokal kilo state'ini de güncelle.
+  useEffect(() => {
+    if (pet?.weight !== undefined) {
+      setWeight(String(pet.weight));
+    }
+  }, [pet?.weight]);
 
   /*
    * CUSTOM POPUP
@@ -530,6 +600,10 @@ export default function EditPetScreen({route}: Props) {
         vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
         notes: notes.trim(),
+        healthStatus: healthStatus.trim(),
+        medications: medications.trim(),
+        allergies: allergies.trim(),
+        healthNotes: healthNotes.trim(),
         photoUri,
       } as Parameters<typeof updatePet>[0]);
 
@@ -603,6 +677,23 @@ export default function EditPetScreen({route}: Props) {
   ) => {
     setActiveMenu(menu);
   };
+
+  if (!pet) {
+    return (
+      <View style={[styles.screen, {alignItems: 'center', justifyContent: 'center'}]}>
+        <Text style={{color: '#737D98', fontSize: 14, fontWeight: '700'}}>
+          Pet bilgisi bulunamadı.
+        </Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={{marginTop: 14, paddingHorizontal: 18, paddingVertical: 10}}>
+          <Text style={{color: '#8067E8', fontSize: 14, fontWeight: '800'}}>
+            Geri Dön
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -722,15 +813,6 @@ export default function EditPetScreen({route}: Props) {
 
             <Text style={styles.editHeroTitle}>Profili Düzenle</Text>
 
-            <Pressable
-              onPress={handleSave}
-              style={({pressed}) => [
-                styles.headerSaveButton,
-                pressed && styles.saveButtonPressed,
-              ]}>
-              <Check size={18} color="#FFFFFF" strokeWidth={2.7} />
-              <Text style={styles.headerSaveText}>Kaydet</Text>
-            </Pressable>
           </View>
 
           <View style={styles.heroProfileArea}>
@@ -771,15 +853,6 @@ export default function EditPetScreen({route}: Props) {
               {safeWeight > 0 ? `  |  ${safeWeight} kg` : ''}
             </Text>
 
-            <Pressable
-              onPress={handlePhotoPress}
-              style={({pressed}) => [
-                styles.changePhotoButton,
-                pressed && styles.pressed,
-              ]}>
-              <Camera size={18} color="#8067E8" strokeWidth={2.3} />
-              <Text style={styles.changePhotoText}>Fotoğrafı Değiştir</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -842,6 +915,9 @@ export default function EditPetScreen({route}: Props) {
         {/* WORKSPACE */}
 
         <View style={styles.workspace}>
+          {activeMenu === 'general' && (
+            <>
+
           <View style={styles.rightContent}>
 
             {/* BASIC INFO */}
@@ -1420,7 +1496,306 @@ export default function EditPetScreen({route}: Props) {
             </View>
 
           </View>
+            </>
+          )}
 
+          {activeMenu === 'health' && (
+            <View style={styles.healthContent}>
+              {/* HEALTH SUMMARY */}
+              <View style={styles.healthSummaryCard}>
+                <View style={styles.healthSummaryTop}>
+                  <View style={styles.healthSummaryIcon}>
+                    <Heart size={25} color="#28A874" strokeWidth={2.3} />
+                  </View>
+
+                  <View style={styles.healthSummaryText}>
+                    <Text style={styles.healthSummaryEyebrow}>SAĞLIK ÖZETİ</Text>
+                    <Text style={styles.healthSummaryTitle}>
+                      {pet.name} nasıl?
+                    </Text>
+                    <Text style={styles.healthSummarySubtitle}>
+                      Genel durumu ve önemli sağlık bilgilerini tek bakışta gör.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.healthStatusRow}>
+                  {['İyi', 'Takip Edilmeli', 'Tedavi Sürecinde'].map(status => {
+                    const selected = healthStatus === status;
+                    const statusStyle =
+                      status === 'İyi'
+                        ? styles.healthStatusGood
+                        : status === 'Takip Edilmeli'
+                          ? styles.healthStatusWatch
+                          : styles.healthStatusTreatment;
+
+                    return (
+                      <Pressable
+                        key={status}
+                        onPress={() => setHealthStatus(status)}
+                        style={({pressed}) => [
+                          styles.healthStatusButton,
+                          statusStyle,
+                          selected && styles.healthStatusButtonSelected,
+                          pressed && styles.pressed,
+                        ]}>
+                        {selected && (
+                          <CheckCircle2
+                            size={16}
+                            color={
+                              status === 'İyi'
+                                ? '#28A874'
+                                : status === 'Takip Edilmeli'
+                                  ? '#C48A2C'
+                                  : '#D26983'
+                            }
+                            strokeWidth={2.5}
+                          />
+                        )}
+                        <Text
+                          numberOfLines={2}
+                          style={[
+                            styles.healthStatusText,
+                            selected && styles.healthStatusTextSelected,
+                          ]}>
+                          {status}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <TextInput
+                  value={healthNotes}
+                  onChangeText={setHealthNotes}
+                  multiline
+                  placeholder="Genel durumu hakkında kısa bir not ekle..."
+                  placeholderTextColor="#86A497"
+                  style={styles.healthSummaryNote}
+                />
+              </View>
+
+              {/* QUICK INFO */}
+              <Text style={styles.healthBlockTitle}>Hızlı Bilgiler</Text>
+
+              <View style={styles.quickHealthRow}>
+                <View style={[styles.quickHealthCard, styles.quickWeightCard]}>
+                  <View style={styles.quickCardTop}>
+                    <View style={[styles.quickIconBox, styles.quickWeightIcon]}>
+                      <Weight size={20} color="#8067E8" strokeWidth={2.2} />
+                    </View>
+                    <Text style={styles.quickCardLabel}>Güncel Kilo</Text>
+                  </View>
+
+                  <View style={styles.quickValueRow}>
+                    <Text style={styles.quickWeightValue}>
+                      {safeWeight > 0 ? safeWeight : '—'}
+                    </Text>
+                    <Text style={styles.quickWeightUnit}>kg</Text>
+                  </View>
+
+                  <Pressable
+                    onPress={() =>
+                      pet &&
+                      navigation.navigate('WeightHistory', {
+                        pet,
+                      })
+                    }
+                    style={({pressed}) => [
+                      styles.quickLink,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={styles.quickWeightLinkText}>
+                      Geçmişi Gör
+                    </Text>
+
+                    <ChevronRight
+                      size={15}
+                      color="#8067E8"
+                      strokeWidth={2.5}
+                    />
+                  </Pressable>
+                </View>
+
+                <View style={[styles.quickHealthCard, styles.quickVetCard]}>
+                  <View style={styles.quickCardTop}>
+                    <View style={[styles.quickIconBox, styles.quickVetIcon]}>
+                      <Stethoscope size={20} color="#4F8EDB" strokeWidth={2.1} />
+                    </View>
+                    <Text style={styles.quickCardLabel}>Son Kontrol</Text>
+                  </View>
+
+                  <Text
+                    numberOfLines={2}
+                    style={styles.quickVetValue}>
+                    {lastVetVisit || 'Henüz eklenmedi'}
+                  </Text>
+
+                  <Pressable
+                    onPress={() =>
+                      showPopup(
+                        'Veteriner Geçmişi',
+                        'Geçmiş veteriner kontrollerini listeleyen ekranı bu alana bağlayacağız.',
+                      )
+                    }
+                    style={({pressed}) => [
+                      styles.quickLink,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={styles.quickVetLinkText}>Kontrolleri Gör</Text>
+                    <ChevronRight size={15} color="#4F8EDB" strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* TREATMENTS */}
+              <View style={[styles.healthDashboardCard, styles.treatmentCard]}>
+                <View style={styles.dashboardCardHeader}>
+                  <View style={[styles.dashboardIcon, styles.treatmentIcon]}>
+                    <Pill size={22} color="#C87845" strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.dashboardHeaderText}>
+                    <Text style={styles.dashboardTitle}>
+                      Aktif Tedaviler & İlaçlar
+                    </Text>
+                    <Text style={styles.dashboardSubtitle}>
+                      İlaç adı, doz ve kullanım sıklığı
+                    </Text>
+                  </View>
+                </View>
+
+                <TextInput
+                  value={medications}
+                  onChangeText={setMedications}
+                  multiline
+                  placeholder="Örn. Vetmedin 5 mg • Sabah / Akşam"
+                  placeholderTextColor="#A78976"
+                  style={[styles.dashboardTextArea, styles.treatmentInput]}
+                />
+
+                <Pressable
+                  onPress={() =>
+                    showPopup(
+                      'İlaç / Tedavi',
+                      'İlaçları ayrı kayıtlar halinde ekleme akışını bu karta bağlayacağız.',
+                    )
+                  }
+                  style={({pressed}) => [
+                    styles.addTreatmentButton,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Plus size={18} color="#C87845" strokeWidth={2.4} />
+                  <Text style={styles.addTreatmentText}>İlaç / Tedavi Ekle</Text>
+                </Pressable>
+              </View>
+
+              {/* ALLERGIES */}
+              <View style={[styles.healthDashboardCard, styles.allergyCard]}>
+                <View style={styles.dashboardCardHeader}>
+                  <View style={[styles.dashboardIcon, styles.allergyDashboardIcon]}>
+                    <ShieldAlert size={22} color="#D26983" strokeWidth={2.1} />
+                  </View>
+                  <View style={styles.dashboardHeaderText}>
+                    <Text style={styles.dashboardTitle}>
+                      Alerjiler & Hassasiyetler
+                    </Text>
+                    <Text style={styles.dashboardSubtitle}>
+                      Mama, ilaç veya bilinen diğer hassasiyetler
+                    </Text>
+                  </View>
+                </View>
+
+                <TextInput
+                  value={allergies}
+                  onChangeText={setAllergies}
+                  multiline
+                  placeholder="Örn. Tavuklu mamaya karşı hassasiyet"
+                  placeholderTextColor="#A7838D"
+                  style={[styles.dashboardTextArea, styles.allergyInput]}
+                />
+              </View>
+
+              {/* HISTORY */}
+              <View style={[styles.healthDashboardCard, styles.historyCard]}>
+                <View style={styles.dashboardCardHeader}>
+                  <View style={[styles.dashboardIcon, styles.historyIcon]}>
+                    <Clock3 size={22} color="#B98A35" strokeWidth={2.1} />
+                  </View>
+                  <View style={styles.dashboardHeaderText}>
+                    <Text style={styles.dashboardTitle}>Sağlık Geçmişi</Text>
+                    <Text style={styles.dashboardSubtitle}>
+                      Kontroller, gözlemler ve sağlık kayıtları
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.timeline}>
+                  {healthHistory.map((item, index) => (
+                    <View key={item.id} style={styles.timelineRow}>
+                      <View style={styles.timelineRail}>
+                        <View
+                          style={[
+                            styles.timelineDot,
+                            {backgroundColor: item.accent},
+                          ]}
+                        />
+                        {index !== healthHistory.length - 1 && (
+                          <View style={styles.timelineLine} />
+                        )}
+                      </View>
+
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineDate}>{item.date}</Text>
+                        <View
+                          style={[
+                            styles.timelineCard,
+                            {backgroundColor: item.color},
+                          ]}>
+                          <Text style={styles.timelineTitle}>{item.title}</Text>
+                          <Text style={styles.timelineDetail}>{item.detail}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable
+                  onPress={() =>
+                    showPopup(
+                      'Sağlık Geçmişi',
+                      'Tüm geçmiş kayıtlarını kronolojik listeleyen ekranı bu butona bağlayacağız.',
+                    )
+                  }
+                  style={({pressed}) => [
+                    styles.historyButton,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={styles.historyButtonText}>Tüm Geçmişi Gör</Text>
+                  <ChevronRight size={17} color="#B98A35" strokeWidth={2.5} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {activeMenu === 'vaccines' && (
+            <View style={styles.emptyTabCard}>
+              <Syringe size={30} color="#8067E8" strokeWidth={2} />
+              <Text style={styles.emptyTabTitle}>Aşılar</Text>
+              <Text style={styles.emptyTabText}>
+                Aşı yönetimi bu sekmede yer alacak.
+              </Text>
+            </View>
+          )}
+
+          {activeMenu === 'appointments' && (
+            <View style={styles.emptyTabCard}>
+              <CalendarDays size={30} color="#8067E8" strokeWidth={2} />
+              <Text style={styles.emptyTabTitle}>Randevular</Text>
+              <Text style={styles.emptyTabText}>
+                Veteriner randevuları bu sekmede yer alacak.
+              </Text>
+            </View>
+          )}
 
         </View>
 
@@ -1445,7 +1820,9 @@ export default function EditPetScreen({route}: Props) {
             style={
               styles.saveButtonText
             }>
-            Değişiklikleri Kaydet
+            {activeMenu === 'health'
+              ? 'Sağlık Bilgilerini Kaydet'
+              : 'Değişiklikleri Kaydet'}
           </Text>
 
         </Pressable>
@@ -2590,6 +2967,477 @@ const styles = StyleSheet.create({
     right: 15,
 
     bottom: 15,
+  },
+
+
+  /*
+   * HEALTH TAB
+   */
+
+  healthContent: {
+    width: '100%',
+  },
+
+  healthSummaryCard: {
+    borderRadius: 27,
+    backgroundColor: '#E7F8F0',
+    borderWidth: 1,
+    borderColor: '#CDEEDF',
+    padding: 17,
+    marginBottom: 19,
+    shadowColor: '#6D9B87',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+
+  healthSummaryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+
+  healthSummaryIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+    backgroundColor: '#D2F3E4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  healthSummaryText: {
+    flex: 1,
+  },
+
+  healthSummaryEyebrow: {
+    color: '#38906D',
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+
+  healthSummaryTitle: {
+    color: '#173C31',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  healthSummarySubtitle: {
+    marginTop: 3,
+    color: '#68877B',
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  healthStatusRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginBottom: 12,
+  },
+
+  healthStatusButton: {
+    flex: 1,
+    minHeight: 57,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    paddingVertical: 7,
+    opacity: 0.68,
+  },
+
+  healthStatusGood: {
+    backgroundColor: '#D8F6E8',
+    borderColor: '#B9E9D3',
+  },
+
+  healthStatusWatch: {
+    backgroundColor: '#FFF3D8',
+    borderColor: '#F0DCA9',
+  },
+
+  healthStatusTreatment: {
+    backgroundColor: '#FFE8EE',
+    borderColor: '#F3CCD6',
+  },
+
+  healthStatusButtonSelected: {
+    opacity: 1,
+    borderWidth: 2,
+    shadowColor: '#658C7B',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+
+  healthStatusText: {
+    marginTop: 4,
+    color: '#5E6E68',
+    fontSize: 10.2,
+    lineHeight: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  healthStatusTextSelected: {
+    color: '#263E36',
+    fontWeight: '800',
+  },
+
+  healthSummaryNote: {
+    minHeight: 76,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.68)',
+    borderWidth: 1,
+    borderColor: '#D4EBE0',
+    color: '#395C50',
+    fontSize: 12.5,
+    lineHeight: 19,
+    paddingHorizontal: 13,
+    paddingTop: 11,
+    paddingBottom: 11,
+    textAlignVertical: 'top',
+  },
+
+  healthBlockTitle: {
+    marginLeft: 3,
+    marginBottom: 10,
+    color: '#172348',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  quickHealthRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  quickHealthCard: {
+    flex: 1,
+    minHeight: 160,
+    borderRadius: 23,
+    padding: 14,
+    borderWidth: 1,
+  },
+
+  quickWeightCard: {
+    backgroundColor: '#F0ECFF',
+    borderColor: '#E0D7FF',
+  },
+
+  quickVetCard: {
+    backgroundColor: '#EAF4FF',
+    borderColor: '#D4E7FB',
+  },
+
+  quickCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  quickIconBox: {
+    width: 35,
+    height: 35,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+  },
+
+  quickWeightIcon: {
+    backgroundColor: '#E2DAFF',
+  },
+
+  quickVetIcon: {
+    backgroundColor: '#D8EBFF',
+  },
+
+  quickCardLabel: {
+    flex: 1,
+    color: '#253455',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+
+  quickValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 17,
+  },
+
+  quickWeightValue: {
+    color: '#4C3C9B',
+    fontSize: 28,
+    fontWeight: '800',
+  },
+
+  quickWeightUnit: {
+    marginLeft: 4,
+    color: '#7568A8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  quickVetValue: {
+    minHeight: 43,
+    marginTop: 16,
+    color: '#345C8D',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+
+  quickLink: {
+    marginTop: 'auto',
+    paddingTop: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  quickWeightLinkText: {
+    color: '#8067E8',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  quickVetLinkText: {
+    color: '#4F8EDB',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  healthDashboardCard: {
+    borderRadius: 25,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    shadowColor: '#6973A0',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  treatmentCard: {
+    backgroundColor: '#FFF1E7',
+    borderColor: '#F5DDCC',
+  },
+
+  allergyCard: {
+    backgroundColor: '#FFF0F4',
+    borderColor: '#F3D8DF',
+  },
+
+  historyCard: {
+    backgroundColor: '#FFF8E8',
+    borderColor: '#F2E6C7',
+  },
+
+  dashboardCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 13,
+  },
+
+  dashboardIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  treatmentIcon: {
+    backgroundColor: '#FFE3CF',
+  },
+
+  allergyDashboardIcon: {
+    backgroundColor: '#FFDEE6',
+  },
+
+  historyIcon: {
+    backgroundColor: '#FFF0C9',
+  },
+
+  dashboardHeaderText: {
+    flex: 1,
+  },
+
+  dashboardTitle: {
+    color: '#172348',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  dashboardSubtitle: {
+    marginTop: 3,
+    color: '#7E8294',
+    fontSize: 11.2,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  dashboardTextArea: {
+    minHeight: 88,
+    borderRadius: 17,
+    borderWidth: 1,
+    color: '#4C5265',
+    fontSize: 12.5,
+    lineHeight: 19,
+    fontWeight: '500',
+    paddingHorizontal: 13,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: 'top',
+  },
+
+  treatmentInput: {
+    backgroundColor: '#FFF8F3',
+    borderColor: '#F2D8C6',
+  },
+
+  allergyInput: {
+    backgroundColor: '#FFF8FA',
+    borderColor: '#F1D5DD',
+  },
+
+  addTreatmentButton: {
+    height: 47,
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1.3,
+    borderStyle: 'dashed',
+    borderColor: '#D99A70',
+    backgroundColor: 'rgba(255,255,255,0.45)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addTreatmentText: {
+    marginLeft: 7,
+    color: '#B66A3D',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+
+  timeline: {
+    marginTop: 2,
+  },
+
+  timelineRow: {
+    flexDirection: 'row',
+    minHeight: 88,
+  },
+
+  timelineRail: {
+    width: 22,
+    alignItems: 'center',
+  },
+
+  timelineDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    marginTop: 7,
+    zIndex: 2,
+  },
+
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#DED7C4',
+    marginTop: 2,
+    marginBottom: -2,
+  },
+
+  timelineContent: {
+    flex: 1,
+    paddingLeft: 7,
+    paddingBottom: 11,
+  },
+
+  timelineDate: {
+    color: '#8B7A50',
+    fontSize: 10.5,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  timelineCard: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(160,140,100,0.10)',
+  },
+
+  timelineTitle: {
+    color: '#30364B',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+
+  timelineDetail: {
+    marginTop: 3,
+    color: '#737887',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  historyButton: {
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FFF1C9',
+    borderWidth: 1,
+    borderColor: '#EAD79E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 3,
+  },
+
+  historyButtonText: {
+    color: '#9A742F',
+    fontSize: 12.5,
+    fontWeight: '800',
+    marginRight: 4,
+  },
+
+  emptyTabCard: {
+    minHeight: 190,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#ECE9F8',
+  },
+
+  emptyTabTitle: {
+    marginTop: 12,
+    color: '#172348',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  emptyTabText: {
+    marginTop: 6,
+    color: '#7D89A6',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
 
   /*

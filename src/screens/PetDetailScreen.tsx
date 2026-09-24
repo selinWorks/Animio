@@ -416,7 +416,12 @@ export default function PetDetailScreen({
   const navigation =
     useNavigation<NavigationProp>();
 
-  const {removePet} = usePets();
+  const {pets, removePet} = usePets();
+
+  // Route ile gelen pet objesi ekran açık kaldıkça eski kalabilir.
+  // Context'teki güncel kaydı esas alarak kilo ve diğer alanları canlı tutuyoruz.
+  const currentPet =
+    pets.find(item => item.id === pet.id) ?? pet;
 
   const [
     deleteModalVisible,
@@ -448,20 +453,20 @@ export default function PetDetailScreen({
   }, [screenOpacity, screenTranslateY]);
 
   const handleDelete = () => {
-    removePet(pet.id);
+    removePet(currentPet.id);
 
     setDeleteModalVisible(false);
 
     navigation.goBack();
   };
 
-  const displayAge = getDisplayAge(pet);
+  const displayAge = getDisplayAge(currentPet);
 
   const vaccineStatus =
-    getVaccineStatus(pet.vaccines);
+    getVaccineStatus(currentPet.vaccines);
 
   const statusLabel =
-    getStatusLabel(pet);
+    getStatusLabel(currentPet);
 
   return (
     <View style={styles.screen}>
@@ -500,7 +505,7 @@ export default function PetDetailScreen({
           <View style={styles.hero}>
 
             <Image
-              source={getPetHero(pet.type)}
+              source={getPetHero(currentPet.type)}
               style={styles.heroImage}
               resizeMode="cover"
             />
@@ -538,7 +543,7 @@ export default function PetDetailScreen({
                 onPress={() =>
                   navigation.navigate(
                     'EditPet',
-                    {pet},
+                    {pet: currentPet},
                   )
                 }>
 
@@ -573,17 +578,17 @@ export default function PetDetailScreen({
 
                 <Image
                   source={
-                    (pet as typeof pet & {photoUri?: string}).photoUri
-                      ? {uri: (pet as typeof pet & {photoUri?: string}).photoUri}
-                      : getDefaultPetAvatar(pet.type)
+                    (currentPet as typeof currentPet & {photoUri?: string}).photoUri
+                      ? {uri: (currentPet as typeof currentPet & {photoUri?: string}).photoUri}
+                      : getDefaultPetAvatar(currentPet.type)
                   }
                   style={[
                     styles.avatarImage,
-                    !(pet as typeof pet & {photoUri?: string}).photoUri &&
+                    !(currentPet as typeof currentPet & {photoUri?: string}).photoUri &&
                       (
-                        normalizePetType(pet.type).includes('diğer') ||
-                        normalizePetType(pet.type).includes('diger') ||
-                        normalizePetType(pet.type).includes('other')
+                        normalizePetType(currentPet.type).includes('diğer') ||
+                        normalizePetType(currentPet.type).includes('diger') ||
+                        normalizePetType(currentPet.type).includes('other')
                       ) &&
                       styles.otherAvatarImage,
                   ]}
@@ -613,18 +618,18 @@ export default function PetDetailScreen({
                 <Text
                   style={styles.petName}
                   numberOfLines={1}>
-                  {pet.name}
+                  {currentPet.name}
                 </Text>
 
               </View>
 
               <Text style={styles.petMeta}>
-                {getPetEmoji(pet.type)}{' '}
-                {pet.type}
+                {getPetEmoji(currentPet.type)}{' '}
+                {currentPet.type}
                 {'  |  '}
                 {displayAge} yaş
                 {'  |  '}
-                {pet.weight || '-'}
+                {currentPet.weight || '-'}
               </Text>
 
             </View>
@@ -662,7 +667,7 @@ export default function PetDetailScreen({
                 </Text>
 
                 <Text style={styles.statValue}>
-                  {pet.gender || 'Belirsiz'}
+                  {currentPet.gender || 'Belirsiz'}
                 </Text>
               </View>
 
@@ -694,7 +699,7 @@ export default function PetDetailScreen({
                 </Text>
 
                 <Text style={styles.statValue}>
-                  {pet.weight || '-'}
+                  {currentPet.weight || '-'}
                 </Text>
               </View>
 
@@ -783,7 +788,7 @@ export default function PetDetailScreen({
 
               <InfoRow
                 label="Tür"
-                value={pet.type || '-'}
+                value={currentPet.type || '-'}
               />
 
               <InfoRow
@@ -794,7 +799,7 @@ export default function PetDetailScreen({
               <InfoRow
                 label="Cinsiyet"
                 value={
-                  pet.gender ||
+                  currentPet.gender ||
                   'Belirtilmedi'
                 }
                 last
@@ -848,7 +853,7 @@ export default function PetDetailScreen({
               <InfoRow
                 label="Son Veteriner"
                 value={
-                  pet.lastVetVisit ||
+                  currentPet.lastVetVisit ||
                   'Eklenmedi'
                 }
               />
@@ -856,7 +861,7 @@ export default function PetDetailScreen({
               <InfoRow
                 label="Aşı Bilgisi"
                 value={
-                  pet.vaccines ||
+                  currentPet.vaccines ||
                   'Eklenmedi'
                 }
               />
@@ -880,7 +885,7 @@ export default function PetDetailScreen({
                     {vaccineStatus}
                   </Text>
 
-                  {pet.vaccines ? (
+                  {currentPet.vaccines ? (
                     <View
                       style={
                         styles.checkCircle
@@ -928,7 +933,7 @@ export default function PetDetailScreen({
 
             <SmallNavigationCard
               title="Kilo Takibi"
-              subtitle={`${pet.name}’un gelişimini takip et`}
+              subtitle={`${currentPet.name}’un gelişimini takip et`}
               backgroundColor="#F0EFFF"
               iconBackground="#E5E1FF"
               icon={
@@ -987,7 +992,7 @@ export default function PetDetailScreen({
               <Text
                 style={styles.notesText}
                 numberOfLines={2}>
-                {pet.notes ||
+                {currentPet.notes ||
                   'Bu dost için henüz not eklenmemiş.'}
               </Text>
 
@@ -1001,41 +1006,55 @@ export default function PetDetailScreen({
 
           </Pressable>
 
+          {/* =====================================================
+              FAMILY SHARING
+          ===================================================== */}
+
+          <View style={styles.familyCard}>
+            <View style={styles.familyHeader}>
+              <View style={styles.familyIconBox}>
+                <Users
+                  size={24}
+                  color="#7655F5"
+                  strokeWidth={2}
+                />
+              </View>
+
+              <View style={styles.familyHeaderText}>
+                <Text style={styles.familyTitle}>
+                  Aileyle Birlikte Takip Et
+                </Text>
+
+                <Text style={styles.familyDescription}>
+                  {currentPet.name}’un bakımını aile üyelerinle birlikte takip et.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              style={({pressed}) => [
+                styles.familyButton,
+                pressed && styles.actionPressed,
+              ]}
+              onPress={() =>
+                navigation.navigate('PetInvite', {
+                  currentPet,
+                })
+              }>
+              <Users
+                size={18}
+                color="#FFFFFF"
+                strokeWidth={2.2}
+              />
+
+              <Text style={styles.familyButtonText}>
+                Aile Üyesi Davet Et
+              </Text>
+            </Pressable>
+          </View>
+
         </ScrollView>
       </Animated.View>
-
-      <View style={styles.familyCard}>
-        <View style={styles.familyHeader}>
-          <View style={styles.familyIconBox}>
-            <Users size={22} color="#8B6FC7" />
-          </View>
-
-          <View style={styles.familyHeaderText}>
-            <Text style={styles.familyTitle}>
-              Aileyle Birlikte Takip Et
-            </Text>
-
-            <Text style={styles.familyDescription}>
-              Bu hayvanın bakımını aile üyelerinle paylaş.
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          style={styles.familyButton}
-          onPress={() =>
-            navigation.navigate('PetInvite', {
-              pet,
-            })
-          }>
-          <Users size={18} color="#FFFFFF" />
-
-          <Text style={styles.familyButtonText}>
-            Aile Üyesi Davet Et
-          </Text>
-        </Pressable>
-      </View>
-
       {/* =====================================================
           DELETE MODAL
       ===================================================== */}
@@ -1070,7 +1089,7 @@ export default function PetDetailScreen({
 
             <Text
               style={styles.modalDescription}>
-              {pet.name} için oluşturduğun profil
+              {currentPet.name} için oluşturduğun profil
               silinecek. Bu işlem geri alınamaz.
             </Text>
 
@@ -1761,12 +1780,23 @@ const styles = StyleSheet.create({
   },
 
   familyCard: {
-    backgroundColor: '#FAF7FF',
+    marginHorizontal: 18,
+    marginBottom: 24,
     borderRadius: 24,
-    padding: 18,
-    marginTop: 14,
+    backgroundColor: '#F7F3FF',
+    paddingHorizontal: 16,
+    paddingVertical: 17,
     borderWidth: 1,
-    borderColor: '#E9DFFF',
+    borderColor: '#E5DBFF',
+
+    shadowColor: '#4D3B7A',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
 
   familyHeader: {
@@ -1789,17 +1819,17 @@ const styles = StyleSheet.create({
   },
 
   familyTitle: {
-    fontFamily: 'Quicksand-Bold',
-    fontSize: 16,
-    color: '#3D3157',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#101C39',
   },
 
   familyDescription: {
     marginTop: 4,
-    fontFamily: 'Quicksand-Regular',
-    fontSize: 12.5,
+    fontSize: 12,
     lineHeight: 18,
-    color: '#8A8098',
+    fontWeight: '500',
+    color: '#6376A2',
   },
 
   familyButton: {
@@ -1814,9 +1844,10 @@ const styles = StyleSheet.create({
 
   familyButtonText: {
     marginLeft: 8,
-    fontFamily: 'Quicksand-Bold',
     fontSize: 14,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
 });
+
 
