@@ -482,14 +482,49 @@ export default function WeightHistoryScreen({
      RECORDS
   --------------------------------------------------------- */
 
-  const allRecords =
-    useMemo(() => {
-      return sortAscending(
-        pet.weightHistory ?? [],
-      );
-    }, [
+  const allRecords = useMemo(() => {
+    const history = Array.isArray(
       pet.weightHistory,
-    ]);
+    )
+      ? pet.weightHistory
+      : [];
+
+    if (history.length > 0) {
+      return sortAscending(history);
+    }
+
+    const parsedWeight = Number(
+      String(pet.weight ?? '')
+        .replace(',', '.')
+        .replace(/[^\d.]/g, ''),
+    );
+
+    if (
+      !Number.isFinite(parsedWeight) ||
+      parsedWeight <= 0
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id: `initial-weight-${pet.id}`,
+        weight: Number(
+          parsedWeight.toFixed(2),
+        ),
+        date:
+          pet.updatedAt?.toDate?.()?.toISOString?.() ??
+          pet.createdAt?.toDate?.()?.toISOString?.() ??
+          new Date().toISOString(),
+      },
+    ];
+  }, [
+    pet.id,
+    pet.weight,
+    pet.weightHistory,
+    pet.updatedAt,
+    pet.createdAt,
+  ]);
 
 
   const filteredRecords =

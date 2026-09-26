@@ -23,10 +23,16 @@ import {useAuth} from './AuthContext';
 
 type PetContextType = {
   pets: Pet[];
-
   addPet: (pet: Pet) => void;
 
-  removePet: (id: string) => Promise<void>;
+  removePet: (
+    id: string,
+    newOwnerId?: string,
+  ) => Promise<void>;
+
+  deletePet: (
+    id: string,
+  ) => Promise<void>;
 
   updatePet: (
     updatedPet: Pet,
@@ -115,26 +121,22 @@ export const PetProvider: React.FC<{
 
   const removePet = async (
     id: string,
+    newOwnerId?: string,
   ) => {
     try {
       if (!user?.uid) {
         return;
       }
 
-      /*
-       * Artık kullanıcıyı petMembers listesinden
-       * çıkartıyoruz.
-       *
-       * Eğer son üyeyse Firestore profili tamamen
-       * siliyor.
-       */
       await deletePetFromFirestore(
         id,
         user.uid,
+        newOwnerId ?? null,
       );
 
       /*
-       * Lokal listeden de kaldır.
+       * Eğer kullanıcı pet'ten ayrıldıysa
+       * artık kendi listesinde görünmemeli.
        */
       setPets(prev =>
         prev.filter(
@@ -146,6 +148,38 @@ export const PetProvider: React.FC<{
         'Pet üyeliğinden ayrılma hatası:',
         error,
       );
+
+      throw error;
+    }
+  };
+
+  const deletePet = async (
+    id: string,
+  ) => {
+    try {
+      if (!user?.uid) {
+        return;
+      }
+
+      await deletePetFromFirestore(
+        id,
+        user.uid,
+        null,
+        true,
+      );
+
+      setPets(prev =>
+        prev.filter(
+          pet => pet.id !== id,
+        ),
+      );
+    } catch (error) {
+      console.log(
+        'Dost silme hatası:',
+        error,
+      );
+
+      throw error;
     }
   };
 
@@ -206,13 +240,10 @@ export const PetProvider: React.FC<{
     <PetContext.Provider
       value={{
         pets,
-
         addPet,
-
         removePet,
-
+        deletePet,
         updatePet,
-
         reloadPets: loadPets,
       }}>
       {children}

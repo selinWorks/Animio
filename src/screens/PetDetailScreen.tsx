@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -31,7 +32,7 @@ import {
 
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
-
+import {useAuth} from '../data/AuthContext';
 
 type ProfileWeightChartPoint = {
   x: number;
@@ -414,12 +415,36 @@ export default function PetDetailScreen({
   const navigation =
     useNavigation<NavigationProp>();
 
-  const {pets, removePet} = usePets();
+  const {pets, removePet, deletePet} = usePets();
+  const {user} = useAuth();
 
-  // Route ile gelen pet objesi ekran açık kaldıkça eski kalabilir.
-  // Context'teki güncel kaydı esas alarak kilo ve diğer alanları canlı tutuyoruz.
   const currentPet =
     pets.find(item => item.id === pet.id) ?? pet;
+
+  const memberIds = Array.isArray(currentPet.petMembers)
+    ? currentPet.petMembers
+    : currentPet.ownerId
+      ? [currentPet.ownerId]
+      : [];
+
+  const isOwner =
+    currentPet.ownerId === user?.uid;
+
+  const otherMembers = memberIds.filter(
+    memberId => memberId !== user?.uid,
+  );
+
+  const canDelete = isOwner;
+
+  const canLeave =
+    memberIds.includes(user?.uid ?? '') &&
+    !isOwner &&
+    memberIds.length > 1;
+
+  const ownerCanLeave =
+    isOwner &&
+    otherMembers.length > 0;
+
 
   const [profileChartWidth, setProfileChartWidth] =
     useState(0);
@@ -501,6 +526,12 @@ export default function PetDetailScreen({
     setDeleteModalVisible,
   ] = useState(false);
 
+  const [leaveModalVisible, setLeaveModalVisible] =
+    useState(false);
+
+  const [selectedNewOwnerId, setSelectedNewOwnerId] =
+    useState<string | null>(null);
+
   const screenOpacity =
     useRef(new Animated.Value(0)).current;
 
@@ -525,15 +556,64 @@ export default function PetDetailScreen({
     ]).start();
   }, [screenOpacity, screenTranslateY]);
 
-  const handleDelete = () => {
-    removePet(currentPet.id);
+  const handleDelete = async () => {
+    try {
+      await deletePet(currentPet.id);
 
-    setDeleteModalVisible(false);
+      setDeleteModalVisible(false);
+      navigation.goBack();
+    } catch (error) {
+      console.log(
+        'Dost silme hatası:',
+        error,
+      );
 
-    navigation.goBack();
+      Alert.alert(
+        'İşlem gerçekleştirilemedi',
+        'Dost silinirken bir sorun oluştu. Lütfen tekrar dene.',
+      );
+    }
   };
 
   const displayAge = getDisplayAge(currentPet);
+
+  const handleLeave = async () => {
+    try {
+      // Yönetici ayrılıyorsa yeni yönetici seçilmiş olmalı
+      if (isOwner && otherMembers.length > 0) {
+        if (!selectedNewOwnerId) {
+          Alert.alert(
+            'Yönetici seç',
+            'Ayrılmadan önce yeni yöneticiyi seçmelisin.',
+          );
+          return;
+        }
+
+        await removePet(
+          currentPet.id,
+          selectedNewOwnerId,
+        );
+      } else {
+        // Normal aile üyesi
+        await removePet(currentPet.id);
+      }
+
+      setLeaveModalVisible(false);
+      setSelectedNewOwnerId(null);
+
+      navigation.goBack();
+    } catch (error) {
+      console.log(
+        'Aileden ayrılma hatası:',
+        error,
+      );
+
+      Alert.alert(
+        'İşlem gerçekleştirilemedi',
+        'Aileden ayrılırken bir sorun oluştu. Lütfen tekrar dene.',
+      );
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -1058,21 +1138,79 @@ export default function PetDetailScreen({
               </View>
             </View>
 
-            <Pressable
-              style={({pressed}) => [
-                styles.familyButton,
-                pressed && styles.actionPressed,
-              ]}
-              onPress={() =>
-                navigation.navigate('PetInvite', {
-                  pet: currentPet,
-                })
-              }>
+            {isOwner && (
+              <Pressable
+                style={({pressed}) => [
+                  styles.familyButton,
+                  pressed && styles.actionPressed,
+                ]}
+                onPress={() =>
+                  navigation.navigate('PetInvite', {
+                    pet: currentPet,
+                  })
+                }>
+                <Text style={styles.familyButtonText}>
+                  Aile Üyesi Davet Et
+                </Text>
+              </Pressable>
+            )}
+          </View>
 
-              <Text style={styles.familyButtonText}>
-                Aile Üyesi Davet Et
-              </Text>
-            </Pressable>
+          {/* =====================================================
+              PROFILE ACTIONS
+          ===================================================== */}
+
+          <View style={styles.profileActionsCard}>
+
+            {canDelete && (
+              <Pressable
+                style={({pressed}) => [
+                  styles.profileActionButton,
+                  styles.deleteActionButton,
+                  pressed && styles.actionPressed,
+                ]}
+                onPress={() =>
+                  setDeleteModalVisible(true)
+                }>
+
+                <Trash2
+                  size={20}
+                  color="#B8325A"
+                  strokeWidth={2}
+                />
+
+                <Text style={styles.deleteActionText}>
+                  Dostu Sil
+                </Text>
+
+              </Pressable>
+            )}
+
+            {(canLeave || ownerCanLeave) && (
+              <Pressable
+                style={({pressed}) => [
+                  styles.profileActionButton,
+                  styles.leaveActionButton,
+                  pressed && styles.actionPressed,
+                ]}
+                onPress={() => {
+                  setSelectedNewOwnerId(null);
+                  setLeaveModalVisible(true);
+                }}>
+
+                <Users
+                  size={20}
+                  color="#7655F5"
+                  strokeWidth={2}
+                />
+
+                <Text style={styles.leaveActionText}>
+                  Aileden Ayrıl
+                </Text>
+
+              </Pressable>
+            )}
+
           </View>
 
         </ScrollView>
@@ -1119,23 +1257,6 @@ export default function PetDetailScreen({
 
               <Pressable
                 style={({pressed}) => [
-                  styles.cancelModalButton,
-                  pressed &&
-                    styles.actionPressed,
-                ]}
-                onPress={() =>
-                  setDeleteModalVisible(false)
-                }>
-
-                <Text
-                  style={styles.cancelModalText}>
-                  Vazgeç
-                </Text>
-
-              </Pressable>
-
-              <Pressable
-                style={({pressed}) => [
                   styles.confirmDeleteButton,
                   pressed &&
                     styles.actionPressed,
@@ -1155,6 +1276,217 @@ export default function PetDetailScreen({
 
           </View>
         </View>
+      </Modal>
+
+      {/* =====================================================
+          LEAVE FAMILY MODAL
+      ===================================================== */}
+
+      <Modal
+        visible={leaveModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          setLeaveModalVisible(false);
+          setSelectedNewOwnerId(null);
+        }}>
+
+        <View style={styles.modalOverlay}>
+
+          <View style={styles.modalCard}>
+
+            {/* ICON */}
+
+            <View style={styles.modalIconCircle}>
+
+              <Users
+                size={28}
+                color="#7655F5"
+                strokeWidth={1.8}
+              />
+
+            </View>
+
+            {/* TITLE */}
+
+            <Text style={styles.modalTitle}>
+
+              {isOwner && otherMembers.length > 0
+                ? 'Yöneticiliği devret'
+                : 'Aileden ayrılmak istiyor musun?'}
+
+            </Text>
+
+            {/* OWNER */}
+
+            {isOwner && otherMembers.length > 0 ? (
+
+              <>
+                <Text style={styles.modalDescription}>
+                  {currentPet.name} için yöneticiliği
+                  devretmek istediğin aile üyesini seç.
+                </Text>
+
+                <View style={styles.memberSelectionList}>
+
+                  {otherMembers.map(
+                    (memberId, index) => {
+
+                      const isSelected =
+                        selectedNewOwnerId ===
+                        memberId;
+
+                      return (
+                        <Pressable
+                          key={memberId}
+                          style={({pressed}) => [
+                            styles.memberOption,
+                            isSelected &&
+                              styles.memberOptionSelected,
+                            pressed &&
+                              styles.actionPressed,
+                          ]}
+                          onPress={() =>
+                            setSelectedNewOwnerId(
+                              memberId,
+                            )
+                          }>
+
+                          <View
+                            style={[
+                              styles.memberAvatar,
+                              isSelected &&
+                                styles.memberAvatarSelected,
+                            ]}>
+
+                            <Users
+                              size={19}
+                              color={
+                                isSelected
+                                  ? '#FFFFFF'
+                                  : '#7655F5'
+                              }
+                              strokeWidth={2}
+                            />
+
+                          </View>
+
+                          <View
+                            style={
+                              styles.memberOptionText
+                            }>
+
+                            <Text
+                              style={
+                                styles.memberOptionTitle
+                              }>
+                              Aile Üyesi {index + 1}
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.memberOptionSubtitle
+                              }>
+                              Yönetici olarak seç
+                            </Text>
+
+                          </View>
+
+                          <View
+                            style={[
+                              styles.radioOuter,
+                              isSelected &&
+                                styles.radioOuterSelected,
+                            ]}>
+
+                            {isSelected && (
+                              <View
+                                style={
+                                  styles.radioInner
+                                }
+                              />
+                            )}
+
+                          </View>
+
+                        </Pressable>
+                      );
+                    },
+                  )}
+
+                </View>
+
+              </>
+
+            ) : (
+
+              /* NORMAL MEMBER */
+
+              <Text style={styles.modalDescription}>
+                {currentPet.name} ailesinden ayrılacaksın.
+                Pet profilindeki üyeliğin kaldırılacak.
+              </Text>
+
+            )}
+
+            {/* BUTTONS */}
+
+            <View style={styles.modalButtons}>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.cancelModalButton,
+                  pressed &&
+                    styles.actionPressed,
+                ]}
+                onPress={() => {
+                  setLeaveModalVisible(false);
+                  setSelectedNewOwnerId(null);
+                }}>
+
+                <Text style={styles.cancelModalText}>
+                  Vazgeç
+                </Text>
+
+              </Pressable>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.confirmLeaveButton,
+
+                  isOwner &&
+                    otherMembers.length > 0 &&
+                    !selectedNewOwnerId &&
+                    styles.confirmLeaveButtonDisabled,
+
+                  pressed &&
+                    styles.actionPressed,
+                ]}
+                disabled={
+                  isOwner &&
+                  otherMembers.length > 0 &&
+                  !selectedNewOwnerId
+                }
+                onPress={handleLeave}>
+
+                <Text
+                  style={
+                    styles.confirmLeaveText
+                  }>
+                  {isOwner && otherMembers.length > 0
+                    ? 'Devret ve Ayrıl'
+                    : 'Aileden Ayrıl'}
+                </Text>
+
+              </Pressable>
+
+            </View>
+
+          </View>
+
+        </View>
+
       </Modal>
 
     </View>
@@ -1905,6 +2237,46 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+    profileActionsCard: {
+      marginHorizontal: 18,
+      marginBottom: 24,
+      gap: 10,
+    },
+
+    profileActionButton: {
+      minHeight: 52,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+    },
+
+    deleteActionButton: {
+      backgroundColor: '#FFF4F7',
+      borderWidth: 1,
+      borderColor: '#F1C5D5',
+    },
+
+    deleteActionText: {
+      color: '#B8325A',
+      fontSize: 14,
+      fontFamily: 'Quicksand-Bold',
+    },
+
+    leaveActionButton: {
+      backgroundColor: '#F3EEFF',
+      borderWidth: 1,
+      borderColor: '#E1D6FF',
+    },
+
+    leaveActionText: {
+      color: '#7655F5',
+      fontSize: 14,
+      fontFamily: 'Quicksand-Bold',
+    },
+
   familyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1953,5 +2325,102 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
+  },
+
+  memberSelectionList: {
+    width: '100%',
+    marginTop: 4,
+    marginBottom: 18,
+    gap: 9,
+  },
+
+  memberOption: {
+    width: '100%',
+    minHeight: 64,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F8F6FC',
+    borderWidth: 1,
+    borderColor: '#E9E3F3',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  memberOptionSelected: {
+    backgroundColor: '#F1ECFF',
+    borderColor: '#CFC0FF',
+  },
+
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#E9E2FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  memberAvatarSelected: {
+    backgroundColor: '#7655F5',
+  },
+
+  memberOptionText: {
+    flex: 1,
+    marginLeft: 11,
+  },
+
+  memberOptionTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
+    color: '#4C3B69',
+  },
+
+  memberOptionSubtitle: {
+    marginTop: 2,
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 11,
+    color: '#8D829E',
+  },
+
+  radioOuter: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#C9C1D8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  radioOuterSelected: {
+    borderColor: '#7655F5',
+  },
+
+  radioInner: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: '#7655F5',
+  },
+
+  confirmLeaveButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: '#7655F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+
+  confirmLeaveButtonDisabled: {
+    opacity: 0.45,
+  },
+
+  confirmLeaveText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
   },
 });

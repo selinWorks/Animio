@@ -27,6 +27,7 @@ import {
   FileText,
   Sparkles,
   CircleAlert,
+  UserRound,
 } from 'lucide-react-native';
 
 import {usePets} from '../data/PetContext';
@@ -90,11 +91,11 @@ export default function AddPetScreen({navigation}: any) {
   const [step, setStep] = useState(1);
   const [photoUrl, setPhotoUrl] = useState('');
   const [name, setName] = useState('');
-  const [type, setType] = useState('Kedi');
+  const [type, setType] = useState('');
   const [customType, setCustomType] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const currentYear = new Date().getFullYear();
-  const [gender, setGender] = useState('Dişi');
+  const [gender, setGender] = useState('');
   const [weight, setWeight] = useState('');
   const [vaccines, setVaccines] = useState('');
   const [lastVetVisit, setLastVetVisit] = useState('');
@@ -106,6 +107,14 @@ export default function AddPetScreen({navigation}: any) {
   const [typeErrorVisible, setTypeErrorVisible] =
     useState(false);
 
+  /* TÜR SEÇİLMEDİ POPUP STATE */
+  const [missingTypeVisible, setMissingTypeVisible] =
+    useState(false);
+
+  /* CİNSİYET SEÇİLMEDİ POPUP STATE */
+  const [genderErrorVisible, setGenderErrorVisible] =
+    useState(false);
+
   /* GEÇERSİZ TÜR POPUP STATE */
   const [invalidTypeVisible, setInvalidTypeVisible] =
     useState(false);
@@ -114,6 +123,9 @@ export default function AddPetScreen({navigation}: any) {
     useState(false);
 
   const [successVisible, setSuccessVisible] =
+    useState(false);
+
+  const [saveErrorVisible, setSaveErrorVisible] =
     useState(false);
 
   /* =====================================================
@@ -149,10 +161,8 @@ export default function AddPetScreen({navigation}: any) {
     }
 
     if (!type) {
-      return Alert.alert(
-        'Eksik bilgi',
-        'Bir tür seç.',
-      );
+      setMissingTypeVisible(true);
+      return;
     }
 
     if (type === 'Diğer') {
@@ -194,10 +204,8 @@ export default function AddPetScreen({navigation}: any) {
     }
 
     if (!gender) {
-      return Alert.alert(
-        'Eksik bilgi',
-        'Cinsiyet seç.',
-      );
+      setGenderErrorVisible(true);
+      return;
     }
 
     setStep(3);
@@ -224,9 +232,15 @@ export default function AddPetScreen({navigation}: any) {
           : type;
 
       const trimmedWeight = weight.trim();
-      const numericWeight = Number(
-        trimmedWeight.replace(',', '.'),
-      );
+      const normalizedWeightText = trimmedWeight.replace(',', '.');
+      const numericWeight = Number(normalizedWeightText);
+      const hasValidWeight =
+        trimmedWeight !== '' &&
+        Number.isFinite(numericWeight) &&
+        numericWeight > 0;
+      const normalizedWeight = hasValidWeight
+        ? numericWeight
+        : 0;
 
       const today = new Date();
       const initialWeightDate = [
@@ -254,7 +268,9 @@ export default function AddPetScreen({navigation}: any) {
         type: finalType,
         birthYear: Number(birthYear),
         gender,
-        weight: trimmedWeight,
+        weight: hasValidWeight
+          ? String(normalizedWeight)
+          : '',
         weightHistory: initialWeightHistory,
         vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
@@ -274,10 +290,8 @@ export default function AddPetScreen({navigation}: any) {
 
       setSuccessVisible(true);
     } catch (error) {
-      Alert.alert(
-        'Hata',
-        'Pet Firestore’a kaydedilemedi.',
-      );
+      console.log('Pet kaydetme hatası:', error);
+      setSaveErrorVisible(true);
     }
   };
 
@@ -1190,6 +1204,114 @@ export default function AddPetScreen({navigation}: any) {
       </Modal>
 
       {/* ================================================= */}
+      {/* TÜR SEÇİLMEDİ - EKSİK BİLGİ POPUP                */}
+      {/* ================================================= */}
+
+      <Modal
+        visible={missingTypeVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setMissingTypeVisible(false)
+        }>
+
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+
+            <View
+              style={[
+                styles.popupIconCircle,
+                styles.missingTypeIconCircle,
+              ]}>
+              <PawPrint
+                size={42}
+                color="#8068D8"
+                strokeWidth={1.8}
+              />
+            </View>
+
+            <Text style={styles.popupTitle}>
+              Eksik bilgi
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              Hayvan dostunun türünü seçmedin.
+              {'\n'}
+              Lütfen devam etmeden önce bir tür seç.
+            </Text>
+
+            <Pressable
+              style={styles.popupButton}
+              onPress={() =>
+                setMissingTypeVisible(false)
+              }>
+              <View style={styles.popupButtonGradient}>
+                <Text style={styles.popupButtonText}>
+                  Tamam, tür seçeyim
+                </Text>
+              </View>
+            </Pressable>
+
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================================================= */}
+      {/* CİNSİYET SEÇİLMEDİ - EKSİK BİLGİ POPUP           */}
+      {/* ================================================= */}
+
+      <Modal
+        visible={genderErrorVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setGenderErrorVisible(false)
+        }>
+
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+
+            <View
+              style={[
+                styles.popupIconCircle,
+                styles.genderErrorIconCircle,
+              ]}>
+              <UserRound
+                size={42}
+                color="#8B6FC7"
+                strokeWidth={1.8}
+              />
+            </View>
+
+            <Text style={styles.popupTitle}>
+              Eksik bilgi
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              Hayvan dostunun cinsiyetini seçmedin.
+              {'\n'}
+              Lütfen devam etmeden önce bir seçim yap.
+            </Text>
+
+            <Pressable
+              style={styles.popupButton}
+              onPress={() =>
+                setGenderErrorVisible(false)
+              }>
+              <View style={styles.popupButtonGradient}>
+                <Text style={styles.popupButtonText}>
+                  Tamam, cinsiyet seçeyim
+                </Text>
+              </View>
+            </Pressable>
+
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================================================= */}
       {/* TÜR EKSİK POPUP                                  */}
       {/* ================================================= */}
 
@@ -1324,6 +1446,78 @@ export default function AddPetScreen({navigation}: any) {
                 </Text>
 
               </View>
+
+            </Pressable>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+      {/* ================================================= */}
+      {/* KAYDETME HATASI POPUP                            */}
+      {/* ================================================= */}
+
+      <Modal
+        visible={saveErrorVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setSaveErrorVisible(false)
+        }>
+
+        <View style={styles.popupOverlay}>
+
+          <View style={styles.popupCard}>
+
+            <View
+              style={[
+                styles.popupIconCircle,
+                styles.saveErrorIconCircle,
+              ]}>
+
+              <CircleAlert
+                size={44}
+                color="#B86BDE"
+                strokeWidth={1.8}
+              />
+
+            </View>
+
+            <Text style={styles.popupTitle}>
+              Kayıt sırasında bir sorun oluştu
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              Dostunun bilgilerini kaydederken
+              {'\n'}
+              beklenmeyen bir sorun oluştu.
+              {'\n'}
+              Lütfen tekrar dene.
+            </Text>
+
+            <Pressable
+              style={styles.popupButton}
+              onPress={() =>
+                setSaveErrorVisible(false)
+              }>
+
+              <LinearGradient
+                colors={[
+                  '#6C5CE7',
+                  '#4F46E5',
+                ]}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 0}}
+                style={styles.popupButtonGradient}>
+
+                <Text style={styles.popupButtonText}>
+                  Tekrar Dene
+                </Text>
+
+              </LinearGradient>
 
             </Pressable>
 
@@ -1569,9 +1763,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F2FF',
   },
 
+  /* Tür seçilmedi popup */
+  missingTypeIconCircle: {
+    backgroundColor: '#F0EBFF',
+    borderWidth: 1,
+    borderColor: '#DED4FF',
+  },
+
   /* Tür boş popup */
   typeErrorIconCircle: {
-    backgroundColor: '#F7F3FF',
+    backgroundColor: '#FFF8E8',
+    borderWidth: 1,
+    borderColor: '#F4DFA5',
+  },
+
+  /* Cinsiyet seçilmedi popup */
+  genderErrorIconCircle: {
+    backgroundColor: '#F1ECFF',
+    borderWidth: 1,
+    borderColor: '#DDD2FF',
   },
 
   /* Geçersiz tür popup */
@@ -1582,6 +1792,10 @@ const styles = StyleSheet.create({
   /* Başarılı popup */
   successIconCircle: {
     backgroundColor: '#E9F9EF',
+  },
+
+  saveErrorIconCircle: {
+    backgroundColor: '#F8EEFF',
   },
 
   popupTitle: {

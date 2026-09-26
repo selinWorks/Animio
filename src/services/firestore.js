@@ -64,7 +64,14 @@ export const updatePetInFirestore = async (
       type: pet.type || '',
       birthYear: pet.birthYear || null,
       gender: pet.gender || '',
+
       weight: pet.weight || '',
+
+      weightHistory:
+        Array.isArray(pet.weightHistory)
+          ? pet.weightHistory
+          : [],
+
       vaccines: pet.vaccines || '',
       lastVetVisit: pet.lastVetVisit || '',
       notes: pet.notes || '',
@@ -162,6 +169,11 @@ export const getPetsFromFirestore = async uid => {
         weight:
           data.weight || '',
 
+        weightHistory:
+          Array.isArray(data.weightHistory)
+            ? data.weightHistory
+            : [],
+
         vaccines:
           data.vaccines || '',
 
@@ -199,12 +211,14 @@ export const getPetsFromFirestore = async uid => {
 };
 
 /* =========================================================
-   DELETE / LEAVE PET
+   DELETE / LEAVE / TRANSFER PET
 ========================================================= */
 
 export const deletePetFromFirestore = async (
   id,
   uid,
+  newOwnerId = null,
+  forceDelete = false,
 ) => {
   if (!id || !uid) {
     throw new Error(
@@ -235,52 +249,116 @@ export const deletePetFromFirestore = async (
             ? [data.ownerId]
             : [];
 
+      const currentOwnerId =
+        data.ownerId || '';
+
       /*
        * Kullanıcı pet'in üyesi değilse
-       * işlem yapılmaz.
+       * hiçbir işlem yapamaz.
        */
       if (!currentMembers.includes(uid)) {
+        throw new Error(
+          'Bu dost için işlem yapma yetkiniz yok.',
+        );
+      }
+
+      const isOwner =
+        currentOwnerId === uid;
+
+      if (forceDelete) {
+        if (!isOwner) {
+          throw new Error(
+            'Bu dostu sadece yönetici silebilir.',
+          );
+        }
+
+        transaction.delete(petRef);
         return;
       }
 
+      /*
+       * Kullanıcının üyelikten ayrıldıktan
+       * sonra kalan üyeleri.
+       */
       const remainingMembers =
         currentMembers.filter(
           memberId => memberId !== uid,
         );
 
-      /*
-       * Son kullanıcı ayrılıyorsa
-       * pet tamamen silinir.
-       */
-      if (remainingMembers.length === 0) {
-        transaction.delete(petRef);
+      /* =====================================================
+         OWNER
+      ===================================================== */
+
+      if (isOwner) {
+
+        /*
+         * Owner tek başınaysa ve ayrılıyorsa
+         * geriye yönetici kalamayacağı için
+         * profil tamamen silinir.
+         */
+        if (remainingMembers.length === 0) {
+          transaction.delete(petRef);
+          return;
+        }
+
+        /*
+         * Owner başka üyeler varken ayrılıyorsa
+         * yeni owner seçilmiş olmak zorunda.
+         */
+        if (!newOwnerId) {
+          throw new Error(
+            'Ayrılmadan önce yeni bir yönetici seçmelisiniz.',
+          );
+        }
+
+        /*
+         * Seçilen yeni yönetici mevcut aile
+         * üyelerinden biri olmalı.
+         */
+        if (
+          !remainingMembers.includes(
+            newOwnerId,
+          )
+        ) {
+          throw new Error(
+            'Seçilen kullanıcı bu dostun aile üyesi değil.',
+          );
+        }
+
+        /*
+         * Eski owner çıkarılır,
+         * seçilen aile üyesi yeni owner olur.
+         */
+        transaction.update(petRef, {
+          petMembers:
+            remainingMembers,
+
+          ownerId:
+            newOwnerId,
+
+          updatedAt:
+            firestore.FieldValue.serverTimestamp(),
+        });
+
         return;
       }
 
-      const currentOwnerId =
-        data.ownerId || '';
-
-      let nextOwnerId =
-        currentOwnerId;
+      /* =====================================================
+         NORMAL AİLE ÜYESİ
+      ===================================================== */
 
       /*
-       * Owner ayrılıyorsa kalan üyelerden
-       * ilki yeni owner olur.
+       * Normal aile üyesi sadece kendisini
+       * aileden çıkarabilir.
+       *
+       * Owner değişmez.
        */
-      if (
-        currentOwnerId === uid ||
-        !remainingMembers.includes(currentOwnerId)
-      ) {
-        nextOwnerId =
-          remainingMembers[0];
-      }
-
       transaction.update(petRef, {
         petMembers:
           remainingMembers,
 
         ownerId:
-          nextOwnerId,
+          currentOwnerId,
 
         updatedAt:
           firestore.FieldValue.serverTimestamp(),
@@ -660,37 +738,31 @@ export const addCareEventToFirestore = async (
     firestore.FieldValue.serverTimestamp();
 
   const docRef = await firestore()
-    .collection('careEvents')
+    .collection('pets')
     .add({
-      ownerId:
-        uid,
+      ownerId: uid,
 
-      title:
-        event.title || '',
+      petMembers: [uid],
 
-      date:
-        event.date || '',
+      name: pet.name || '',
+      type: pet.type || '',
+      birthYear: pet.birthYear || null,
+      gender: pet.gender || '',
 
-      time:
-        event.time || '',
+      weight: pet.weight || '',
 
-      type:
-        event.type || 'Custom',
+      weightHistory:
+        Array.isArray(pet.weightHistory)
+          ? pet.weightHistory
+          : [],
 
-      petName:
-        event.petName || '',
+      vaccines: pet.vaccines || '',
+      lastVetVisit: pet.lastVetVisit || '',
+      notes: pet.notes || '',
+      photoUrl: pet.photoUrl || '',
 
-      note:
-        event.note || '',
-
-      color:
-        event.color || '#C4B5FD',
-
-      createdAt:
-        now,
-
-      updatedAt:
-        now,
+      createdAt: now,
+      updatedAt: now,
     });
 
   return docRef.id;

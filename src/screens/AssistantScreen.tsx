@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +14,7 @@ import {
   View,
   TextInput,
 } from 'react-native';
+
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -345,19 +347,19 @@ const AssistantScreen = () => {
   const {user} = useAuth();
 
   const [petType, setPetType] =
-    useState<PetType>('Köpek');
+    useState<PetType>('');
 
   const [problemTypes, setProblemTypes] =
-    useState<ProblemType[]>(['İştahsızlık']);
+    useState<ProblemType[]>([]);
 
   const [followUpAnswers, setFollowUpAnswers] =
     useState<FollowUpAnswers>({});
 
   const [duration, setDuration] =
-    useState<DurationType>('1-2_gundur');
+    useState<DurationType>('');
 
   const [urgency, setUrgency] =
-    useState<UrgencyType>('Hayır');
+    useState<UrgencyType>('');
 
   const [result, setResult] =
     useState<RiskResult | null>(null);
@@ -414,58 +416,87 @@ const AssistantScreen = () => {
     try {
       if (!user?.uid) {
         console.log('CHAT: UID YOK');
+        setChatHistory([]);
         return;
       }
+
+      console.log(
+        'CHAT: geçmiş yükleniyor, UID:',
+        user.uid,
+      );
 
       const chats =
         await getAssistantChatsFromFirestore(
           user.uid,
         );
 
-      setChatHistory(chats);
-
       console.log(
-        'CHAT: kayıt sayısı',
+        'CHAT: kayıt sayısı:',
         chats.length,
       );
+
+      console.log(
+        'CHAT: kayıtlar:',
+        chats,
+      );
+
+      setChatHistory(chats);
     } catch (error) {
       console.log(
-        'CHAT: HATA',
+        'CHAT: HATA:',
         error,
       );
+
+      setChatHistory([]);
     }
   };
 
-  useEffect(() => {
-    console.log(
-      '🟣 AssistantScreen useEffect ÇALIŞTI',
-      user?.uid,
-    );
+  // =======================================================
+  // AI EKRANI SIFIRLAMA
+  // =======================================================
 
-    // =====================================================
-    // YENİ KULLANICI / YENİ OTURUM
-    // AI FORMUNU TEMİZ BAŞLAT
-    // =====================================================
-
+  const resetAssistantScreen = () => {
     setPetType('');
     setProblemTypes([]);
     setFollowUpAnswers({});
     setDuration('');
     setUrgency('');
+
     setResult(null);
     setAiMessage('');
     setLoading(false);
 
-    // Modal durumlarını da kapat
     setValidationModalVisible(false);
     setConnectionErrorVisible(false);
     setDeleteConfirmVisible(false);
     setDeleteChatId(undefined);
+  };
 
-    // Geçmiş sohbetleri yükle
-    loadChatHistory();
+  // =======================================================
+  // YENİ KULLANICI / YENİ OTURUM
+  // AI FORMUNU TEMİZ BAŞLAT
+  // =======================================================
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      console.log(
+        '🟣 AssistantScreen kullanıcı:',
+        user?.uid,
+      );
+
+      if (!user?.uid) {
+        console.log(
+          '🟡 Kullanıcı UID henüz yok.',
+        );
+        setChatHistory([]);
+        return;
+      }
+
+      await loadChatHistory();
+    };
+
+    loadHistory();
   }, [user?.uid]);
-
 
   /* =======================================================
      AI REQUEST
