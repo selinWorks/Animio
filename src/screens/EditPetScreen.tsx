@@ -1,5 +1,4 @@
-
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   TextInput,
@@ -10,7 +9,6 @@ import {
   Modal,
   StatusBar,
   Platform,
-  GestureResponderEvent,
   Image,
 } from 'react-native';
 
@@ -134,35 +132,16 @@ export default function EditPetScreen({route}: Props) {
   const [notes, setNotes] = useState(pet?.notes || '');
 
   const healthPet = (pet ?? {}) as NonNullable<typeof pet> & {
-    healthStatus?: string;
     medications?: string;
     allergies?: string;
-    healthNotes?: string;
   };
-
-  const [healthStatus, setHealthStatus] = useState(
-    healthPet.healthStatus || 'İyi',
-  );
-  const [medications, setMedications] = useState(
+const [medications, setMedications] = useState(
     healthPet.medications || '',
   );
   const [allergies, setAllergies] = useState(
     healthPet.allergies || '',
   );
-  const [healthNotes, setHealthNotes] = useState(
-    healthPet.healthNotes || '',
-  );
-
-  const healthHistory = [
-    {
-      id: 'observation',
-      date: '23 Eyl 2026',
-      title: 'Gözlem eklendi',
-      detail: healthNotes.trim() || 'Sol kulağında dönemsel kaşıntı gözlemlendi.',
-      color: '#FFF8E8',
-      accent: '#B98A35',
-    },
-    {
+const healthHistory = [    {
       id: 'vet',
       date: lastVetVisit || '18 Nisan 2026',
       title: 'Veteriner kontrolü',
@@ -375,7 +354,7 @@ export default function EditPetScreen({route}: Props) {
   };
 
   /*
-   * WEIGHT
+   * CURRENT WEIGHT (Health > Weight History tarafından yönetilir)
    */
 
   const currentWeight = Number(
@@ -388,58 +367,6 @@ export default function EditPetScreen({route}: Props) {
     ? 0
     : currentWeight;
 
-  const weightPercent = Math.min(
-    Math.max(safeWeight / 20, 0),
-    1,
-  );
-
-  const weightSliderRef = useRef<View>(null);
-  const weightSliderPageX = useRef(0);
-  const weightSliderWidth = useRef(0);
-
-  const updateWeightFromPageX = (pageX: number) => {
-    if (weightSliderWidth.current <= 0) {
-      return;
-    }
-
-    const localX = Math.min(
-      Math.max(
-        pageX - weightSliderPageX.current,
-        0,
-      ),
-      weightSliderWidth.current,
-    );
-
-    const rawWeight =
-      (localX / weightSliderWidth.current) * 20;
-
-    const steppedWeight =
-      Math.round(rawWeight * 4) / 4;
-
-    setWeight(
-      steppedWeight
-        .toFixed(2)
-        .replace(/\.00$/, '')
-        .replace(/(\.\d)0$/, '$1'),
-    );
-  };
-
-  const measureWeightSlider = () => {
-    weightSliderRef.current?.measure(
-      (_x, _y, width, _height, pageX) => {
-        weightSliderWidth.current = width;
-        weightSliderPageX.current = pageX;
-      },
-    );
-  };
-
-  const handleWeightTouch = (
-    event: GestureResponderEvent,
-  ) => {
-    updateWeightFromPageX(
-      event.nativeEvent.pageX,
-    );
-  };
 
   /*
    * PHOTO
@@ -600,10 +527,8 @@ export default function EditPetScreen({route}: Props) {
         vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
         notes: notes.trim(),
-        healthStatus: healthStatus.trim(),
         medications: medications.trim(),
         allergies: allergies.trim(),
-        healthNotes: healthNotes.trim(),
         photoUri,
       } as Parameters<typeof updatePet>[0]);
 
@@ -1257,168 +1182,6 @@ export default function EditPetScreen({route}: Props) {
 
               </View>
 
-              {/* WEIGHT */}
-
-              <Text
-                style={[
-                  styles.fieldLabel,
-                  styles.weightLabel,
-                ]}>
-                Kilo
-              </Text>
-
-              <View
-                style={
-                  styles.weightRow
-                }>
-
-                <View
-                  style={
-                    styles.weightIcon
-                  }>
-
-                  <Weight
-                    size={20}
-                    color="#66769B"
-                    strokeWidth={2}
-                  />
-
-                </View>
-
-                <View
-                  style={
-                    styles.weightContent
-                  }>
-
-                  <View
-                    style={[
-                      styles.weightBubble,
-
-                      {
-                        left: `${Math.min(
-                          Math.max(
-                            weightPercent *
-                              100,
-                            4,
-                          ),
-                          88,
-                        )}%`,
-                      },
-                    ]}>
-
-                    <Text
-                      style={
-                        styles.weightBubbleText
-                      }>
-                      {safeWeight || 0}{' '}
-                      kg
-                    </Text>
-
-                  </View>
-
-                  <View
-                    ref={weightSliderRef}
-                    style={
-                      styles.sliderTouchArea
-                    }
-                    onLayout={
-                      measureWeightSlider
-                    }
-                    onStartShouldSetResponder={() =>
-                      true
-                    }
-                    onMoveShouldSetResponder={() =>
-                      true
-                    }
-                    onResponderGrant={
-                      handleWeightTouch
-                    }
-                    onResponderMove={
-                      handleWeightTouch
-                    }>
-
-                    <View
-                      style={
-                        styles.slider
-                      }>
-
-                      <View
-                        style={[
-                          styles.sliderProgress,
-
-                          {
-                            width: `${
-                              weightPercent *
-                              100
-                            }%`,
-                          },
-                        ]}
-                      />
-
-                      <View
-                        style={[
-                          styles.sliderThumb,
-
-                          {
-                            left: `${
-                              weightPercent *
-                              100
-                            }%`,
-                          },
-                        ]}
-                      />
-
-                    </View>
-
-                  </View>
-
-                  <View
-                    style={
-                      styles.sliderTicks
-                    }>
-
-                    {Array.from({
-                      length: 10,
-                    }).map(
-                      (_, index) => (
-                        <View
-                          key={
-                            index
-                          }
-                          style={
-                            styles.sliderTick
-                          }
-                        />
-                      ),
-                    )}
-
-                  </View>
-
-                  <View
-                    style={
-                      styles.weightRange
-                    }>
-
-                    <Text
-                      style={
-                        styles.weightRangeText
-                      }>
-                      0 kg
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.weightRangeText
-                      }>
-                      20 kg
-                    </Text>
-
-                  </View>
-
-                </View>
-
-              </View>
-
             </View>
 
             {/* ABOUT */}
@@ -1496,84 +1259,12 @@ export default function EditPetScreen({route}: Props) {
             </View>
 
           </View>
+
             </>
           )}
 
           {activeMenu === 'health' && (
             <View style={styles.healthContent}>
-              {/* HEALTH SUMMARY */}
-              <View style={styles.healthSummaryCard}>
-                <View style={styles.healthSummaryTop}>
-                  <View style={styles.healthSummaryIcon}>
-                    <Heart size={25} color="#28A874" strokeWidth={2.3} />
-                  </View>
-
-                  <View style={styles.healthSummaryText}>
-                    <Text style={styles.healthSummaryEyebrow}>SAĞLIK ÖZETİ</Text>
-                    <Text style={styles.healthSummaryTitle}>
-                      {pet.name} nasıl?
-                    </Text>
-                    <Text style={styles.healthSummarySubtitle}>
-                      Genel durumu ve önemli sağlık bilgilerini tek bakışta gör.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.healthStatusRow}>
-                  {['İyi', 'Takip Edilmeli', 'Tedavi Sürecinde'].map(status => {
-                    const selected = healthStatus === status;
-                    const statusStyle =
-                      status === 'İyi'
-                        ? styles.healthStatusGood
-                        : status === 'Takip Edilmeli'
-                          ? styles.healthStatusWatch
-                          : styles.healthStatusTreatment;
-
-                    return (
-                      <Pressable
-                        key={status}
-                        onPress={() => setHealthStatus(status)}
-                        style={({pressed}) => [
-                          styles.healthStatusButton,
-                          statusStyle,
-                          selected && styles.healthStatusButtonSelected,
-                          pressed && styles.pressed,
-                        ]}>
-                        {selected && (
-                          <CheckCircle2
-                            size={16}
-                            color={
-                              status === 'İyi'
-                                ? '#28A874'
-                                : status === 'Takip Edilmeli'
-                                  ? '#C48A2C'
-                                  : '#D26983'
-                            }
-                            strokeWidth={2.5}
-                          />
-                        )}
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            styles.healthStatusText,
-                            selected && styles.healthStatusTextSelected,
-                          ]}>
-                          {status}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <TextInput
-                  value={healthNotes}
-                  onChangeText={setHealthNotes}
-                  multiline
-                  placeholder="Genel durumu hakkında kısa bir not ekle..."
-                  placeholderTextColor="#86A497"
-                  style={styles.healthSummaryNote}
-                />
-              </View>
 
               {/* QUICK INFO */}
               <Text style={styles.healthBlockTitle}>Hızlı Bilgiler</Text>
@@ -2697,175 +2388,6 @@ const styles = StyleSheet.create({
   },
 
   /*
-   * WEIGHT
-   */
-
-  weightLabel: {
-    marginTop: 17,
-  },
-
-  weightRow: {
-    flexDirection: 'row',
-
-    alignItems: 'flex-start',
-  },
-
-  weightIcon: {
-    width: 43,
-
-    height: 43,
-
-    borderRadius: 13,
-
-    backgroundColor: '#F2F5FA',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-
-    marginRight: 8,
-  },
-
-  weightContent: {
-    flex: 1,
-
-    paddingTop: 16,
-
-    position: 'relative',
-  },
-
-  weightBubble: {
-    position: 'absolute',
-
-    top: -22,
-
-    minWidth: 48,
-
-    paddingHorizontal: 8,
-
-    height: 30,
-
-    borderRadius: 10,
-
-    backgroundColor: '#F3F5FB',
-
-    justifyContent: 'center',
-
-    alignItems: 'center',
-
-    transform: [
-      {
-        translateX: -22,
-      },
-    ],
-  },
-
-  weightBubbleText: {
-    color: '#14234A',
-
-    fontSize: 12,
-
-    fontWeight: '800',
-  },
-
-  sliderTouchArea: {
-    height: 29,
-
-    justifyContent: 'center',
-  },
-
-  slider: {
-    height: 5,
-
-    borderRadius: 5,
-
-    backgroundColor: '#ECEBF8',
-
-    position: 'relative',
-  },
-
-  sliderProgress: {
-    position: 'absolute',
-
-    height: 5,
-
-    borderRadius: 5,
-
-    backgroundColor: '#9180E6',
-
-    left: 0,
-  },
-
-  sliderThumb: {
-    position: 'absolute',
-
-    width: 23,
-
-    height: 23,
-
-    borderRadius: 12,
-
-    backgroundColor: '#8E7AE5',
-
-    borderWidth: 3,
-
-    borderColor: '#FFFFFF',
-
-    top: -9,
-
-    marginLeft: -11,
-
-    shadowColor: '#7163C3',
-
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-
-    shadowOpacity: 0.25,
-
-    shadowRadius: 4,
-
-    elevation: 4,
-  },
-
-  sliderTicks: {
-    flexDirection: 'row',
-
-    justifyContent:
-      'space-between',
-
-    paddingHorizontal: 2,
-
-    marginTop: -1,
-  },
-
-  sliderTick: {
-    width: 1.5,
-
-    height: 6,
-
-    backgroundColor: '#D7DCF0',
-  },
-
-  weightRange: {
-    flexDirection: 'row',
-
-    justifyContent:
-      'space-between',
-
-    marginTop: 5,
-  },
-
-  weightRangeText: {
-    fontSize: 11,
-
-    color: '#7080A2',
-
-    fontWeight: '600',
-  },
-
-  /*
    * ABOUT
    */
 
@@ -2976,134 +2498,6 @@ const styles = StyleSheet.create({
 
   healthContent: {
     width: '100%',
-  },
-
-  healthSummaryCard: {
-    borderRadius: 27,
-    backgroundColor: '#E7F8F0',
-    borderWidth: 1,
-    borderColor: '#CDEEDF',
-    padding: 17,
-    marginBottom: 19,
-    shadowColor: '#6D9B87',
-    shadowOffset: {width: 0, height: 5},
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-
-  healthSummaryTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-
-  healthSummaryIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 17,
-    backgroundColor: '#D2F3E4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-
-  healthSummaryText: {
-    flex: 1,
-  },
-
-  healthSummaryEyebrow: {
-    color: '#38906D',
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-
-  healthSummaryTitle: {
-    color: '#173C31',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  healthSummarySubtitle: {
-    marginTop: 3,
-    color: '#68877B',
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: '500',
-  },
-
-  healthStatusRow: {
-    flexDirection: 'row',
-    gap: 7,
-    marginBottom: 12,
-  },
-
-  healthStatusButton: {
-    flex: 1,
-    minHeight: 57,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 7,
-    opacity: 0.68,
-  },
-
-  healthStatusGood: {
-    backgroundColor: '#D8F6E8',
-    borderColor: '#B9E9D3',
-  },
-
-  healthStatusWatch: {
-    backgroundColor: '#FFF3D8',
-    borderColor: '#F0DCA9',
-  },
-
-  healthStatusTreatment: {
-    backgroundColor: '#FFE8EE',
-    borderColor: '#F3CCD6',
-  },
-
-  healthStatusButtonSelected: {
-    opacity: 1,
-    borderWidth: 2,
-    shadowColor: '#658C7B',
-    shadowOffset: {width: 0, height: 3},
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-
-  healthStatusText: {
-    marginTop: 4,
-    color: '#5E6E68',
-    fontSize: 10.2,
-    lineHeight: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
-  healthStatusTextSelected: {
-    color: '#263E36',
-    fontWeight: '800',
-  },
-
-  healthSummaryNote: {
-    minHeight: 76,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.68)',
-    borderWidth: 1,
-    borderColor: '#D4EBE0',
-    color: '#395C50',
-    fontSize: 12.5,
-    lineHeight: 19,
-    paddingHorizontal: 13,
-    paddingTop: 11,
-    paddingBottom: 11,
-    textAlignVertical: 'top',
   },
 
   healthBlockTitle: {
@@ -3655,3 +3049,6 @@ const styles = StyleSheet.create({
   },
 
 });
+
+
+

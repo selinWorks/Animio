@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -12,29 +12,74 @@ import {
   StatusBar,
 } from 'react-native';
 
+import Svg, {Path} from 'react-native-svg';
+
 import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {
-  Activity,
-  BarChart3,
   CalendarDays,
   Camera,
-  Check,
   ChevronLeft,
   ChevronRight,
   FileText,
-  Heart,
   NotebookPen,
   Pencil,
-  Scale,
   Trash2,
-  Venus,
   Users,
 } from 'lucide-react-native';
 
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
+
+
+type ProfileWeightChartPoint = {
+  x: number;
+  y: number;
+  id: string;
+};
+
+const PROFILE_WEIGHT_PURPLE = '#8067E8';
+
+function createProfileWeightPath(
+  points: ProfileWeightChartPoint[],
+) {
+  if (points.length === 0) {
+    return '';
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  let path = `M ${points[0].x} ${points[0].y}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const current = points[i];
+    const next = points[i + 1];
+    const middleX = (current.x + next.x) / 2;
+
+    path +=
+      ` C ${middleX} ${current.y},` +
+      ` ${middleX} ${next.y},` +
+      ` ${next.x} ${next.y}`;
+  }
+
+  return path;
+}
+
+function formatProfileWeightDate(date: string) {
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toLocaleDateString('tr-TR', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
 
 /* =========================================================
    IMAGES
@@ -106,11 +151,6 @@ type PetDetailScreenProps = {
   route: PetDetailRouteProp;
 };
 
-type InfoRowProps = {
-  label: string;
-  value: string;
-  last?: boolean;
-};
 
 type SmallNavigationCardProps = {
   title: string;
@@ -310,53 +350,11 @@ function getDisplayAge(pet: {
   return pet.age ?? 0;
 }
 
-function getStatusLabel(pet: {
-  vaccines?: string;
-  lastVetVisit?: string;
-}) {
-  if (pet.vaccines && pet.lastVetVisit) {
-    return 'Aktif';
-  }
-
-  if (pet.vaccines || pet.lastVetVisit) {
-    return 'Takipte';
-  }
-
-  return 'Yeni';
-}
-
-function getVaccineStatus(vaccines?: string) {
-  return vaccines ? 'Güncel' : 'Eksik';
-}
 
 /* =========================================================
    SMALL COMPONENTS
 ========================================================= */
 
-function InfoRow({
-  label,
-  value,
-  last = false,
-}: InfoRowProps) {
-  return (
-    <View
-      style={[
-        styles.infoRow,
-        last && styles.infoRowLast,
-      ]}>
-      <Text style={styles.infoLabel}>
-        {label}
-      </Text>
-
-      <Text
-        style={styles.infoValue}
-        numberOfLines={1}
-        ellipsizeMode="tail">
-        {value}
-      </Text>
-    </View>
-  );
-}
 
 function SmallNavigationCard({
   title,
@@ -423,6 +421,81 @@ export default function PetDetailScreen({
   const currentPet =
     pets.find(item => item.id === pet.id) ?? pet;
 
+  const [profileChartWidth, setProfileChartWidth] =
+    useState(0);
+
+  const profileWeightRecords = useMemo(() => {
+    return [...(currentPet.weightHistory ?? [])].sort(
+      (a, b) =>
+        new Date(a.date).getTime() -
+        new Date(b.date).getTime(),
+    );
+  }, [currentPet.weightHistory]);
+
+  const profileChartHeight = 165;
+  const profileChartPaddingX = 16;
+  const profileChartPaddingY = 18;
+
+  const profileChartPoints =
+    useMemo<ProfileWeightChartPoint[]>(() => {
+      if (
+        profileWeightRecords.length === 0 ||
+        profileChartWidth <= 0
+      ) {
+        return [];
+      }
+
+      const weights = profileWeightRecords.map(
+        item => item.weight,
+      );
+
+      let minWeight = Math.min(...weights);
+      let maxWeight = Math.max(...weights);
+
+      if (minWeight == maxWeight) {
+        minWeight -= 0.5;
+        maxWeight += 0.5;
+      }
+
+      const usableWidth =
+        profileChartWidth -
+        profileChartPaddingX * 2;
+
+      const usableHeight =
+        profileChartHeight -
+        profileChartPaddingY * 2;
+
+      return profileWeightRecords.map(
+        (record, index) => {
+          const x =
+            profileWeightRecords.length === 1
+              ? profileChartWidth / 2
+              : profileChartPaddingX +
+                (index /
+                  (profileWeightRecords.length - 1)) *
+                  usableWidth;
+
+          const normalized =
+            (record.weight - minWeight) /
+            (maxWeight - minWeight);
+
+          const y =
+            profileChartPaddingY +
+            usableHeight -
+            normalized * usableHeight;
+
+          return {
+            x,
+            y,
+            id: record.id,
+          };
+        },
+      );
+    }, [
+      profileWeightRecords,
+      profileChartWidth,
+    ]);
+
   const [
     deleteModalVisible,
     setDeleteModalVisible,
@@ -461,12 +534,6 @@ export default function PetDetailScreen({
   };
 
   const displayAge = getDisplayAge(currentPet);
-
-  const vaccineStatus =
-    getVaccineStatus(currentPet.vaccines);
-
-  const statusLabel =
-    getStatusLabel(currentPet);
 
   return (
     <View style={styles.screen}>
@@ -623,15 +690,6 @@ export default function PetDetailScreen({
 
               </View>
 
-              <Text style={styles.petMeta}>
-                {getPetEmoji(currentPet.type)}{' '}
-                {currentPet.type}
-                {'  |  '}
-                {displayAge} yaş
-                {'  |  '}
-                {currentPet.weight || '-'}
-              </Text>
-
             </View>
           </View>
 
@@ -647,21 +705,7 @@ export default function PetDetailScreen({
                 styles.genderStatCard,
               ]}>
 
-              <View
-                style={[
-                  styles.statIconCircle,
-                  styles.genderIconCircle,
-                ]}>
-
-                <Venus
-                  size={25}
-                  color="#F04478"
-                  strokeWidth={2}
-                />
-
-              </View>
-
-              <View>
+              <View style={styles.statTextWrap}>
                 <Text style={styles.statLabel}>
                   Cinsiyet
                 </Text>
@@ -676,30 +720,28 @@ export default function PetDetailScreen({
             <View
               style={[
                 styles.quickStatCard,
-                styles.weightStatCard,
+                styles.weightAgeStatCard,
               ]}>
 
-              <View
-                style={[
-                  styles.statIconCircle,
-                  styles.weightIconCircle,
-                ]}>
-
-                <Scale
-                  size={24}
-                  color="#15A96A"
-                  strokeWidth={2}
-                />
-
-              </View>
-
-              <View>
+              <View style={styles.weightAgeHalf}>
                 <Text style={styles.statLabel}>
                   Kilo
                 </Text>
 
                 <Text style={styles.statValue}>
                   {currentPet.weight || '-'}
+                </Text>
+              </View>
+
+              <View style={styles.weightAgeDivider} />
+
+              <View style={styles.weightAgeHalf}>
+                <Text style={styles.statLabel}>
+                  Yaş
+                </Text>
+
+                <Text style={styles.statValue}>
+                  {displayAge}
                 </Text>
               </View>
 
@@ -711,244 +753,232 @@ export default function PetDetailScreen({
                 styles.statusStatCard,
               ]}>
 
-              <View
-                style={[
-                  styles.statIconCircle,
-                  styles.statusIconCircle,
-                ]}>
-
-                <Activity
-                  size={25}
-                  color="#168DE2"
-                  strokeWidth={2}
-                />
-
-              </View>
-
-              <View>
+              <View style={styles.statTextWrap}>
                 <Text style={styles.statLabel}>
-                  Durum
+                  Tür
                 </Text>
-
-                <Text style={styles.statValue}>
-                  {statusLabel}
-                </Text>
-              </View>
-
-            </View>
-
-          </View>
-
-          {/* =====================================================
-              GENERAL + HEALTH
-          ===================================================== */}
-
-          <View style={styles.twoColumnRow}>
-
-            {/* GENERAL */}
-
-            <View
-              style={[
-                styles.largeCard,
-                styles.generalCard,
-              ]}>
-
-              <View style={styles.cardHeader}>
-
-                <View
-                  style={styles.cardHeaderLeft}>
-
-                  <View
-                    style={[
-                      styles.cardIconCircle,
-                      styles.generalIconCircle,
-                    ]}>
-
-                    <FileText
-                      size={24}
-                      color="#7655F5"
-                      strokeWidth={2}
-                    />
-
-                  </View>
-
-                  <Text style={styles.cardTitle}>
-                    Genel Bilgiler
-                  </Text>
-
-                </View>
-
-                <ChevronRight
-                  size={23}
-                  color="#172C59"
-                  strokeWidth={2.2}
-                />
-
-              </View>
-
-              <InfoRow
-                label="Tür"
-                value={currentPet.type || '-'}
-              />
-
-              <InfoRow
-                label="Yaş"
-                value={`${displayAge} yaş`}
-              />
-
-              <InfoRow
-                label="Cinsiyet"
-                value={
-                  currentPet.gender ||
-                  'Belirtilmedi'
-                }
-                last
-              />
-
-            </View>
-
-            {/* HEALTH */}
-
-            <Pressable
-              style={({pressed}) => [
-                styles.largeCard,
-                styles.healthCard,
-                pressed &&
-                  styles.pressedCard,
-              ]}>
-
-              <View style={styles.cardHeader}>
-
-                <View
-                  style={styles.cardHeaderLeft}>
-
-                  <View
-                    style={[
-                      styles.cardIconCircle,
-                      styles.healthIconCircle,
-                    ]}>
-
-                    <Heart
-                      size={24}
-                      color="#F04C73"
-                      strokeWidth={2}
-                    />
-
-                  </View>
-
-                  <Text style={styles.cardTitle}>
-                    Sağlık Geçmişi
-                  </Text>
-
-                </View>
-
-                <ChevronRight
-                  size={23}
-                  color="#172C59"
-                  strokeWidth={2.2}
-                />
-
-              </View>
-
-              <InfoRow
-                label="Son Veteriner"
-                value={
-                  currentPet.lastVetVisit ||
-                  'Eklenmedi'
-                }
-              />
-
-              <InfoRow
-                label="Aşı Bilgisi"
-                value={
-                  currentPet.vaccines ||
-                  'Eklenmedi'
-                }
-              />
-
-              <View
-                style={
-                  styles.vaccineStatusRow
-                }>
-
-                <Text style={styles.infoLabel}>
-                  Aşı Durumu
-                </Text>
-
-                <View
-                  style={
-                    styles.vaccineStatusRight
-                  }>
-
-                  <Text
-                    style={styles.infoValue}>
-                    {vaccineStatus}
-                  </Text>
-
-                  {currentPet.vaccines ? (
-                    <View
-                      style={
-                        styles.checkCircle
-                      }>
-
-                      <Check
-                        size={14}
-                        color="#FFFFFF"
-                        strokeWidth={3}
-                      />
-
-                    </View>
-                  ) : null}
-
-                </View>
-              </View>
-
-              <View
-                style={styles.viewAllButton}>
 
                 <Text
-                  style={styles.viewAllText}>
-                  Tümünü Gör
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {currentPet.type || '-'}
                 </Text>
+              </View>
 
-                <ChevronRight
-                  size={20}
-                  color="#C9203D"
-                  strokeWidth={2.3}
+            </View>
+
+          </View>
+
+          {/* =====================================================
+              PET SUMMARY
+          ===================================================== */}
+
+          <Pressable
+            style={({pressed}) => [
+              styles.petSummaryCard,
+              pressed && styles.pressedCard,
+            ]}>
+
+            <View style={styles.petSummaryTop}>
+
+              <View
+                style={[
+                  styles.cardIconCircle,
+                  styles.generalIconCircle,
+                ]}>
+
+                <FileText
+                  size={24}
+                  color="#7655F5"
+                  strokeWidth={2}
                 />
 
               </View>
 
-            </Pressable>
+              <View style={styles.petSummaryTextWrap}>
+
+                <Text style={styles.petSummaryTitle}>
+                  Pet Özeti
+                </Text>
+
+                <Text style={styles.petSummaryDescription}>
+                  {currentPet.name}’ın önemli bilgilerini tek yerde görüntüle ve paylaş.
+                </Text>
+
+              </View>
+
+            </View>
+
+            <View style={styles.petSummaryAction}>
+
+              <Text style={styles.petSummaryActionText}>
+                Özeti Gör
+              </Text>
+
+              <ChevronRight
+                size={20}
+                color="#7655F5"
+                strokeWidth={2.2}
+              />
+
+            </View>
+
+          </Pressable>
+
+          {/* =====================================================
+              WEIGHT CHANGE
+          ===================================================== */}
+
+          <View style={styles.profileWeightGraphCard}>
+
+            <View style={styles.profileWeightGraphHeader}>
+
+              <View>
+                <Text style={styles.profileWeightGraphTitle}>
+                  Kilo Değişimi
+                </Text>
+
+                <Text style={styles.profileWeightGraphSubtitle}>
+                  Zaman içindeki değişim
+                </Text>
+              </View>
+
+              <View style={styles.profileWeightGraphBadge}>
+                <Text style={styles.profileWeightGraphBadgeText}>
+                  kg
+                </Text>
+              </View>
+
+            </View>
+
+            {profileWeightRecords.length === 0 ? (
+              <View style={styles.profileWeightGraphEmpty}>
+
+                {[0, 1, 2, 3].map(item => (
+                  <View
+                    key={`profile-empty-h-${item}`}
+                    style={[
+                      styles.profileWeightHorizontalGrid,
+                      {top: 18 + item * 37},
+                    ]}
+                  />
+                ))}
+
+                {[0, 1, 2, 3, 4].map(item => (
+                  <View
+                    key={`profile-empty-v-${item}`}
+                    style={[
+                      styles.profileWeightVerticalGrid,
+                      {left: `${item * 25}%`},
+                    ]}
+                  />
+                ))}
+
+                <View style={styles.profileWeightPreparingBadge}>
+                  <Text style={styles.profileWeightPreparingText}>
+                    Grafik hazırlanıyor
+                  </Text>
+                </View>
+
+              </View>
+            ) : (
+              <>
+                <View
+                  style={styles.profileWeightChartContainer}
+                  onLayout={event =>
+                    setProfileChartWidth(
+                      event.nativeEvent.layout.width,
+                    )
+                  }>
+
+                  {[0, 1, 2, 3].map(item => (
+                    <View
+                      key={`profile-h-${item}`}
+                      style={[
+                        styles.profileWeightHorizontalGrid,
+                        {top: 15 + item * 42},
+                      ]}
+                    />
+                  ))}
+
+                  {[0, 1, 2, 3, 4].map(item => (
+                    <View
+                      key={`profile-v-${item}`}
+                      style={[
+                        styles.profileWeightVerticalGrid,
+                        {left: `${item * 25}%`},
+                      ]}
+                    />
+                  ))}
+
+                  {profileChartWidth > 0 &&
+                    profileChartPoints.length > 1 && (
+                      <Svg
+                        pointerEvents="none"
+                        width={profileChartWidth}
+                        height={profileChartHeight}
+                        style={StyleSheet.absoluteFill}>
+
+                        <Path
+                          d={createProfileWeightPath(
+                            profileChartPoints,
+                          )}
+                          fill="none"
+                          stroke={PROFILE_WEIGHT_PURPLE}
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                      </Svg>
+                    )}
+
+                  {profileChartPoints.map(point => (
+                    <View
+                      key={point.id}
+                      style={[
+                        styles.profileWeightChartDotOuter,
+                        {
+                          left: point.x - 6,
+                          top: point.y - 6,
+                        },
+                      ]}>
+
+                      <View style={styles.profileWeightChartDot} />
+
+                    </View>
+                  ))}
+
+                </View>
+
+                <View style={styles.profileWeightChartDates}>
+
+                  <Text style={styles.profileWeightChartDateText}>
+                    {formatProfileWeightDate(
+                      profileWeightRecords[0].date,
+                    )}
+                  </Text>
+
+                  <Text style={styles.profileWeightChartDateText}>
+                    {formatProfileWeightDate(
+                      profileWeightRecords[
+                        profileWeightRecords.length - 1
+                      ].date,
+                    )}
+                  </Text>
+
+                </View>
+              </>
+            )}
+
           </View>
 
           {/* =====================================================
-              TRACKING NAVIGATION
+              REMINDERS + NOTES
           ===================================================== */}
 
-          <View
-            style={
-              styles.navigationCardsRow
-            }>
-
-            <SmallNavigationCard
-              title="Kilo Takibi"
-              subtitle={`${currentPet.name}’un gelişimini takip et`}
-              backgroundColor="#F0EFFF"
-              iconBackground="#E5E1FF"
-              icon={
-                <BarChart3
-                  size={26}
-                  color="#6552EE"
-                  strokeWidth={2}
-                />
-              }
-              onPress={() =>
-                navigation.navigate('WeightHistory', {
-                  pet: currentPet,
-                })
-              }
-            />
+          <View style={styles.reminderNotesRow}>
 
             <SmallNavigationCard
               title="Hatırlatmalar"
@@ -957,59 +987,51 @@ export default function PetDetailScreen({
               iconBackground="#D9F5E6"
               icon={
                 <CalendarDays
-                  size={26}
+                  size={24}
                   color="#13A968"
                   strokeWidth={2}
                 />
               }
             />
 
-          </View>
+            <Pressable
+              style={({pressed}) => [
+                styles.notesSmallCard,
+                pressed && styles.pressedCard,
+              ]}>
 
-          {/* =====================================================
-              NOTES
-          ===================================================== */}
+              <View style={styles.notesSmallIcon}>
+                <NotebookPen
+                  size={24}
+                  color="#F47A19"
+                  strokeWidth={2}
+                />
+              </View>
 
-          <Pressable
-            style={({pressed}) => [
-              styles.notesCard,
-              pressed &&
-                styles.pressedCard,
-            ]}>
+              <View style={styles.notesSmallContent}>
 
-            <View
-              style={styles.notesIconCircle}>
+                <Text style={styles.notesSmallTitle}>
+                  Notlar
+                </Text>
 
-              <NotebookPen
-                size={25}
-                color="#F47A19"
-                strokeWidth={2}
+                <Text
+                  style={styles.notesSmallText}
+                  numberOfLines={2}>
+                  {currentPet.notes ||
+                    'Henüz not eklenmemiş.'}
+                </Text>
+
+              </View>
+
+              <ChevronRight
+                size={22}
+                color="#263E73"
+                strokeWidth={2.2}
               />
 
-            </View>
+            </Pressable>
 
-            <View style={styles.notesContent}>
-
-              <Text style={styles.notesTitle}>
-                Notlar
-              </Text>
-
-              <Text
-                style={styles.notesText}
-                numberOfLines={2}>
-                {currentPet.notes ||
-                  'Bu dost için henüz not eklenmemiş.'}
-              </Text>
-
-            </View>
-
-            <ChevronRight
-              size={24}
-              color="#172C59"
-              strokeWidth={2.2}
-            />
-
-          </Pressable>
+          </View>
 
           {/* =====================================================
               FAMILY SHARING
@@ -1046,11 +1068,6 @@ export default function PetDetailScreen({
                   pet: currentPet,
                 })
               }>
-              <Users
-                size={18}
-                color="#FFFFFF"
-                strokeWidth={2.2}
-              />
 
               <Text style={styles.familyButtonText}>
                 Aile Üyesi Davet Et
@@ -1233,7 +1250,7 @@ const styles = StyleSheet.create({
 
   editTopButtonText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-Bold',
     color: '#23375F',
   },
 
@@ -1245,11 +1262,11 @@ const styles = StyleSheet.create({
   /* PROFILE */
 
   profileSection: {
-    minHeight: 110,
+    minHeight: 85,
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     paddingHorizontal: 22,
-    paddingBottom: 20,
+    paddingBottom: 1,
   },
 
   profileAvatarArea: {
@@ -1329,7 +1346,7 @@ const styles = StyleSheet.create({
   petName: {
     flexShrink: 1,
     fontSize: 30,
-    fontWeight: '900',
+    fontFamily: 'Quicksand-Bold',
     color: '#101D3D',
     letterSpacing: -0.8,
   },
@@ -1338,7 +1355,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 14,
     color: '#536997',
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
   },
 
   quotePill: {
@@ -1358,7 +1375,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: '#6974B3',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
   /* QUICK STATS */
@@ -1367,18 +1384,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 9,
     paddingHorizontal: 18,
-    marginTop: 4,
+    marginTop: 1,
     marginBottom: 14,
   },
 
   quickStatCard: {
     flex: 1,
-    minHeight: 86,
+    minHeight: 76,
     borderRadius: 22,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
 
     shadowColor: '#253659',
     shadowOffset: {
@@ -1394,62 +1410,61 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF0F4',
   },
 
-  weightStatCard: {
+  weightAgeStatCard: {
+    flex: 1.45,
     backgroundColor: '#EAFBF1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+    position: 'relative',
+  },
+
+  weightAgeHalf: {
+    width: '50%',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+
+  weightAgeDivider: {
+    position: 'absolute',
+    left: '50%',
+    width: 1,
+    height: 48,
+    top: '50%',
+    marginTop: -24,
+    backgroundColor: 'rgba(83,105,145,0.22)',
   },
 
   statusStatCard: {
     backgroundColor: '#EAF6FF',
   },
 
-  statIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  genderIconCircle: {
-    backgroundColor: '#FFE0EA',
-  },
-
-  weightIconCircle: {
-    backgroundColor: '#D9F6E6',
-  },
-
-  statusIconCircle: {
-    backgroundColor: '#D9EEFF',
+  statTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
 
   statLabel: {
     color: '#536991',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
     marginBottom: 3,
   },
 
   statValue: {
     color: '#111C37',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
-  /* MAIN CARDS */
+  /* PET SUMMARY */
 
-  twoColumnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 18,
+  petSummaryCard: {
+    marginHorizontal: 18,
     marginBottom: 14,
-  },
-
-  largeCard: {
-    flex: 1,
-    minHeight: 245,
     borderRadius: 24,
-    padding: 14,
-
+    padding: 16,
+    backgroundColor: '#F5F0FF',
     shadowColor: '#24345B',
     shadowOffset: {
       width: 0,
@@ -1458,28 +1473,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.055,
     shadowRadius: 12,
     elevation: 3,
-  },
-
-  generalCard: {
-    backgroundColor: '#F5F0FF',
-  },
-
-  healthCard: {
-    backgroundColor: '#FFF0F1',
-  },
-
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-
-  cardHeaderLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
 
   cardIconCircle: {
@@ -1494,85 +1487,243 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8DFFF',
   },
 
-  healthIconCircle: {
-    backgroundColor: '#FFDDE3',
+  petSummaryTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
 
-  cardTitle: {
-    flexShrink: 1,
-    fontSize: 15,
+  petSummaryTextWrap: {
+    flex: 1,
+    marginLeft: 12,
+    paddingRight: 4,
+  },
+
+  petSummaryTitle: {
+    fontSize: 17,
+    fontFamily: 'Quicksand-Bold',
     color: '#101C39',
-    fontWeight: '800',
+    marginBottom: 5,
   },
 
-  infoRow: {
-    minHeight: 45,
-    borderBottomWidth: 1,
-    borderBottomColor:
-      'rgba(95,107,150,0.12)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 7,
+  petSummaryDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Quicksand-Medium',
+    color: '#6376A2',
   },
 
-  infoRowLast: {
-    borderBottomWidth: 0,
-  },
-
-  infoLabel: {
-    flexShrink: 1,
-    color: '#536A96',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-
-  infoValue: {
-    flexShrink: 1,
-    maxWidth: '58%',
-    textAlign: 'right',
-    color: '#17213B',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  vaccineStatusRow: {
-    minHeight: 45,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  vaccineStatusRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#36C976',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  viewAllButton: {
-    minHeight: 40,
-    marginTop: 5,
+  petSummaryAction: {
+    marginTop: 18,
+    height: 42,
     borderRadius: 14,
-    backgroundColor: '#FFDDE3',
+    backgroundColor: '#EAE2FF',
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
+    justifyContent: 'space-between',
   },
 
-  viewAllText: {
-    color: '#C9203D',
+  petSummaryActionText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
+    color: '#6849D8',
+  },
+
+
+  profileWeightGraphCard: {
+    marginHorizontal: 18,
+    marginBottom: 14,
+    borderRadius: 23,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE9F7',
+    padding: 14,
+    shadowColor: '#6973A0',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 11,
+    elevation: 2,
+  },
+
+  profileWeightGraphHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  profileWeightGraphTitle: {
+    color: '#172348',
+    fontSize: 15.5,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  profileWeightGraphSubtitle: {
+    color: '#9299AC',
+    fontSize: 10.5,
+    fontFamily: 'Quicksand-Medium',
+    marginTop: 2,
+  },
+
+  profileWeightGraphBadge: {
+    minWidth: 39,
+    height: 28,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    backgroundColor: '#F0ECFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  profileWeightGraphBadgeText: {
+    color: PROFILE_WEIGHT_PURPLE,
+    fontSize: 10.5,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  profileWeightGraphEmpty: {
+    height: 150,
+    position: 'relative',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  profileWeightPreparingBadge: {
+    position: 'absolute',
+    top: 58,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderWidth: 1,
+    borderColor: '#E8E2FF',
+    paddingHorizontal: 13,
+    height: 29,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7565B5',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  profileWeightPreparingText: {
+    color: '#7867C9',
+    fontSize: 9.5,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  profileWeightChartContainer: {
+    position: 'relative',
+    height: 165,
+    marginTop: 15,
+    overflow: 'hidden',
+  },
+
+  profileWeightHorizontalGrid: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#F0EEF7',
+  },
+
+  profileWeightVerticalGrid: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#F3F1F8',
+  },
+
+  profileWeightChartDotOuter: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E3DCFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  profileWeightChartDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: PROFILE_WEIGHT_PURPLE,
+  },
+
+  profileWeightChartDates: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+
+  profileWeightChartDateText: {
+    color: '#9BA0B0',
+    fontSize: 9.5,
+    fontFamily: 'Quicksand-Medium',
+  },
+
+
+  reminderNotesRow: {
+    flexDirection: 'column',
+    gap: 10,
+    paddingHorizontal: 18,
+    marginBottom: 18,
+  },
+
+  notesSmallCard: {
+    width: '100%',
+    minHeight: 50,
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: '#FFF5E6',
+    shadowColor: '#503C28',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  notesSmallIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 17,
+    backgroundColor: '#FFEBCB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  notesSmallContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  notesSmallTitle: {
+    color: '#101C39',
+    fontSize: 15,
+    fontFamily: 'Quicksand-Bold',
+    marginBottom: 4,
+  },
+
+  notesSmallText: {
+    color: '#6376A2',
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: 'Quicksand-Medium',
   },
 
   /* NAV CARDS */
@@ -1585,11 +1736,11 @@ const styles = StyleSheet.create({
   },
 
   smallNavCard: {
-    flex: 1,
-    minHeight: 112,
-    borderRadius: 23,
-    paddingHorizontal: 13,
-    paddingVertical: 14,
+    width: '100%',
+    minHeight: 50,
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -1619,7 +1770,7 @@ const styles = StyleSheet.create({
   smallNavTitle: {
     color: '#101C39',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     marginBottom: 4,
   },
 
@@ -1627,63 +1778,12 @@ const styles = StyleSheet.create({
     color: '#6376A2',
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
   },
 
   pressedCard: {
     opacity: 0.82,
     transform: [{scale: 0.985}],
-  },
-
-  /* NOTES */
-
-  notesCard: {
-    marginHorizontal: 18,
-    minHeight: 100,
-    borderRadius: 24,
-    backgroundColor: '#FFF5E6',
-    paddingHorizontal: 16,
-    paddingVertical: 17,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    marginBottom: 18,
-
-    shadowColor: '#503C28',
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    shadowOpacity: 0.045,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-
-  notesIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 17,
-    backgroundColor: '#FFEBCB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  notesContent: {
-    flex: 1,
-  },
-
-  notesTitle: {
-    color: '#101C39',
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 5,
-  },
-
-  notesText: {
-    color: '#34486F',
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '500',
   },
 
   actionPressed: {
@@ -1732,12 +1832,13 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: '#17182B',
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Quicksand-Bold',
     textAlign: 'center',
     marginBottom: 9,
   },
 
   modalDescription: {
+    fontFamily: 'Quicksand-Medium',
     maxWidth: 310,
     color: '#697089',
     fontSize: 13,
@@ -1764,7 +1865,7 @@ const styles = StyleSheet.create({
   cancelModalText: {
     color: '#403A36',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   confirmDeleteButton: {
@@ -1781,7 +1882,7 @@ const styles = StyleSheet.create({
   confirmDeleteText: {
     color: '#B8325A',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   familyCard: {
@@ -1825,7 +1926,7 @@ const styles = StyleSheet.create({
 
   familyTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     color: '#101C39',
   },
 
@@ -1833,7 +1934,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
     color: '#6376A2',
   },
 
@@ -1850,9 +1951,7 @@ const styles = StyleSheet.create({
   familyButtonText: {
     marginLeft: 8,
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
   },
 });
-
-

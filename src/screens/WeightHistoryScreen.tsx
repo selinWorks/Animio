@@ -1,4 +1,3 @@
-
 import React, {useMemo, useState} from 'react';
 import Svg, {Path} from 'react-native-svg';
 
@@ -438,12 +437,6 @@ export default function WeightHistoryScreen({
   ] = useState(
     getTodayText(),
   );
-
-  const [
-    noteInput,
-    setNoteInput,
-  ] = useState('');
-
   const [
     saving,
     setSaving,
@@ -568,10 +561,7 @@ export default function WeightHistoryScreen({
     setDateInput(
       getTodayText(),
     );
-
-    setNoteInput('');
-
-    setModalVisible(true);
+setModalVisible(true);
   };
 
 
@@ -591,12 +581,7 @@ export default function WeightHistoryScreen({
         record.date,
       ),
     );
-
-    setNoteInput(
-      record.note ?? '',
-    );
-
-    setModalVisible(true);
+setModalVisible(true);
   };
 
 
@@ -787,12 +772,6 @@ export default function WeightHistoryScreen({
 
         return;
       }
-
-
-      const trimmedNote =
-        noteInput.trim();
-
-
       const record:
         WeightRecord = {
         id:
@@ -810,13 +789,6 @@ export default function WeightHistoryScreen({
 
         date:
           isoDate,
-
-        ...(trimmedNote
-          ? {
-              note:
-                trimmedNote,
-            }
-          : {}),
       };
 
 
@@ -877,9 +849,7 @@ export default function WeightHistoryScreen({
         );
 
         setWeightInput('');
-
-        setNoteInput('');
-      } catch (error) {
+} catch (error) {
         console.error(
           'KİLO KAYIT HATASI:',
           error,
@@ -1678,18 +1648,6 @@ export default function WeightHistoryScreen({
                       </View>
 
 
-                      {!!record.note && (
-                        <Text
-                          style={
-                            styles.recordNote
-                          }>
-                          {
-                            record.note
-                          }
-                        </Text>
-                      )}
-
-
                       <View
                         style={
                           styles.recordActions
@@ -1953,47 +1911,6 @@ export default function WeightHistoryScreen({
               }>
               Örnek: 2026-09-23
             </Text>
-
-
-            {/* NOTE */}
-
-            <Text
-              style={
-                styles.inputLabel
-              }>
-              Not
-              <Text
-                style={
-                  styles.optionalText
-                }>
-                {' '}
-                (opsiyonel)
-              </Text>
-            </Text>
-
-            <TextInput
-              value={noteInput}
-              onChangeText={
-                setNoteInput
-              }
-              placeholder="Örn. İştahı normal, genel durumu iyi..."
-              placeholderTextColor="#B0B4C3"
-              multiline
-              maxLength={180}
-              textAlignVertical="top"
-              style={
-                styles.noteInput
-              }
-            />
-
-
-            <Text
-              style={
-                styles.characterCount
-              }>
-              {noteInput.length}/180
-            </Text>
-
 
             {/* MODAL ACTIONS */}
 
@@ -3038,20 +2955,6 @@ const styles =
     },
 
 
-    recordNote: {
-      color: '#747A8E',
-
-      fontSize: 10.5,
-
-      lineHeight: 16,
-
-      fontFamily:
-        'Quicksand-Medium',
-
-      marginTop: 4,
-    },
-
-
     recordActions: {
       flexDirection:
         'row',
@@ -3410,14 +3313,6 @@ const styles =
     },
 
 
-    optionalText: {
-      color: '#A2A6B4',
-
-      fontFamily:
-        'Quicksand-Medium',
-    },
-
-
     weightInputWrapper: {
       height: 54,
 
@@ -3522,57 +3417,13 @@ const styles =
     },
 
 
-    noteInput: {
-      minHeight: 94,
-
-      maxHeight: 130,
-
-      borderRadius: 17,
-
-      borderWidth: 1,
-
-      borderColor:
-        '#E7E3F4',
-
-      backgroundColor:
-        '#FAF9FD',
-
-      color: '#42465A',
-
-      fontSize: 11,
-
-      lineHeight: 17,
-
-      fontFamily:
-        'Quicksand-Medium',
-
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-    },
-
-
-    characterCount: {
-      alignSelf:
-        'flex-end',
-
-      color: '#ACAFBC',
-
-      fontSize: 8.5,
-
-      fontFamily:
-        'Quicksand-Medium',
-
-      marginTop: 4,
-    },
-
-
     modalActions: {
       flexDirection:
         'row',
 
       gap: 10,
 
-      marginTop: 17,
+      marginTop: 15,
     },
 
 
@@ -3646,5 +3497,6 @@ const styles =
       opacity: 0.72,
     },
   });
+
 
 

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
+  LogBox,
 } from 'react-native';
 
 import NetInfo from '@react-native-community/netinfo';
@@ -17,6 +18,18 @@ import {NavigationContainer} from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
 import {PetProvider} from './src/data/PetContext';
 import {AuthProvider} from './src/data/AuthContext';
+
+/*
+ * FIREBASE DEPRECATED API WARNINGS
+ *
+ * React Native Firebase'in eski namespaced API kullanımından
+ * gelen uyarıları uygulama üzerinde göstermiyoruz.
+ *
+ * Diğer warningler görünmeye devam eder.
+ */
+LogBox.ignoreLogs([
+  'This method is deprecated',
+]);
 
 const COLORS = {
   bg: '#FAF9FF',
@@ -106,7 +119,10 @@ function AppContent() {
     setIsConnected(connected);
   };
 
-  // İlk internet kontrolü yapılırken kısa yükleme
+  /*
+   * İlk internet kontrolü yapılırken
+   * kısa yükleme ekranı
+   */
   if (isConnected === null) {
     return (
       <View style={styles.loadingContainer}>
@@ -118,7 +134,10 @@ function AppContent() {
     );
   }
 
-  // İnternet yoksa uygulamanın tamamında bu ekran
+  /*
+   * İnternet yoksa uygulamanın
+   * tamamında bu ekran gösterilir
+   */
   if (!isConnected) {
     return (
       <NoInternetScreen
