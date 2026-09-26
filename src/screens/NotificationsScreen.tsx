@@ -4,9 +4,10 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {
   Bell,
@@ -271,42 +272,33 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-
     padding: 20,
-
     gap: 12,
   },
 
   headerTitle: {
     fontSize: 22,
     fontFamily: 'Quicksand-Bold',
-
     color: '#11163A',
   },
 
   loaderContainer: {
     flex: 1,
-
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   emptyContainer: {
     flex: 1,
-
     justifyContent: 'center',
     alignItems: 'center',
-
     paddingHorizontal: 32,
   },
 
   emptyText: {
     fontFamily: 'Quicksand-Medium',
-
     fontSize: 14,
-
     color: '#687492',
-
     textAlign: 'center',
   },
 
@@ -317,42 +309,29 @@ const styles = StyleSheet.create({
 
   notificationCard: {
     flexDirection: 'row',
-
     backgroundColor: '#FFFFFF',
-
     borderRadius: 18,
-
     padding: 16,
-
     marginBottom: 12,
-
     alignItems: 'center',
-
     borderWidth: 1,
     borderColor: '#E5E8F2',
-
     shadowColor: '#7257FF',
-
     shadowOffset: {
       width: 0,
       height: 4,
     },
-
     shadowOpacity: 0.05,
     shadowRadius: 8,
-
     elevation: 2,
   },
 
   iconBox: {
     width: 44,
     height: 44,
-
     borderRadius: 22,
-
     justifyContent: 'center',
     alignItems: 'center',
-
     marginRight: 14,
   },
 
@@ -362,36 +341,27 @@ const styles = StyleSheet.create({
 
   notifTitle: {
     fontFamily: 'Quicksand-Bold',
-
     fontSize: 15,
-
     color: '#11163A',
-
     marginBottom: 4,
   },
 
   notifMessage: {
     fontFamily: 'Quicksand-Regular',
-
     fontSize: 13,
-
     color: '#687492',
-
     marginBottom: 6,
   },
 
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-
     gap: 4,
   },
 
   notifDate: {
     fontFamily: 'Quicksand-Medium',
-
     fontSize: 11,
-
     color: '#687492',
   },
 });

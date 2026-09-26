@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
-  Alert,
   View,
   Text,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   Easing,
   Image,
   StatusBar,
+  Alert,
 } from 'react-native';
 
 import Svg, {Path} from 'react-native-svg';
@@ -33,6 +33,7 @@ import {
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
 import {useAuth} from '../data/AuthContext';
+
 
 type ProfileWeightChartPoint = {
   x: number;
@@ -418,6 +419,8 @@ export default function PetDetailScreen({
   const {pets, removePet, deletePet} = usePets();
   const {user} = useAuth();
 
+  // Route ile gelen pet objesi ekran açık kaldıkça eski kalabilir.
+  // Context'teki güncel kaydı esas alarak kilo ve diğer alanları canlı tutuyoruz.
   const currentPet =
     pets.find(item => item.id === pet.id) ?? pet;
 
@@ -427,8 +430,7 @@ export default function PetDetailScreen({
       ? [currentPet.ownerId]
       : [];
 
-  const isOwner =
-    currentPet.ownerId === user?.uid;
+  const isOwner = currentPet.ownerId === user?.uid;
 
   const otherMembers = memberIds.filter(
     memberId => memberId !== user?.uid,
@@ -444,7 +446,6 @@ export default function PetDetailScreen({
   const ownerCanLeave =
     isOwner &&
     otherMembers.length > 0;
-
 
   const [profileChartWidth, setProfileChartWidth] =
     useState(0);
@@ -526,11 +527,15 @@ export default function PetDetailScreen({
     setDeleteModalVisible,
   ] = useState(false);
 
-  const [leaveModalVisible, setLeaveModalVisible] =
-    useState(false);
+  const [
+    leaveModalVisible,
+    setLeaveModalVisible,
+  ] = useState(false);
 
-  const [selectedNewOwnerId, setSelectedNewOwnerId] =
-    useState<string | null>(null);
+  const [
+    selectedNewOwnerId,
+    setSelectedNewOwnerId,
+  ] = useState<string | null>(null);
 
   const screenOpacity =
     useRef(new Animated.Value(0)).current;
@@ -556,23 +561,12 @@ export default function PetDetailScreen({
     ]).start();
   }, [screenOpacity, screenTranslateY]);
 
-  const handleDelete = async () => {
-    try {
-      await deletePet(currentPet.id);
+  const handleDelete = () => {
+    removePet(currentPet.id);
 
-      setDeleteModalVisible(false);
-      navigation.goBack();
-    } catch (error) {
-      console.log(
-        'Dost silme hatası:',
-        error,
-      );
+    setDeleteModalVisible(false);
 
-      Alert.alert(
-        'İşlem gerçekleştirilemedi',
-        'Dost silinirken bir sorun oluştu. Lütfen tekrar dene.',
-      );
-    }
+    navigation.goBack();
   };
 
   const displayAge = getDisplayAge(currentPet);
@@ -743,17 +737,6 @@ export default function PetDetailScreen({
                 />
 
               </View>
-
-              <Pressable
-                style={styles.cameraButton}>
-
-                <Camera
-                  size={20}
-                  color="#FFFFFF"
-                  strokeWidth={2.2}
-                />
-
-              </Pressable>
 
             </View>
 
@@ -1140,19 +1123,20 @@ export default function PetDetailScreen({
 
             {isOwner && (
               <Pressable
-                style={({pressed}) => [
-                  styles.familyButton,
-                  pressed && styles.actionPressed,
-                ]}
-                onPress={() =>
-                  navigation.navigate('PetInvite', {
-                    pet: currentPet,
-                  })
-                }>
-                <Text style={styles.familyButtonText}>
-                  Aile Üyesi Davet Et
-                </Text>
-              </Pressable>
+              style={({pressed}) => [
+                styles.familyButton,
+                pressed && styles.actionPressed,
+              ]}
+              onPress={() =>
+                navigation.navigate('PetInvite', {
+                  pet: currentPet,
+                })
+              }>
+
+              <Text style={styles.familyButtonText}>
+                Aile Üyesi Davet Et
+              </Text>
+            </Pressable>
             )}
           </View>
 
@@ -1254,6 +1238,23 @@ export default function PetDetailScreen({
             </Text>
 
             <View style={styles.modalButtons}>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.cancelModalButton,
+                  pressed &&
+                    styles.actionPressed,
+                ]}
+                onPress={() =>
+                  setDeleteModalVisible(false)
+                }>
+
+                <Text
+                  style={styles.cancelModalText}>
+                  Vazgeç
+                </Text>
+
+              </Pressable>
 
               <Pressable
                 style={({pressed}) => [
@@ -1488,7 +1489,6 @@ export default function PetDetailScreen({
         </View>
 
       </Modal>
-
     </View>
   );
 }
@@ -2237,46 +2237,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-    profileActionsCard: {
-      marginHorizontal: 18,
-      marginBottom: 24,
-      gap: 10,
-    },
-
-    profileActionButton: {
-      minHeight: 52,
-      borderRadius: 18,
-      paddingHorizontal: 18,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 9,
-    },
-
-    deleteActionButton: {
-      backgroundColor: '#FFF4F7',
-      borderWidth: 1,
-      borderColor: '#F1C5D5',
-    },
-
-    deleteActionText: {
-      color: '#B8325A',
-      fontSize: 14,
-      fontFamily: 'Quicksand-Bold',
-    },
-
-    leaveActionButton: {
-      backgroundColor: '#F3EEFF',
-      borderWidth: 1,
-      borderColor: '#E1D6FF',
-    },
-
-    leaveActionText: {
-      color: '#7655F5',
-      fontSize: 14,
-      fontFamily: 'Quicksand-Bold',
-    },
-
   familyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2326,6 +2286,52 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
   },
+
+
+    profileActionsCard: {
+      marginHorizontal: 18,
+      marginBottom: 24,
+      gap: 10,
+    },
+
+
+    profileActionButton: {
+      minHeight: 52,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+    },
+
+
+    deleteActionButton: {
+      backgroundColor: '#FFF4F7',
+      borderWidth: 1,
+      borderColor: '#F1C5D5',
+    },
+
+
+    deleteActionText: {
+      color: '#B8325A',
+      fontSize: 14,
+      fontFamily: 'Quicksand-Bold',
+    },
+
+
+    leaveActionButton: {
+      backgroundColor: '#F3EEFF',
+      borderWidth: 1,
+      borderColor: '#E1D6FF',
+    },
+
+
+    leaveActionText: {
+      color: '#7655F5',
+      fontSize: 14,
+      fontFamily: 'Quicksand-Bold',
+    },
 
   memberSelectionList: {
     width: '100%',
@@ -2423,4 +2429,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Quicksand-Bold',
   },
+
 });
