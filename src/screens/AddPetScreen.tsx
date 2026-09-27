@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+
+import React, {useCallback, useState} from 'react';
 import {
   Alert,
   Image,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
 import {launchImageLibrary} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -129,6 +131,41 @@ export default function AddPetScreen({navigation}: any) {
     useState(false);
 
   /* =====================================================
+     FORM RESET
+  ===================================================== */
+
+  const resetForm = useCallback(() => {
+    setStep(1);
+    setPhotoUrl('');
+    setName('');
+    setType('');
+    setCustomType('');
+    setBirthYear('');
+    setGender('');
+    setWeight('');
+    setVaccines('');
+    setLastVetVisit('');
+    setNotes('');
+
+    setNameErrorVisible(false);
+    setTypeErrorVisible(false);
+    setMissingTypeVisible(false);
+    setGenderErrorVisible(false);
+    setInvalidTypeVisible(false);
+    setBirthYearErrorVisible(false);
+    setSuccessVisible(false);
+    setSaveErrorVisible(false);
+  }, []);
+
+  // AddPet ekranına her yeniden gelindiğinde form temiz başlar.
+  // Böylece önceki hayvanın bilgileri yeni hayvana taşınmaz.
+  useFocusEffect(
+    useCallback(() => {
+      resetForm();
+    }, [resetForm]),
+  );
+
+  /* =====================================================
      PHOTO
   ===================================================== */
 
@@ -215,6 +252,10 @@ export default function AddPetScreen({navigation}: any) {
      SAVE
   ===================================================== */
 
+  /* =====================================================
+     SAVE
+  ===================================================== */
+
   const handleSave = async () => {
     const currentUser = auth().currentUser;
 
@@ -231,67 +272,146 @@ export default function AddPetScreen({navigation}: any) {
           ? customType.trim()
           : type;
 
-      const trimmedWeight = weight.trim();
-      const normalizedWeightText = trimmedWeight.replace(',', '.');
-      const numericWeight = Number(normalizedWeightText);
+      const trimmedWeight =
+        weight.trim();
+
+      const normalizedWeightText =
+        trimmedWeight.replace(',', '.');
+
+      const numericWeight =
+        Number(normalizedWeightText);
+
       const hasValidWeight =
         trimmedWeight !== '' &&
         Number.isFinite(numericWeight) &&
         numericWeight > 0;
-      const normalizedWeight = hasValidWeight
-        ? numericWeight
-        : 0;
 
-      const today = new Date();
+      const normalizedWeight =
+        hasValidWeight
+          ? numericWeight
+          : 0;
+
+      const today =
+        new Date();
+
       const initialWeightDate = [
         today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, '0'),
-        String(today.getDate()).padStart(2, '0'),
+        String(
+          today.getMonth() + 1,
+        ).padStart(2, '0'),
+        String(
+          today.getDate(),
+        ).padStart(2, '0'),
       ].join('-');
 
       const initialWeightHistory =
-        trimmedWeight &&
-        Number.isFinite(numericWeight) &&
-        numericWeight > 0
+        hasValidWeight
           ? [
               {
-                id: 'initial-' + Date.now(),
-                weight: numericWeight,
-                date: initialWeightDate,
-                note: 'İlk kilo kaydı',
+                id:
+                  'initial-' +
+                  Date.now(),
+
+                weight:
+                  numericWeight,
+
+                date:
+                  initialWeightDate,
+
+                note:
+                  'İlk kilo kaydı',
               },
             ]
           : [];
 
       const petData = {
-        name: name.trim(),
-        type: finalType,
-        birthYear: Number(birthYear),
+        name:
+          name.trim(),
+
+        type:
+          finalType,
+
+        birthYear:
+          Number(birthYear),
+
         gender,
-        weight: hasValidWeight
-          ? String(normalizedWeight)
-          : '',
-        weightHistory: initialWeightHistory,
-        vaccines: vaccines.trim(),
-        lastVetVisit: lastVetVisit.trim(),
-        notes: notes.trim(),
+
+        weight:
+          hasValidWeight
+            ? String(normalizedWeight)
+            : '',
+
+        weightHistory:
+          initialWeightHistory,
+
+        vaccines:
+          vaccines.trim(),
+
+        lastVetVisit:
+          lastVetVisit.trim(),
+
+        notes:
+          notes.trim(),
+
         photoUrl,
       };
 
-      const id = await addPetToFirestore(
+      console.log(
+        '🐾 PET KAYDI BAŞLIYOR:',
         petData,
-        currentUser.uid,
+      );
+
+      const id =
+        await addPetToFirestore(
+          petData,
+          currentUser.uid,
+        );
+
+      console.log(
+        '✅ PET FIRESTORE KAYDEDİLDİ:',
+        id,
       );
 
       addPet({
         id,
         ...petData,
+        ownerId:
+          currentUser.uid,
+        petMembers: [
+          currentUser.uid,
+        ],
       });
+
+      console.log(
+        '✅ PET CONTEXT\'E EKLENDİ',
+      );
 
       setSuccessVisible(true);
     } catch (error) {
-      console.log('Pet kaydetme hatası:', error);
-      setSaveErrorVisible(true);
+      console.log(
+        '❌ PET KAYIT HATASI:',
+        error,
+      );
+
+      console.log(
+        '❌ ERROR CODE:',
+        (error as any)?.code,
+      );
+
+      console.log(
+        '❌ ERROR MESSAGE:',
+        (error as any)?.message,
+      );
+
+      Alert.alert(
+        'Kayıt Sırasında Bir Sorun Oluştu',
+        'Dostunuzun bilgileri kaydedilirken beklenmeyen bir sorun oluştu. Lütfen tekrar deneyin.',
+        [
+          {
+            text: 'Tekrar Dene',
+          },
+        ],
+      );
     }
   };
 
@@ -1570,7 +1690,8 @@ export default function AddPetScreen({navigation}: any) {
               style={styles.popupButton}
               onPress={() => {
                 setSuccessVisible(false);
-                navigation.navigate('Pets');
+                resetForm();
+                navigation.goBack();
               }}>
 
               <LinearGradient

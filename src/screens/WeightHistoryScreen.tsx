@@ -483,46 +483,96 @@ export default function WeightHistoryScreen({
   --------------------------------------------------------- */
 
   const allRecords = useMemo(() => {
-    const history = Array.isArray(
-      pet.weightHistory,
-    )
-      ? pet.weightHistory
+    const history = Array.isArray(pet.weightHistory)
+      ? pet.weightHistory.filter(
+          item =>
+            item &&
+            Number.isFinite(Number(item.weight)) &&
+            Number(item.weight) > 0 &&
+            item.date,
+        )
       : [];
 
-    if (history.length > 0) {
-      return sortAscending(history);
-    }
+    const sortedHistory = sortAscending(history);
 
-    const parsedWeight = Number(
-      String(pet.weight ?? '')
-        .replace(',', '.')
-        .replace(/[^\d.]/g, ''),
-    );
+    /*
+     * Hayvan ilk oluşturulduğunda weightHistory henüz
+     * oluşmamış olabilir.
+     *
+     * Bu durumda pet.weight içindeki ilk kiloyu
+     * grafiğe dahil ediyoruz.
+     */
+    if (sortedHistory.length === 0) {
+      const parsedWeight = Number(
+        String(pet.weight ?? '')
+          .replace(',', '.')
+          .replace(/[^\d.]/g, ''),
+      );
 
-    if (
-      !Number.isFinite(parsedWeight) ||
-      parsedWeight <= 0
-    ) {
+      if (
+        Number.isFinite(parsedWeight) &&
+        parsedWeight > 0
+      ) {
+        let initialDate = new Date();
+
+        /*
+         * createdAt varsa ilk kilo tarihi olarak onu kullan.
+         */
+        try {
+          if (pet.createdAt?.toDate) {
+            const firestoreDate =
+              pet.createdAt.toDate();
+
+            if (
+              firestoreDate instanceof Date &&
+              !Number.isNaN(
+                firestoreDate.getTime(),
+              )
+            ) {
+              initialDate = firestoreDate;
+            }
+          } else if (pet.createdAt instanceof Date) {
+            initialDate = pet.createdAt;
+          } else if (
+            typeof pet.createdAt === 'string'
+          ) {
+            const parsedDate =
+              new Date(pet.createdAt);
+
+            if (
+              !Number.isNaN(
+                parsedDate.getTime(),
+              )
+            ) {
+              initialDate = parsedDate;
+            }
+          }
+        } catch (error) {
+          console.log(
+            'İlk kilo tarihi alınamadı:',
+            error,
+          );
+        }
+
+        return [
+          {
+            id: `initial-weight-${pet.id}`,
+            weight: Number(
+              parsedWeight.toFixed(2),
+            ),
+            date: initialDate.toISOString(),
+          },
+        ];
+      }
+
       return [];
     }
 
-    return [
-      {
-        id: `initial-weight-${pet.id}`,
-        weight: Number(
-          parsedWeight.toFixed(2),
-        ),
-        date:
-          pet.updatedAt?.toDate?.()?.toISOString?.() ??
-          pet.createdAt?.toDate?.()?.toISOString?.() ??
-          new Date().toISOString(),
-      },
-    ];
+    return sortedHistory;
   }, [
     pet.id,
     pet.weight,
     pet.weightHistory,
-    pet.updatedAt,
     pet.createdAt,
   ]);
 
@@ -755,150 +805,137 @@ setModalVisible(true);
      SAVE RECORD
   --------------------------------------------------------- */
 
-  const saveRecord =
-    async () => {
-      const parsedWeight =
-        Number(
-          weightInput
-            .trim()
-            .replace(',', '.'),
-        );
+  const saveRecord = async () => {
+    const parsedWeight = Number(
+      weightInput
+        .trim()
+        .replace(',', '.'),
+    );
 
-      if (
-        !Number.isFinite(
-          parsedWeight,
-        ) ||
-        parsedWeight <= 0
-      ) {
-        showPopup(
-          'Geçersiz kilo',
-          'Lütfen geçerli bir kilo değeri gir.',
-          'weight',
-        );
+    if (
+      !Number.isFinite(parsedWeight) ||
+      parsedWeight <= 0
+    ) {
+      showPopup(
+        'Geçersiz kilo',
+        'Lütfen geçerli bir kilo değeri gir.',
+        'weight',
+      );
 
-        return;
-      }
+      return;
+    }
 
+    if (parsedWeight > 200) {
+      showPopup(
+        'Kilo değerini kontrol et',
+        'Girilen kilo değeri 200 kg üzerinde görünüyor.',
+        'warning',
+      );
 
-      if (
-        parsedWeight > 200
-      ) {
-        showPopup(
-          'Kilo değerini kontrol et',
-          'Girilen kilo değeri 200 kg üzerinde görünüyor.',
-          'warning',
-        );
+      return;
+    }
 
-        return;
-      }
+    const isoDate = inputToISO(dateInput);
 
+    if (!isoDate) {
+      showPopup(
+        'Geçersiz tarih',
+        'Tarihi YYYY-AA-GG biçiminde gir. Örneğin: 2026-09-23',
+        'date',
+      );
 
-      const isoDate =
-        inputToISO(
-          dateInput,
-        );
+      return;
+    }
 
-      if (!isoDate) {
-        showPopup(
-          'Geçersiz tarih',
-          'Tarihi YYYY-AA-GG biçiminde gir. Örneğin: 2026-09-23',
-          'date',
-        );
+    const record: WeightRecord = {
+      id:
+        editingRecord?.id ??
+        `weight-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`,
 
-        return;
-      }
-      const record:
-        WeightRecord = {
-        id:
-          editingRecord?.id ??
-          `weight-${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2, 8)}`,
+      weight: Number(
+        parsedWeight.toFixed(2),
+      ),
 
-        weight:
-          Number(
-            parsedWeight.toFixed(
-              2,
-            ),
-          ),
+      date: isoDate,
+    };
 
-        date:
-          isoDate,
-      };
+    let nextRecords: WeightRecord[];
 
+    if (editingRecord) {
+      /*
+       * Düzenleme
+       */
+      nextRecords = allRecords.map(item =>
+        item.id === editingRecord.id
+          ? record
+          : item,
+      );
+    } else {
+      /*
+       * Yeni kayıt
+       *
+       * Eğer allRecords içindeki tek kayıt
+       * initial-weight ile oluşturulmuş geçici
+       * ilk kayıt ise onu gerçek kayıtla değiştir.
+       */
+      const hasOnlyInitialRecord =
+        allRecords.length === 1 &&
+        allRecords[0].id ===
+          `initial-weight-${pet.id}`;
 
-      let nextRecords:
-        WeightRecord[];
-
-
-      if (editingRecord) {
-        nextRecords =
-          allRecords.map(
-            item =>
-              item.id ===
-              editingRecord.id
-                ? record
-                : item,
-          );
+      if (hasOnlyInitialRecord) {
+        nextRecords = [record];
       } else {
         nextRecords = [
           ...allRecords,
           record,
         ];
       }
+    }
 
+    nextRecords = sortAscending(
+      nextRecords,
+    );
 
-      nextRecords =
-        sortAscending(
-          nextRecords,
-        );
+    const newestRecord =
+      nextRecords[
+        nextRecords.length - 1
+      ];
 
+    try {
+      setSaving(true);
 
-      const newestRecord =
-        nextRecords[
-          nextRecords.length - 1
-        ];
+      await updatePet({
+        ...pet,
 
+        weightHistory: nextRecords,
 
-      try {
-        setSaving(true);
+        weight: String(
+          newestRecord.weight,
+        ),
+      });
 
-        await updatePet({
-          ...pet,
+      setModalVisible(false);
+      setEditingRecord(null);
+      setWeightInput('');
 
-          weightHistory:
-            nextRecords,
+    } catch (error) {
+      console.error(
+        'KİLO KAYIT HATASI:',
+        error,
+      );
 
-          weight:
-            String(
-              newestRecord.weight,
-            ),
-        });
-
-        setModalVisible(
-          false,
-        );
-
-        setEditingRecord(
-          null,
-        );
-
-        setWeightInput('');
-} catch (error) {
-        console.error(
-          'KİLO KAYIT HATASI:',
-          error,
-        );
-
-        showPopup(
-          'Kayıt başarısız',
-          'Kilo kaydı güncellenirken bir sorun oluştu.',
-          'error',
-        );
-      } finally {
-        setSaving(false);
-      }
-    };
+      showPopup(
+        'Kayıt başarısız',
+        'Kilo kaydı güncellenirken bir sorun oluştu.',
+        'error',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
 
   /* ---------------------------------------------------------
@@ -1405,29 +1442,25 @@ setModalVisible(true);
 
                 {/* SMOOTH LINE */}
 
-                {chartWidth > 0 &&
-                  chartPoints.length > 1 && (
-                    <Svg
-                      pointerEvents="none"
-                      width={chartWidth}
-                      height={chartHeight}
-                      style={
-                        StyleSheet.absoluteFill
-                      }>
-
+                {chartWidth > 0 && chartPoints.length > 0 && (
+                  <Svg
+                    pointerEvents="none"
+                    width={chartWidth}
+                    height={chartHeight}
+                    style={StyleSheet.absoluteFill}
+                  >
+                    {chartPoints.length > 1 && (
                       <Path
-                        d={createSmoothPath(
-                          chartPoints,
-                        )}
+                        d={createSmoothPath(chartPoints)}
                         fill="none"
                         stroke={PURPLE}
                         strokeWidth={2.5}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
-
-                    </Svg>
-                  )}
+                    )}
+                  </Svg>
+                )}
 
 
                 {/* DOTS */}

@@ -424,13 +424,24 @@ export default function PetDetailScreen({
   const currentPet =
     pets.find(item => item.id === pet.id) ?? pet;
 
-  const memberIds = Array.isArray(currentPet.petMembers)
-    ? currentPet.petMembers
-    : currentPet.ownerId
-      ? [currentPet.ownerId]
-      : [];
+  const memberIds = Array.from(
+    new Set([
+      ...(Array.isArray(currentPet.petMembers)
+        ? currentPet.petMembers
+        : []),
+      ...(currentPet.ownerId
+        ? [currentPet.ownerId]
+        : []),
+    ]),
+  );
 
-  const isOwner = currentPet.ownerId === user?.uid;
+  const isOwner =
+    currentPet.ownerId === user?.uid ||
+    (
+      !currentPet.ownerId &&
+      !!user?.uid &&
+      memberIds.includes(user.uid)
+    );
 
   const otherMembers = memberIds.filter(
     memberId => memberId !== user?.uid,

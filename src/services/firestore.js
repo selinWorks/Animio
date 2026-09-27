@@ -5,37 +5,166 @@ import auth from '@react-native-firebase/auth';
    PETS
 ========================================================= */
 
-export const addPetToFirestore = async (pet, uid) => {
+/* =========================================================
+   ADD PET
+========================================================= */
+
+export const addPetToFirestore = async (
+  pet,
+  uid,
+) => {
   if (!uid) {
-    throw new Error('Kullanıcı bilgisi gerekli.');
+    throw new Error(
+      'Kullanıcı bilgisi gerekli.',
+    );
   }
 
-  const now = firestore.FieldValue.serverTimestamp();
+  const now =
+    firestore.FieldValue.serverTimestamp();
+
+  /*
+   * -------------------------------------------------------
+   * PET
+   * -------------------------------------------------------
+   */
 
   const docRef = await firestore()
     .collection('pets')
     .add({
-      ownerId: uid,
+      ownerId:
+        uid,
 
       /*
-       * Pet'i oluşturan kullanıcı otomatik
-       * olarak üye olur.
+       * Pet'i oluşturan kullanıcı
+       * otomatik olarak aile üyesidir.
        */
-      petMembers: [uid],
+      petMembers: [
+        uid,
+      ],
 
-      name: pet.name || '',
-      type: pet.type || '',
-      birthYear: pet.birthYear || null,
-      gender: pet.gender || '',
-      weight: pet.weight || '',
-      vaccines: pet.vaccines || '',
-      lastVetVisit: pet.lastVetVisit || '',
-      notes: pet.notes || '',
-      photoUrl: pet.photoUrl || '',
+      name:
+        pet?.name || '',
 
-      createdAt: now,
-      updatedAt: now,
+      type:
+        pet?.type || '',
+
+      birthYear:
+        pet?.birthYear || null,
+
+      gender:
+        pet?.gender || '',
+
+      /*
+       * Son / güncel kilo
+       */
+      weight:
+        pet?.weight || '',
+
+      vaccines:
+        pet?.vaccines || '',
+
+      lastVetVisit:
+        pet?.lastVetVisit || '',
+
+      notes:
+        pet?.notes || '',
+
+      photoUrl:
+        pet?.photoUrl || '',
+
+      createdAt:
+        now,
+
+      updatedAt:
+        now,
     });
+
+  /*
+   * -------------------------------------------------------
+   * INITIAL WEIGHT HISTORY
+   * -------------------------------------------------------
+   *
+   * AddPetScreen'den gelen ilk kilo kaydını
+   * weightHistory alt koleksiyonuna yazıyoruz.
+   */
+
+  const initialWeightHistory =
+    Array.isArray(
+      pet?.weightHistory,
+    )
+      ? pet.weightHistory
+      : [];
+
+  if (
+    initialWeightHistory.length > 0
+  ) {
+    const batch =
+      firestore().batch();
+
+    initialWeightHistory.forEach(
+      record => {
+        /*
+         * Firestore document ID.
+         *
+         * AddPetScreen'den id geliyorsa onu
+         * kullanıyoruz.
+         */
+        const weightRef =
+          docRef
+            .collection(
+              'weightHistory',
+            )
+            .doc(
+              record?.id ||
+                undefined,
+            );
+
+        const numericWeight =
+          typeof record?.weight ===
+          'number'
+            ? record.weight
+            : Number(
+                String(
+                  record?.weight || '',
+                ).replace(',', '.'),
+              );
+
+        if (
+          !Number.isFinite(
+            numericWeight,
+          ) ||
+          numericWeight <= 0
+        ) {
+          return;
+        }
+
+        batch.set(
+          weightRef,
+          {
+            weight:
+              numericWeight,
+
+            date:
+              record?.date ||
+              new Date()
+                .toISOString()
+                .split('T')[0],
+
+            createdBy:
+              uid,
+
+            createdAt:
+              now,
+
+            updatedAt:
+              now,
+          },
+        );
+      },
+    );
+
+    await batch.commit();
+  }
 
   return docRef.id;
 };
@@ -54,32 +183,74 @@ export const updatePetInFirestore = async (
     );
   }
 
-  await firestore()
+  /*
+   * Güncelleme yapabilmek için kullanıcının
+   * pet üyesi olması gerekir.
+   */
+  const petRef = firestore()
     .collection('pets')
-    .doc(pet.id)
-    .update({
-      ownerId: pet.ownerId || uid,
+    .doc(pet.id);
 
-      name: pet.name || '',
-      type: pet.type || '',
-      birthYear: pet.birthYear || null,
-      gender: pet.gender || '',
+  const petSnapshot = await petRef.get();
 
-      weight: pet.weight || '',
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
 
-      weightHistory:
-        Array.isArray(pet.weightHistory)
-          ? pet.weightHistory
-          : [],
+  const existingData =
+    petSnapshot.data() || {};
 
-      vaccines: pet.vaccines || '',
-      lastVetVisit: pet.lastVetVisit || '',
-      notes: pet.notes || '',
-      photoUrl: pet.photoUrl || '',
+  const petMembers =
+    Array.isArray(existingData.petMembers)
+      ? existingData.petMembers
+      : existingData.ownerId
+        ? [existingData.ownerId]
+        : [];
 
-      updatedAt:
-        firestore.FieldValue.serverTimestamp(),
-    });
+  if (!petMembers.includes(uid)) {
+    throw new Error(
+      'Bu dostu güncelleme yetkiniz yok.',
+    );
+  }
+
+  await petRef.update({
+    ownerId:
+      existingData.ownerId || pet.ownerId || uid,
+
+    petMembers,
+
+    name:
+      pet.name || '',
+
+    type:
+      pet.type || '',
+
+    birthYear:
+      pet.birthYear || null,
+
+    gender:
+      pet.gender || '',
+
+    weight:
+      pet.weight || '',
+
+    vaccines:
+      pet.vaccines || '',
+
+    lastVetVisit:
+      pet.lastVetVisit || '',
+
+    notes:
+      pet.notes || '',
+
+    photoUrl:
+      pet.photoUrl || '',
+
+    updatedAt:
+      firestore.FieldValue.serverTimestamp(),
+  });
 };
 
 /* =========================================================
@@ -120,7 +291,7 @@ export const getPetsFromFirestore = async uid => {
 
   /*
    * Aynı pet iki sorgudan da gelebileceği için
-   * Map kullanarak tekilleştiriyoruz.
+   * Map ile tekilleştiriyoruz.
    */
   const petMap = new Map();
 
@@ -132,80 +303,178 @@ export const getPetsFromFirestore = async uid => {
     petMap.set(doc.id, doc);
   });
 
-  const pets = Array.from(petMap.values())
-    .map(doc => {
-      const data = doc.data();
+  /*
+   * Her pet'in weightHistory alt koleksiyonunu
+   * ayrıca okuyoruz.
+   */
+  const pets = await Promise.all(
+    Array.from(petMap.values()).map(
+      async doc => {
+        const data = doc.data() || {};
 
-      const petMembers = Array.isArray(
-        data.petMembers,
-      )
-        ? data.petMembers
-        : data.ownerId
-          ? [data.ownerId]
-          : [];
+        /*
+         * ---------------------------------------------------
+         * PET MEMBERS
+         * ---------------------------------------------------
+         */
 
-      return {
-        id: doc.id,
+        const petMembers =
+          Array.isArray(data.petMembers)
+            ? data.petMembers
+            : data.ownerId
+              ? [data.ownerId]
+              : [];
 
-        ownerId:
-          data.ownerId || '',
+        /*
+         * ---------------------------------------------------
+         * WEIGHT HISTORY
+         * ---------------------------------------------------
+         */
 
-        petMembers,
+        let weightHistory = [];
 
-        name:
-          data.name || '',
+        try {
+          const weightSnapshot =
+            await firestore()
+              .collection('pets')
+              .doc(doc.id)
+              .collection('weightHistory')
+              .get();
 
-        type:
-          data.type || '',
+          weightHistory =
+            weightSnapshot.docs
+              .map(weightDoc => {
+                const weightData =
+                  weightDoc.data() || {};
 
-        birthYear:
-          typeof data.birthYear === 'number'
-            ? data.birthYear
-            : undefined,
+                return {
+                  id:
+                    weightDoc.id,
 
-        gender:
-          data.gender || '',
+                  weight:
+                    typeof weightData.weight ===
+                    'number'
+                      ? weightData.weight
+                      : Number(
+                          weightData.weight,
+                        ) || 0,
 
-        weight:
-          data.weight || '',
+                  date:
+                    weightData.date || '',
 
-        weightHistory:
-          Array.isArray(data.weightHistory)
-            ? data.weightHistory
-            : [],
+                  createdBy:
+                    weightData.createdBy || '',
 
-        vaccines:
-          data.vaccines || '',
+                  createdAt:
+                    weightData.createdAt ||
+                    null,
 
-        lastVetVisit:
-          data.lastVetVisit || '',
+                  updatedAt:
+                    weightData.updatedAt ||
+                    null,
+                };
+              })
+              .sort((a, b) => {
+                if (a.date !== b.date) {
+                  return b.date.localeCompare(
+                    a.date,
+                  );
+                }
 
-        notes:
-          data.notes || '',
+                const aTime =
+                  a.createdAt?.toMillis
+                    ? a.createdAt.toMillis()
+                    : 0;
 
-        photoUrl:
-          data.photoUrl || '',
+                const bTime =
+                  b.createdAt?.toMillis
+                    ? b.createdAt.toMillis()
+                    : 0;
 
-        createdAt:
-          data.createdAt || null,
+                return bTime - aTime;
+              });
+        } catch (weightError) {
+          console.log(
+            'Kilo geçmişi yüklenemedi:',
+            doc.id,
+            weightError,
+          );
 
-        updatedAt:
-          data.updatedAt || null,
-      };
-    })
-    .sort((a, b) => {
-      const aTime =
-        a.createdAt?.toMillis
-          ? a.createdAt.toMillis()
-          : 0;
+          weightHistory = [];
+        }
 
-      const bTime =
-        b.createdAt?.toMillis
-          ? b.createdAt.toMillis()
-          : 0;
+        /*
+         * ---------------------------------------------------
+         * PET OBJECT
+         * ---------------------------------------------------
+         */
 
-      return bTime - aTime;
-    });
+        return {
+          id:
+            doc.id,
+
+          ownerId:
+            data.ownerId || '',
+
+          petMembers,
+
+          name:
+            data.name || '',
+
+          type:
+            data.type || '',
+
+          birthYear:
+            typeof data.birthYear === 'number'
+              ? data.birthYear
+              : undefined,
+
+          gender:
+            data.gender || '',
+
+          weight:
+            data.weight || '',
+
+          weightHistory,
+
+          vaccines:
+            data.vaccines || '',
+
+          lastVetVisit:
+            data.lastVetVisit || '',
+
+          notes:
+            data.notes || '',
+
+          photoUrl:
+            data.photoUrl || '',
+
+          createdAt:
+            data.createdAt || null,
+
+          updatedAt:
+            data.updatedAt || null,
+        };
+      },
+    ),
+  );
+
+  /*
+   * En yeni oluşturulan petler üstte.
+   */
+  pets.sort((a, b) => {
+    const aTime =
+      a.createdAt?.toMillis
+        ? a.createdAt.toMillis()
+        : 0;
+
+    const bTime =
+      b.createdAt?.toMillis
+        ? b.createdAt.toMillis()
+        : 0;
+
+    return bTime - aTime;
+  });
 
   return pets;
 };
@@ -252,10 +521,6 @@ export const deletePetFromFirestore = async (
       const currentOwnerId =
         data.ownerId || '';
 
-      /*
-       * Kullanıcı pet'in üyesi değilse
-       * hiçbir işlem yapamaz.
-       */
       if (!currentMembers.includes(uid)) {
         throw new Error(
           'Bu dost için işlem yapma yetkiniz yok.',
@@ -265,6 +530,9 @@ export const deletePetFromFirestore = async (
       const isOwner =
         currentOwnerId === uid;
 
+      /*
+       * Zorla silme.
+       */
       if (forceDelete) {
         if (!isOwner) {
           throw new Error(
@@ -276,10 +544,6 @@ export const deletePetFromFirestore = async (
         return;
       }
 
-      /*
-       * Kullanıcının üyelikten ayrıldıktan
-       * sonra kalan üyeleri.
-       */
       const remainingMembers =
         currentMembers.filter(
           memberId => memberId !== uid,
@@ -290,11 +554,8 @@ export const deletePetFromFirestore = async (
       ===================================================== */
 
       if (isOwner) {
-
         /*
-         * Owner tek başınaysa ve ayrılıyorsa
-         * geriye yönetici kalamayacağı için
-         * profil tamamen silinir.
+         * Owner tek üyeyse pet tamamen silinir.
          */
         if (remainingMembers.length === 0) {
           transaction.delete(petRef);
@@ -302,8 +563,7 @@ export const deletePetFromFirestore = async (
         }
 
         /*
-         * Owner başka üyeler varken ayrılıyorsa
-         * yeni owner seçilmiş olmak zorunda.
+         * Yeni owner seçilmek zorunda.
          */
         if (!newOwnerId) {
           throw new Error(
@@ -311,10 +571,6 @@ export const deletePetFromFirestore = async (
           );
         }
 
-        /*
-         * Seçilen yeni yönetici mevcut aile
-         * üyelerinden biri olmalı.
-         */
         if (
           !remainingMembers.includes(
             newOwnerId,
@@ -325,10 +581,6 @@ export const deletePetFromFirestore = async (
           );
         }
 
-        /*
-         * Eski owner çıkarılır,
-         * seçilen aile üyesi yeni owner olur.
-         */
         transaction.update(petRef, {
           petMembers:
             remainingMembers,
@@ -347,12 +599,6 @@ export const deletePetFromFirestore = async (
          NORMAL AİLE ÜYESİ
       ===================================================== */
 
-      /*
-       * Normal aile üyesi sadece kendisini
-       * aileden çıkarabilir.
-       *
-       * Owner değişmez.
-       */
       transaction.update(petRef, {
         petMembers:
           remainingMembers,
@@ -371,25 +617,6 @@ export const deletePetFromFirestore = async (
    WEIGHT HISTORY
 ========================================================= */
 
-/*
- * Yeni kilo kaydı ekler.
- *
- * Firestore yapısı:
- *
- * pets
- *   └── petId
- *        └── weightHistory
- *             └── recordId
- *
- * Her kayıt:
- *
- * {
- *   weight: 6.4,
- *   date: '2026-09-24',
- *   createdBy: uid,
- *   createdAt: Timestamp
- * }
- */
 export const addWeightRecordToFirestore = async (
   petId,
   weight,
@@ -431,23 +658,46 @@ export const addWeightRecordToFirestore = async (
       .toISOString()
       .split('T')[0];
 
-  const now =
-    firestore.FieldValue.serverTimestamp();
-
   const petRef = firestore()
     .collection('pets')
     .doc(petId);
+
+  /*
+   * Kullanıcının pet üyesi olup olmadığını
+   * kontrol ediyoruz.
+   */
+  const petSnapshot =
+    await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
+
+  const petData =
+    petSnapshot.data() || {};
+
+  const petMembers =
+    Array.isArray(petData.petMembers)
+      ? petData.petMembers
+      : petData.ownerId
+        ? [petData.ownerId]
+        : [];
+
+  if (!petMembers.includes(uid)) {
+    throw new Error(
+      'Bu pet için kilo kaydı ekleme yetkiniz yok.',
+    );
+  }
+
+  const now =
+    firestore.FieldValue.serverTimestamp();
 
   const weightRef = petRef
     .collection('weightHistory')
     .doc();
 
-  /*
-   * Kilo geçmişine kayıt eklenirken pet'in
-   * güncel kilosunu da aynı anda güncelliyoruz.
-   *
-   * Böylece iki veri birbirinden kopmuyor.
-   */
   const batch =
     firestore().batch();
 
@@ -526,10 +776,6 @@ export const getWeightHistoryFromFirestore = async (
       };
     })
     .sort((a, b) => {
-      /*
-       * YYYY-MM-DD formatı olduğu için
-       * string karşılaştırması yeterli.
-       */
       if (a.date !== b.date) {
         return b.date.localeCompare(a.date);
       }
@@ -572,18 +818,8 @@ export const deleteWeightRecordFromFirestore = async (
     .collection('weightHistory')
     .doc(recordId);
 
-  /*
-   * Önce kayıt silinir.
-   */
   await weightRef.delete();
 
-  /*
-   * Kalan kilo kayıtlarını alıyoruz.
-   *
-   * Eğer silinen kayıt en güncel kayıtsa
-   * pet.weight değerinin de önceki kayda
-   * dönmesi gerekir.
-   */
   const remainingHistory =
     await getWeightHistoryFromFirestore(
       petId,
@@ -601,10 +837,6 @@ export const deleteWeightRecordFromFirestore = async (
         firestore.FieldValue.serverTimestamp(),
     });
   } else {
-    /*
-     * Hiç kilo kaydı kalmadıysa güncel
-     * kilo alanını boşaltıyoruz.
-     */
     await petRef.update({
       weight:
         '',
@@ -648,9 +880,11 @@ export const updateWeightRecordInFirestore = async (
     );
   }
 
-  const weightRef = firestore()
+  const petRef = firestore()
     .collection('pets')
-    .doc(petId)
+    .doc(petId);
+
+  const weightRef = petRef
     .collection('weightHistory')
     .doc(recordId);
 
@@ -666,8 +900,8 @@ export const updateWeightRecordInFirestore = async (
   });
 
   /*
-   * Güncellemeden sonra en güncel kaydı tekrar
-   * bulup pet.weight alanını senkronize ediyoruz.
+   * Güncellemeden sonra en güncel kayıt
+   * pet.weight alanına aktarılır.
    */
   const history =
     await getWeightHistoryFromFirestore(
@@ -675,16 +909,13 @@ export const updateWeightRecordInFirestore = async (
     );
 
   if (history.length > 0) {
-    await firestore()
-      .collection('pets')
-      .doc(petId)
-      .update({
-        weight:
-          String(history[0].weight),
+    await petRef.update({
+      weight:
+        String(history[0].weight),
 
-        updatedAt:
-          firestore.FieldValue.serverTimestamp(),
-      });
+      updatedAt:
+        firestore.FieldValue.serverTimestamp(),
+    });
   }
 };
 
@@ -692,12 +923,67 @@ export const updateWeightRecordInFirestore = async (
    CARE EVENTS
 ========================================================= */
 
+/*
+ * Kullanıcının erişebildiği pet ID'lerini alır.
+ *
+ * Hem petMembers hem ownerId sistemi desteklenir.
+ */
+const getUserPetIds = async uid => {
+  if (!uid) {
+    return [];
+  }
+
+  const memberSnapshot = await firestore()
+    .collection('pets')
+    .where(
+      'petMembers',
+      'array-contains',
+      uid,
+    )
+    .get();
+
+  const ownerSnapshot = await firestore()
+    .collection('pets')
+    .where(
+      'ownerId',
+      '==',
+      uid,
+    )
+    .get();
+
+  const petIds = new Set();
+
+  memberSnapshot.docs.forEach(doc => {
+    petIds.add(doc.id);
+  });
+
+  ownerSnapshot.docs.forEach(doc => {
+    petIds.add(doc.id);
+  });
+
+  return Array.from(petIds);
+};
+
+/* =========================================================
+   GET CARE EVENTS
+========================================================= */
+
 export const getCareEventsFromFirestore = async uid => {
   if (!uid) {
     return [];
   }
 
-  const snapshot = await firestore()
+  /*
+   * Öncelikle kullanıcının erişebildiği petleri buluyoruz.
+   */
+  const userPetIds =
+    await getUserPetIds(uid);
+
+  /*
+   * Eski sistemde ownerId üzerinden oluşturulmuş
+   * etkinlikleri de kaybetmemek için ayrıca sorguluyoruz.
+   */
+  const ownerSnapshot = await firestore()
     .collection('careEvents')
     .where(
       'ownerId',
@@ -706,23 +992,92 @@ export const getCareEventsFromFirestore = async uid => {
     )
     .get();
 
-  const events = snapshot.docs
-    .map(doc => ({
-      id: doc.id,
+  const eventMap = new Map();
+
+  /*
+   * OwnerId üzerinden gelen etkinlikler.
+   */
+  ownerSnapshot.docs.forEach(doc => {
+    eventMap.set(doc.id, {
+      id:
+        doc.id,
+
       ...doc.data(),
-    }))
-    .sort((a, b) => {
-      const aDate =
-        a.date || '';
-
-      const bDate =
-        b.date || '';
-
-      return aDate.localeCompare(bDate);
     });
+  });
+
+  /*
+   * Kullanıcının aile üyesi olduğu petlere ait
+   * etkinlikleri alıyoruz.
+   *
+   * Firestore where-in sorgusu maksimum 10 eleman
+   * sınırına sahip olabildiği için gruplara bölüyoruz.
+   */
+  const chunks = [];
+
+  for (
+    let i = 0;
+    i < userPetIds.length;
+    i += 10
+  ) {
+    chunks.push(
+      userPetIds.slice(
+        i,
+        i + 10,
+      ),
+    );
+  }
+
+  for (const chunk of chunks) {
+    if (chunk.length === 0) {
+      continue;
+    }
+
+    const snapshot = await firestore()
+      .collection('careEvents')
+      .where(
+        'petId',
+        'in',
+        chunk,
+      )
+      .get();
+
+    snapshot.docs.forEach(doc => {
+      eventMap.set(doc.id, {
+        id:
+          doc.id,
+
+        ...doc.data(),
+      });
+    });
+  }
+
+  const events =
+    Array.from(eventMap.values());
+
+  /*
+   * Tarih + saat sıralaması.
+   */
+  events.sort((a, b) => {
+    const aDate =
+      `${a.date || ''} ${
+        a.time || ''
+      }`;
+
+    const bDate =
+      `${b.date || ''} ${
+        b.time || ''
+      }`;
+
+    return aDate.localeCompare(bDate);
+  });
 
   return events;
 };
+
+/* =========================================================
+   ADD CARE EVENT
+========================================================= */
 
 export const addCareEventToFirestore = async (
   event,
@@ -734,51 +1089,302 @@ export const addCareEventToFirestore = async (
     );
   }
 
+  if (!event) {
+    throw new Error(
+      'Etkinlik bilgisi gerekli.',
+    );
+  }
+
+  const petId =
+    event.petId || '';
+
+  /*
+   * Eğer etkinlik bir pet'e bağlıysa
+   * kullanıcının o pet'e erişimi olmalı.
+   */
+  if (petId) {
+    const petRef = firestore()
+      .collection('pets')
+      .doc(petId);
+
+    const petSnapshot =
+      await petRef.get();
+
+    if (!petSnapshot.exists) {
+      throw new Error(
+        'Etkinliğin bağlı olduğu pet bulunamadı.',
+      );
+    }
+
+    const petData =
+      petSnapshot.data() || {};
+
+    const petMembers =
+      Array.isArray(
+        petData.petMembers,
+      )
+        ? petData.petMembers
+        : petData.ownerId
+          ? [petData.ownerId]
+          : [];
+
+    if (!petMembers.includes(uid)) {
+      throw new Error(
+        'Bu pet için etkinlik ekleme yetkiniz yok.',
+      );
+    }
+  }
+
   const now =
     firestore.FieldValue.serverTimestamp();
 
   const docRef = await firestore()
-    .collection('pets')
+    .collection('careEvents')
     .add({
-      ownerId: uid,
+      ownerId:
+        uid,
 
-      petMembers: [uid],
+      petId:
+        event.petId || '',
 
-      name: pet.name || '',
-      type: pet.type || '',
-      birthYear: pet.birthYear || null,
-      gender: pet.gender || '',
+      petName:
+        event.petName || '',
 
-      weight: pet.weight || '',
+      /*
+       * Eski kodların name kullanma ihtimaline
+       * karşı name alanını da koruyoruz.
+       */
+      name:
+        event.name ||
+        event.title ||
+        '',
 
-      weightHistory:
-        Array.isArray(pet.weightHistory)
-          ? pet.weightHistory
-          : [],
+      title:
+        event.title ||
+        event.name ||
+        '',
 
-      vaccines: pet.vaccines || '',
-      lastVetVisit: pet.lastVetVisit || '',
-      notes: pet.notes || '',
-      photoUrl: pet.photoUrl || '',
+      type:
+        event.type || '',
 
-      createdAt: now,
-      updatedAt: now,
+      date:
+        event.date || '',
+
+      time:
+        event.time || '',
+
+      description:
+        event.description || '',
+
+      notes:
+        event.notes || '',
+
+      createdAt:
+        now,
+
+      updatedAt:
+        now,
     });
 
   return docRef.id;
 };
 
+/* =========================================================
+   UPDATE CARE EVENT
+========================================================= */
+
+export const updateCareEventInFirestore = async (
+  event,
+  uid,
+) => {
+  if (!event?.id || !uid) {
+    throw new Error(
+      'Etkinlik ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  const eventRef = firestore()
+    .collection('careEvents')
+    .doc(event.id);
+
+  const eventSnapshot =
+    await eventRef.get();
+
+  if (!eventSnapshot.exists) {
+    throw new Error(
+      'Etkinlik bulunamadı.',
+    );
+  }
+
+  const existingData =
+    eventSnapshot.data() || {};
+
+  /*
+   * Etkinlik sahibi güncelleyebilir.
+   *
+   * Pet aile üyeleri de güncelleyebilir.
+   */
+  let canUpdate =
+    existingData.ownerId === uid;
+
+  if (
+    !canUpdate &&
+    existingData.petId
+  ) {
+    const petSnapshot =
+      await firestore()
+        .collection('pets')
+        .doc(existingData.petId)
+        .get();
+
+    if (petSnapshot.exists) {
+      const petData =
+        petSnapshot.data() || {};
+
+      const petMembers =
+        Array.isArray(
+          petData.petMembers,
+        )
+          ? petData.petMembers
+          : petData.ownerId
+            ? [petData.ownerId]
+            : [];
+
+      canUpdate =
+        petMembers.includes(uid);
+    }
+  }
+
+  if (!canUpdate) {
+    throw new Error(
+      'Bu etkinliği güncelleme yetkiniz yok.',
+    );
+  }
+
+  await eventRef.update({
+    petId:
+      event.petId ||
+      existingData.petId ||
+      '',
+
+    petName:
+      event.petName ||
+      existingData.petName ||
+      '',
+
+    name:
+      event.name ||
+      event.title ||
+      existingData.name ||
+      '',
+
+    title:
+      event.title ||
+      event.name ||
+      existingData.title ||
+      '',
+
+    type:
+      event.type ||
+      existingData.type ||
+      '',
+
+    date:
+      event.date ||
+      '',
+
+    time:
+      event.time ||
+      '',
+
+    description:
+      event.description ||
+      '',
+
+    notes:
+      event.notes ||
+      '',
+
+    updatedAt:
+      firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+/* =========================================================
+   DELETE CARE EVENT
+========================================================= */
+
 export const deleteCareEventFromFirestore = async (
   eventId,
+  uid = null,
 ) => {
   if (!eventId) {
     return;
   }
 
-  await firestore()
+  const eventRef = firestore()
     .collection('careEvents')
-    .doc(eventId)
-    .delete();
+    .doc(eventId);
+
+  /*
+   * UID verilmezse eski kullanım şekli korunuyor.
+   */
+  if (!uid) {
+    await eventRef.delete();
+    return;
+  }
+
+  const eventSnapshot =
+    await eventRef.get();
+
+  if (!eventSnapshot.exists) {
+    return;
+  }
+
+  const eventData =
+    eventSnapshot.data() || {};
+
+  let canDelete =
+    eventData.ownerId === uid;
+
+  /*
+   * Pet aile üyeleri de etkinliği silebilir.
+   */
+  if (
+    !canDelete &&
+    eventData.petId
+  ) {
+    const petSnapshot =
+      await firestore()
+        .collection('pets')
+        .doc(eventData.petId)
+        .get();
+
+    if (petSnapshot.exists) {
+      const petData =
+        petSnapshot.data() || {};
+
+      const petMembers =
+        Array.isArray(
+          petData.petMembers,
+        )
+          ? petData.petMembers
+          : petData.ownerId
+            ? [petData.ownerId]
+            : [];
+
+      canDelete =
+        petMembers.includes(uid);
+    }
+  }
+
+  if (!canDelete) {
+    throw new Error(
+      'Bu etkinliği silme yetkiniz yok.',
+    );
+  }
+
+  await eventRef.delete();
 };
 
 /* =========================================================
@@ -866,7 +1472,9 @@ export const getUserSettingsFromFirestore = async uid => {
   }
 
   return {
-    id: doc.id,
+    id:
+      doc.id,
+
     ...doc.data(),
   };
 };
@@ -921,12 +1529,12 @@ export const addAssistantChatToFirestore = async (
         chat.petType || '',
 
       /*
-       * Eski kayıtlarla uyumluluk
+       * Eski kayıtlarla uyumluluk.
        */
       problemType,
 
       /*
-       * Çoklu semptom sistemi
+       * Çoklu semptom sistemi.
        */
       problemTypes,
 
@@ -1053,6 +1661,34 @@ export const createPetInvitation = async (
     );
   }
 
+  /*
+   * Daveti sadece pet owner oluşturabilir.
+   */
+  const petRef = firestore()
+    .collection('pets')
+    .doc(pet.id);
+
+  const petSnapshot =
+    await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
+
+  const petData =
+    petSnapshot.data() || {};
+
+  if (
+    petData.ownerId &&
+    petData.ownerId !== inviterId
+  ) {
+    throw new Error(
+      'Bu dosta aile üyesi davet etme yetkiniz yok.',
+    );
+  }
+
   const normalizedEmail =
     (inviteeEmail || '')
       .trim()
@@ -1163,6 +1799,7 @@ export const createPetInvitation = async (
 
   return {
     code,
+
     invitationId:
       code,
   };
@@ -1259,11 +1896,7 @@ export const acceptPetInvitation = async (
       .doc(normalizedCode);
 
   /*
-   * Önce sadece daveti okuyoruz.
-   *
-   * Kullanıcı henüz petMembers içinde olmadığı için
-   * pet dokümanını okumak Firestore Rules tarafından
-   * engellenebilir.
+   * Önce daveti okuyoruz.
    */
   const invitationSnapshot =
     await invitationRef.get();
