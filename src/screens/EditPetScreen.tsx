@@ -28,8 +28,6 @@ import {
   Rabbit,
   Ellipsis,
   Heart,
-  Syringe,
-  CalendarDays,
   UserRound,
   Camera,
   Minus,
@@ -37,8 +35,6 @@ import {
   Mars,
   Venus,
   Weight,
-  FileText,
-  Pencil,
   Check,
   CircleAlert,
   CheckCircle2,
@@ -46,7 +42,6 @@ import {
   ImagePlus,
   Activity,
   Stethoscope,
-  Pill,
   ShieldAlert,
   ChevronRight,
   Clock3,
@@ -79,7 +74,7 @@ type PopupIconType =
   | 'photo'
   | 'info';
 
-type MenuKey = 'general' | 'health' | 'vaccines' | 'appointments';
+type MenuKey = 'general' | 'health';
 
 type PetTypeOption = {
   key: string;
@@ -127,37 +122,21 @@ export default function EditPetScreen({route}: Props) {
   const [age, setAge] = useState(String(pet ? getPetAge(pet) : 0));
   const [gender, setGender] = useState(pet?.gender || '');
   const [weight, setWeight] = useState(pet?.weight || '');
-  const [vaccines] = useState(pet?.vaccines || '');
   const [lastVetVisit] = useState(pet?.lastVetVisit || '');
-  const [notes, setNotes] = useState(pet?.notes || '');
-
   const healthPet = (pet ?? {}) as NonNullable<typeof pet> & {
-    medications?: string;
     allergies?: string;
   };
-const [medications, setMedications] = useState(
-    healthPet.medications || '',
-  );
   const [allergies, setAllergies] = useState(
     healthPet.allergies || '',
   );
-const healthHistory = [    {
-      id: 'vet',
-      date: lastVetVisit || '18 Nisan 2026',
-      title: 'Veteriner kontrolü',
-      detail: 'Rutin sağlık kontrolü tamamlandı.',
-      color: '#EAF4FF',
-      accent: '#4F8EDB',
-    },
-    {
-      id: 'vaccine',
-      date: '02 Ocak 2026',
-      title: 'Karma aşı',
-      detail: 'Karma aşı kaydı oluşturuldu.',
-      color: '#FFF0F4',
-      accent: '#D26983',
-    },
-  ];
+  const healthHistory: Array<{
+    id: string;
+    date: string;
+    title: string;
+    detail: string;
+    color: string;
+    accent: string;
+  }> = [];
 
   const initialPhotoUri =
     ((pet ?? {}) as NonNullable<typeof pet> & {photoUri?: string}).photoUri || '';
@@ -524,10 +503,7 @@ const healthHistory = [    {
 
         gender: gender.trim(),
         weight: weight.trim(),
-        vaccines: vaccines.trim(),
         lastVetVisit: lastVetVisit.trim(),
-        notes: notes.trim(),
-        medications: medications.trim(),
         allergies: allergies.trim(),
         photoUri,
       } as Parameters<typeof updatePet>[0]);
@@ -606,13 +582,13 @@ const healthHistory = [    {
   if (!pet) {
     return (
       <View style={[styles.screen, {alignItems: 'center', justifyContent: 'center'}]}>
-        <Text style={{color: '#737D98', fontSize: 14, fontWeight: '700'}}>
+        <Text style={{color: '#737D98', fontSize: 14, fontFamily: 'Quicksand-SemiBold'}}>
           Pet bilgisi bulunamadı.
         </Text>
         <Pressable
           onPress={() => navigation.goBack()}
           style={{marginTop: 14, paddingHorizontal: 18, paddingVertical: 10}}>
-          <Text style={{color: '#8067E8', fontSize: 14, fontWeight: '800'}}>
+          <Text style={{color: '#8067E8', fontSize: 14, fontFamily: 'Quicksand-Bold'}}>
             Geri Dön
           </Text>
         </Pressable>
@@ -756,7 +732,7 @@ const healthHistory = [    {
                     resizeMode="cover"
                   />
                 ) : (
-                  <Cat size={68} color="#7A6B9C" strokeWidth={1.6} />
+                  <Cat size={58} color="#7A6B9C" strokeWidth={1.6} />
                 )}
               </Pressable>
 
@@ -767,16 +743,11 @@ const healthHistory = [    {
                   styles.heroCameraButton,
                   pressed && styles.cameraButtonPressed,
                 ]}>
-                <Camera size={21} color="#FFFFFF" strokeWidth={2.4} />
+                <Camera size={19} color="#FFFFFF" strokeWidth={2.4} />
               </Pressable>
             </View>
 
             <Text style={styles.heroPetName}>{name || 'Pet'}</Text>
-
-            <Text style={styles.heroPetMeta}>
-              {selectedType}  |  {currentAge} yaş
-              {safeWeight > 0 ? `  |  ${safeWeight} kg` : ''}
-            </Text>
 
           </View>
         </View>
@@ -810,31 +781,6 @@ const healthHistory = [    {
             onPress={() => handleMenuPress('health')}
           />
 
-          <SideMenuButton
-            active={activeMenu === 'vaccines'}
-            label="Aşılar"
-            icon={
-              <Syringe
-                size={21}
-                color={activeMenu === 'vaccines' ? '#8067E8' : '#7481A4'}
-                strokeWidth={2}
-              />
-            }
-            onPress={() => handleMenuPress('vaccines')}
-          />
-
-          <SideMenuButton
-            active={activeMenu === 'appointments'}
-            label="Randevular"
-            icon={
-              <CalendarDays
-                size={21}
-                color={activeMenu === 'appointments' ? '#8067E8' : '#7481A4'}
-                strokeWidth={2}
-              />
-            }
-            onPress={() => handleMenuPress('appointments')}
-          />
         </View>
 
         {/* WORKSPACE */}
@@ -1184,80 +1130,6 @@ const healthHistory = [    {
 
             </View>
 
-            {/* ABOUT */}
-
-            <View
-              style={
-                styles.aboutCard
-              }>
-
-              <View
-                style={
-                  styles.aboutHeader
-                }>
-
-                <View
-                  style={
-                    styles.aboutIcon
-                  }>
-
-                  <FileText
-                    size={23}
-                    color="#8067E8"
-                    strokeWidth={2.2}
-                  />
-
-                </View>
-
-                <Text
-                  style={
-                    styles.aboutTitle
-                  }>
-                  Hakkında
-                </Text>
-
-              </View>
-
-              <Text
-                style={
-                  styles.aboutSubtitle
-                }>
-                Patin hakkında eklemek
-                istediğin kısa bilgiler
-                var mı?
-              </Text>
-
-              <View
-                style={
-                  styles.notesContainer
-                }>
-
-                <TextInput
-                  value={notes}
-                  onChangeText={
-                    setNotes
-                  }
-                  multiline
-                  placeholder="Örn. Meraklı, oyuncu ve çok sevgi dolu."
-                  placeholderTextColor="#8A98B5"
-                  style={
-                    styles.notesInput
-                  }
-                />
-
-                <Pencil
-                  size={20}
-                  color="#6C7CA2"
-                  strokeWidth={2}
-                  style={
-                    styles.notesPencil
-                  }
-                />
-
-              </View>
-
-            </View>
-
           </View>
 
             </>
@@ -1339,47 +1211,6 @@ const healthHistory = [    {
                 </View>
               </View>
 
-              {/* TREATMENTS */}
-              <View style={[styles.healthDashboardCard, styles.treatmentCard]}>
-                <View style={styles.dashboardCardHeader}>
-                  <View style={[styles.dashboardIcon, styles.treatmentIcon]}>
-                    <Pill size={22} color="#C87845" strokeWidth={2.2} />
-                  </View>
-                  <View style={styles.dashboardHeaderText}>
-                    <Text style={styles.dashboardTitle}>
-                      Aktif Tedaviler & İlaçlar
-                    </Text>
-                    <Text style={styles.dashboardSubtitle}>
-                      İlaç adı, doz ve kullanım sıklığı
-                    </Text>
-                  </View>
-                </View>
-
-                <TextInput
-                  value={medications}
-                  onChangeText={setMedications}
-                  multiline
-                  placeholder="Örn. Vetmedin 5 mg • Sabah / Akşam"
-                  placeholderTextColor="#A78976"
-                  style={[styles.dashboardTextArea, styles.treatmentInput]}
-                />
-
-                <Pressable
-                  onPress={() =>
-                    showPopup(
-                      'İlaç / Tedavi',
-                      'İlaçları ayrı kayıtlar halinde ekleme akışını bu karta bağlayacağız.',
-                    )
-                  }
-                  style={({pressed}) => [
-                    styles.addTreatmentButton,
-                    pressed && styles.pressed,
-                  ]}>
-                  <Plus size={18} color="#C87845" strokeWidth={2.4} />
-                  <Text style={styles.addTreatmentText}>İlaç / Tedavi Ekle</Text>
-                </Pressable>
-              </View>
-
               {/* ALLERGIES */}
               <View style={[styles.healthDashboardCard, styles.allergyCard]}>
                 <View style={styles.dashboardCardHeader}>
@@ -1420,9 +1251,10 @@ const healthHistory = [    {
                   </View>
                 </View>
 
-                <View style={styles.timeline}>
-                  {healthHistory.map((item, index) => (
-                    <View key={item.id} style={styles.timelineRow}>
+                {healthHistory.length > 0 ? (
+                  <View style={styles.timeline}>
+                    {healthHistory.map((item, index) => (
+                      <View key={item.id} style={styles.timelineRow}>
                       <View style={styles.timelineRail}>
                         <View
                           style={[
@@ -1447,8 +1279,16 @@ const healthHistory = [    {
                         </View>
                       </View>
                     </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyHistoryBox}>
+                    <Text style={styles.emptyHistoryTitle}>Henüz sağlık kaydı yok</Text>
+                    <Text style={styles.emptyHistoryText}>
+                      Eklenen veteriner kontrolleri ve sağlık kayıtları burada görünecek.
+                    </Text>
+                  </View>
+                )}
 
                 <Pressable
                   onPress={() =>
@@ -1468,25 +1308,7 @@ const healthHistory = [    {
             </View>
           )}
 
-          {activeMenu === 'vaccines' && (
-            <View style={styles.emptyTabCard}>
-              <Syringe size={30} color="#8067E8" strokeWidth={2} />
-              <Text style={styles.emptyTabTitle}>Aşılar</Text>
-              <Text style={styles.emptyTabText}>
-                Aşı yönetimi bu sekmede yer alacak.
-              </Text>
-            </View>
-          )}
 
-          {activeMenu === 'appointments' && (
-            <View style={styles.emptyTabCard}>
-              <CalendarDays size={30} color="#8067E8" strokeWidth={2} />
-              <Text style={styles.emptyTabTitle}>Randevular</Text>
-              <Text style={styles.emptyTabText}>
-                Veteriner randevuları bu sekmede yer alacak.
-              </Text>
-            </View>
-          )}
 
         </View>
 
@@ -1604,8 +1426,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop:
       Platform.OS === 'android'
-        ? 20
-        : 12,
+        ? 10
+        : 7,
 
     paddingBottom: 0,
   },
@@ -1694,13 +1516,13 @@ const styles = StyleSheet.create({
 
   editHero: {
     paddingHorizontal: 18,
-    paddingTop: 35,
-    paddingBottom: 8,
+    paddingTop: 10,
+    paddingBottom: 4,
     position: 'relative',
   },
 
   editHeroTopRow: {
-    minHeight: 62,
+    minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1726,7 +1548,7 @@ const styles = StyleSheet.create({
 
   editHeroTitle: {
     fontSize: 23,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     color: '#152349',
     letterSpacing: -0.45,
   },
@@ -1753,30 +1575,30 @@ const styles = StyleSheet.create({
     marginLeft: 7,
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   heroProfileArea: {
     alignItems: 'center',
-    paddingTop: 15,
-    paddingBottom: 14,
+    paddingTop: 7,
+    paddingBottom: 8,
     position: 'relative',
     overflow: 'hidden',
   },
 
   heroPhotoWrapper: {
-    width: 132,
-    height: 132,
+    width: 116,
+    height: 116,
     position: 'relative',
     zIndex: 4,
   },
 
   heroPhoto: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
+    width: 116,
+    height: 116,
+    borderRadius: 58,
     backgroundColor: '#F3EDF9',
-    borderWidth: 7,
+    borderWidth: 6,
     borderColor: '#D9CCFF',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1795,9 +1617,9 @@ const styles = StyleSheet.create({
 
   heroCameraButton: {
     position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     right: -4,
     bottom: 1,
     backgroundColor: '#7E5DEA',
@@ -1809,18 +1631,11 @@ const styles = StyleSheet.create({
   },
 
   heroPetName: {
-    marginTop: 13,
+    marginTop: 8,
     color: '#132144',
     fontSize: 26,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     letterSpacing: -0.5,
-  },
-
-  heroPetMeta: {
-    marginTop: 3,
-    color: '#7180A2',
-    fontSize: 13.5,
-    fontWeight: '600',
   },
 
   changePhotoButton: {
@@ -1838,7 +1653,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: '#8067E8',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
   heroDecorLeft: {
@@ -1852,7 +1667,7 @@ const styles = StyleSheet.create({
   heroDecorMark: {
     color: '#7F70D8',
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
 
@@ -1873,8 +1688,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 18,
-    marginTop: 6,
-    marginBottom: 18,
+    marginBottom: 12,
     padding: 6,
     height: 64,
     backgroundColor: 'rgba(255,255,255,0.96)',
@@ -1927,14 +1741,14 @@ const styles = StyleSheet.create({
     color: '#7481A4',
     marginLeft: 5,
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
     textAlign: 'center',
     flexShrink: 1,
   },
 
   sideMenuLabelActive: {
     color: '#6C5DBD',
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   sideMenu: {
@@ -2023,7 +1837,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 19,
 
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
 
     color: '#132144',
 
@@ -2034,6 +1848,7 @@ const styles = StyleSheet.create({
     color: '#7583A3',
 
     fontSize: 12,
+    fontFamily: 'Quicksand-Regular',
 
     marginTop: 4,
 
@@ -2047,7 +1862,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 13,
 
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
 
     color: '#182344',
 
@@ -2085,7 +1900,7 @@ const styles = StyleSheet.create({
 
     fontSize: 15,
 
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
 
     paddingHorizontal: 13,
   },
@@ -2129,11 +1944,11 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
   typeLabelSelected: {
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   selectedBadge: {
@@ -2263,7 +2078,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     color: '#372A78',
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     textAlign: 'center',
   },
 
@@ -2271,7 +2086,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
     color: '#786BAA',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
   genderRow: {
@@ -2350,7 +2165,7 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   femaleText: {
@@ -2360,7 +2175,7 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   genderCheck: {
@@ -2388,111 +2203,6 @@ const styles = StyleSheet.create({
   },
 
   /*
-   * ABOUT
-   */
-
-  aboutCard: {
-    backgroundColor:
-      'rgba(255,255,255,0.94)',
-
-    borderRadius: 27,
-
-    padding: 17,
-
-    marginTop: 12,
-
-    shadowColor: '#6973A0',
-
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    shadowOpacity: 0.07,
-
-    shadowRadius: 12,
-
-    elevation: 3,
-  },
-
-  aboutHeader: {
-    flexDirection: 'row',
-
-    alignItems: 'center',
-  },
-
-  aboutIcon: {
-    width: 39,
-
-    height: 39,
-
-    borderRadius: 13,
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-  },
-
-  aboutTitle: {
-    fontSize: 17,
-
-    color: '#152349',
-
-    fontWeight: '800',
-
-    marginLeft: 5,
-  },
-
-  aboutSubtitle: {
-    fontSize: 11.5,
-
-    color: '#7785A3',
-
-    marginTop: 3,
-
-    marginBottom: 10,
-
-    marginLeft: 4,
-  },
-
-  notesContainer: {
-    minHeight: 103,
-
-    backgroundColor: '#F5F7FC',
-
-    borderRadius: 17,
-
-    position: 'relative',
-  },
-
-  notesInput: {
-    minHeight: 103,
-
-    color: '#5E6D91',
-
-    fontSize: 13,
-
-    lineHeight: 20,
-
-    textAlignVertical: 'top',
-
-    paddingHorizontal: 14,
-
-    paddingTop: 13,
-
-    paddingRight: 43,
-  },
-
-  notesPencil: {
-    position: 'absolute',
-
-    right: 15,
-
-    bottom: 15,
-  },
-
-
-  /*
    * HEALTH TAB
    */
 
@@ -2505,7 +2215,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: '#172348',
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   quickHealthRow: {
@@ -2516,9 +2226,9 @@ const styles = StyleSheet.create({
 
   quickHealthCard: {
     flex: 1,
-    minHeight: 160,
-    borderRadius: 23,
-    padding: 14,
+    minHeight: 120,
+    borderRadius: 21,
+    padding: 12,
     borderWidth: 1,
   },
 
@@ -2558,54 +2268,54 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#253455',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   quickValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginTop: 17,
+    marginTop: 10,
   },
 
   quickWeightValue: {
     color: '#4C3C9B',
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 25,
+    fontFamily: 'Quicksand-Bold',
+    marginTop:-9,
   },
 
   quickWeightUnit: {
     marginLeft: 4,
     color: '#7568A8',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-SemiBold',
   },
 
   quickVetValue: {
-    minHeight: 43,
-    marginTop: 16,
+    minHeight: 34,
+    marginTop: 10,
     color: '#345C8D',
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   quickLink: {
-    marginTop: 'auto',
-    paddingTop: 11,
+    marginTop: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
 
   quickWeightLinkText: {
     color: '#8067E8',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   quickVetLinkText: {
     color: '#4F8EDB',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   healthDashboardCard: {
@@ -2618,11 +2328,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 2,
-  },
-
-  treatmentCard: {
-    backgroundColor: '#FFF1E7',
-    borderColor: '#F5DDCC',
   },
 
   allergyCard: {
@@ -2650,10 +2355,6 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
 
-  treatmentIcon: {
-    backgroundColor: '#FFE3CF',
-  },
-
   allergyDashboardIcon: {
     backgroundColor: '#FFDEE6',
   },
@@ -2669,7 +2370,7 @@ const styles = StyleSheet.create({
   dashboardTitle: {
     color: '#172348',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   dashboardSubtitle: {
@@ -2677,7 +2378,7 @@ const styles = StyleSheet.create({
     color: '#7E8294',
     fontSize: 11.2,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
   },
 
   dashboardTextArea: {
@@ -2687,41 +2388,16 @@ const styles = StyleSheet.create({
     color: '#4C5265',
     fontSize: 12.5,
     lineHeight: 19,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
     paddingHorizontal: 13,
     paddingTop: 12,
     paddingBottom: 12,
     textAlignVertical: 'top',
   },
 
-  treatmentInput: {
-    backgroundColor: '#FFF8F3',
-    borderColor: '#F2D8C6',
-  },
-
   allergyInput: {
     backgroundColor: '#FFF8FA',
     borderColor: '#F1D5DD',
-  },
-
-  addTreatmentButton: {
-    height: 47,
-    marginTop: 10,
-    borderRadius: 16,
-    borderWidth: 1.3,
-    borderStyle: 'dashed',
-    borderColor: '#D99A70',
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  addTreatmentText: {
-    marginLeft: 7,
-    color: '#B66A3D',
-    fontSize: 12.5,
-    fontWeight: '800',
   },
 
   timeline: {
@@ -2763,7 +2439,7 @@ const styles = StyleSheet.create({
   timelineDate: {
     color: '#8B7A50',
     fontSize: 10.5,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     marginBottom: 5,
   },
 
@@ -2778,7 +2454,7 @@ const styles = StyleSheet.create({
   timelineTitle: {
     color: '#30364B',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
   },
 
   timelineDetail: {
@@ -2786,7 +2462,36 @@ const styles = StyleSheet.create({
     color: '#737887',
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Medium',
+  },
+
+  emptyHistoryBox: {
+    minHeight: 96,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderWidth: 1,
+    borderColor: '#EADFBF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    marginBottom: 10,
+  },
+
+  emptyHistoryTitle: {
+    color: '#66562F',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
+    textAlign: 'center',
+  },
+
+  emptyHistoryText: {
+    marginTop: 5,
+    color: '#8B816B',
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: 'Quicksand-Medium',
+    textAlign: 'center',
   },
 
   historyButton: {
@@ -2804,34 +2509,8 @@ const styles = StyleSheet.create({
   historyButtonText: {
     color: '#9A742F',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontFamily: 'Quicksand-Bold',
     marginRight: 4,
-  },
-
-  emptyTabCard: {
-    minHeight: 190,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderColor: '#ECE9F8',
-  },
-
-  emptyTabTitle: {
-    marginTop: 12,
-    color: '#172348',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  emptyTabText: {
-    marginTop: 6,
-    color: '#7D89A6',
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
   },
 
   /*
@@ -2884,7 +2563,7 @@ const styles = StyleSheet.create({
 
     fontSize: 17,
 
-    fontWeight: '600',
+    fontFamily: 'Quicksand-SemiBold',
 
     marginLeft: 12,
   },
@@ -2899,7 +2578,7 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#D65C72',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Quicksand-SemiBold',
   },
   pressed: {
     opacity: 0.75,
@@ -3049,6 +2728,4 @@ const styles = StyleSheet.create({
   },
 
 });
-
-
 
