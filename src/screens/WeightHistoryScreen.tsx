@@ -81,11 +81,6 @@ type FilterType =
   | '3months'
   | '1year';
 
-type ChartPoint = {
-  x: number;
-  y: number;
-  record: WeightRecord;
-};
 
 type PopupType =
   | 'error'
@@ -554,10 +549,6 @@ export default function WeightHistoryScreen({
     },
   ]);
 
-  const [
-    chartWidth,
-    setChartWidth,
-  ] = useState(0);
 
   const [
     weightRecords,
@@ -2364,7 +2355,7 @@ const styles =
     },
 
     scrollContent: {
-      paddingTop: 60,
+      paddingTop: 20,
       paddingHorizontal: 14,
       paddingBottom: 32,
     },

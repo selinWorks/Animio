@@ -1544,7 +1544,7 @@ const styles = StyleSheet.create({
 
   heroTopBar: {
     position: 'absolute',
-    top: 52,
+    top: 25,
     left: 20,
     right: 20,
     flexDirection: 'row',
