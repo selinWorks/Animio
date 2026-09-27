@@ -1,4 +1,10 @@
-import React, {useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import Svg, {Path} from 'react-native-svg';
 
 import {
@@ -30,7 +36,6 @@ import {
 } from 'lucide-react-native';
 
 import {
-  RouteProp,
   useNavigation,
 } from '@react-navigation/native';
 
@@ -40,6 +45,15 @@ import {
 
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
+
+import {
+  addWeightRecordToFirestore,
+  getWeightHistoryFromFirestore,
+  updateWeightRecordInFirestore,
+  deleteWeightRecordFromFirestore,
+} from '../services/firestore';
+
+import {useAuth} from '../data/AuthContext';
 import {WeightRecord} from '../types/Pet';
 
 
@@ -89,40 +103,6 @@ type PopupButton = {
 };
 
 
-const createSmoothPath = (
-  points: ChartPoint[],
-) => {
-  if (points.length === 0) {
-    return '';
-  }
-
-  if (points.length === 1) {
-    return `M ${points[0].x} ${points[0].y}`;
-  }
-
-  let path =
-    `M ${points[0].x} ${points[0].y}`;
-
-  for (
-    let i = 0;
-    i < points.length - 1;
-    i++
-  ) {
-    const current = points[i];
-    const next = points[i + 1];
-    const middleX =
-      (current.x + next.x) / 2;
-
-    path +=
-      ` C ${middleX} ${current.y},` +
-      ` ${middleX} ${next.y},` +
-      ` ${next.x} ${next.y}`;
-  }
-
-  return path;
-};
-
-
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -157,10 +137,46 @@ const FILTERS: {
    HELPERS
 ========================================================= */
 
+const createSmoothPath = (
+  points: ChartPoint[],
+) => {
+  if (points.length === 0) {
+    return '';
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  let path =
+    `M ${points[0].x} ${points[0].y}`;
+
+  for (
+    let i = 0;
+    i < points.length - 1;
+    i++
+  ) {
+    const current = points[i];
+    const next = points[i + 1];
+
+    const middleX =
+      (current.x + next.x) / 2;
+
+    path +=
+      ` C ${middleX} ${current.y},` +
+      ` ${middleX} ${next.y},` +
+      ` ${next.x} ${next.y}`;
+  }
+
+  return path;
+};
+
+
 const getTodayText = () => {
   const now = new Date();
 
-  const year = now.getFullYear();
+  const year =
+    now.getFullYear();
 
   const month = String(
     now.getMonth() + 1,
@@ -174,8 +190,32 @@ const getTodayText = () => {
 };
 
 
-const dateToInput = (date: string) => {
-  const parsed = new Date(date);
+const dateToInput = (
+  date: string,
+) => {
+  if (!date) {
+    return '';
+  }
+
+  /*
+   * YYYY-MM-DD şeklinde geldiyse
+   * timezone dönüşümü yapmadan kullan.
+   */
+  const simpleMatch =
+    /^(\d{4})-(\d{2})-(\d{2})/.exec(
+      date,
+    );
+
+  if (simpleMatch) {
+    return (
+      `${simpleMatch[1]}-` +
+      `${simpleMatch[2]}-` +
+      `${simpleMatch[3]}`
+    );
+  }
+
+  const parsed =
+    new Date(date);
 
   if (
     Number.isNaN(
@@ -233,10 +273,8 @@ const inputToISO = (
     );
 
   if (
-    date.getFullYear() !==
-      year ||
-    date.getMonth() !==
-      month - 1 ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
     date.getDate() !== day
   ) {
     return null;
@@ -249,7 +287,12 @@ const inputToISO = (
 const formatDate = (
   date: string,
 ) => {
-  const parsed = new Date(date);
+  if (!date) {
+    return '';
+  }
+
+  const parsed =
+    new Date(date);
 
   if (
     Number.isNaN(
@@ -273,7 +316,12 @@ const formatDate = (
 const formatShortDate = (
   date: string,
 ) => {
-  const parsed = new Date(date);
+  if (!date) {
+    return '';
+  }
+
+  const parsed =
+    new Date(date);
 
   if (
     Number.isNaN(
@@ -373,6 +421,27 @@ const getFilteredRecords = (
 };
 
 
+const parsePetWeight = (
+  value: unknown,
+) => {
+  const parsed =
+    Number(
+      String(value ?? '')
+        .replace(',', '.')
+        .replace(/[^\d.]/g, ''),
+    );
+
+  if (
+    Number.isFinite(parsed) &&
+    parsed > 0
+  ) {
+    return parsed;
+  }
+
+  return 0;
+};
+
+
 /* =========================================================
    SCREEN
 ========================================================= */
@@ -386,16 +455,17 @@ export default function WeightHistoryScreen({
   const navigation =
     useNavigation<NavigationProp>();
 
-  const {
-    pets,
-    updatePet,
-  } = usePets();
+  const {pets, reloadPets} = usePets();
+
+  const {user} =
+    useAuth();
 
 
-  /* ---------------------------------------------------------
-     LIVE PET
-  --------------------------------------------------------- */
-
+  /*
+   * ÖNEMLİ:
+   * Burada artık ikinci bir `const pet`
+   * tanımlanmıyor.
+   */
   const pet =
     pets.find(
       item =>
@@ -437,10 +507,21 @@ export default function WeightHistoryScreen({
   ] = useState(
     getTodayText(),
   );
+
   const [
     saving,
     setSaving,
   ] = useState(false);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    records,
+    setRecords,
+  ] = useState<WeightRecord[]>([]);
 
   const [
     popupVisible,
@@ -460,7 +541,8 @@ export default function WeightHistoryScreen({
   const [
     popupType,
     setPopupType,
-  ] = useState<PopupType>('info');
+  ] =
+    useState<PopupType>('info');
 
   const [
     popupButtons,
@@ -477,114 +559,85 @@ export default function WeightHistoryScreen({
     setChartWidth,
   ] = useState(0);
 
+  const [
+    weightRecords,
+    setWeightRecords,
+  ] = useState<WeightRecord[]>([]);
+
+  const [
+    historyLoading,
+    setHistoryLoading,
+  ] = useState(true);
+
 
   /* ---------------------------------------------------------
-     RECORDS
+     LOAD WEIGHT HISTORY
   --------------------------------------------------------- */
 
-  const allRecords = useMemo(() => {
-    const history = Array.isArray(pet.weightHistory)
-      ? pet.weightHistory.filter(
-          item =>
-            item &&
-            Number.isFinite(Number(item.weight)) &&
-            Number(item.weight) > 0 &&
-            item.date,
-        )
-      : [];
+  const loadWeightHistory =
+    async () => {
+      try {
+        setLoading(true);
 
-    const sortedHistory = sortAscending(history);
-
-    /*
-     * Hayvan ilk oluşturulduğunda weightHistory henüz
-     * oluşmamış olabilir.
-     *
-     * Bu durumda pet.weight içindeki ilk kiloyu
-     * grafiğe dahil ediyoruz.
-     */
-    if (sortedHistory.length === 0) {
-      const parsedWeight = Number(
-        String(pet.weight ?? '')
-          .replace(',', '.')
-          .replace(/[^\d.]/g, ''),
-      );
-
-      if (
-        Number.isFinite(parsedWeight) &&
-        parsedWeight > 0
-      ) {
-        let initialDate = new Date();
-
-        /*
-         * createdAt varsa ilk kilo tarihi olarak onu kullan.
-         */
-        try {
-          if (pet.createdAt?.toDate) {
-            const firestoreDate =
-              pet.createdAt.toDate();
-
-            if (
-              firestoreDate instanceof Date &&
-              !Number.isNaN(
-                firestoreDate.getTime(),
-              )
-            ) {
-              initialDate = firestoreDate;
-            }
-          } else if (pet.createdAt instanceof Date) {
-            initialDate = pet.createdAt;
-          } else if (
-            typeof pet.createdAt === 'string'
-          ) {
-            const parsedDate =
-              new Date(pet.createdAt);
-
-            if (
-              !Number.isNaN(
-                parsedDate.getTime(),
-              )
-            ) {
-              initialDate = parsedDate;
-            }
-          }
-        } catch (error) {
-          console.log(
-            'İlk kilo tarihi alınamadı:',
-            error,
+        const history =
+          await getWeightHistoryFromFirestore(
+            pet.id,
           );
-        }
 
-        return [
-          {
-            id: `initial-weight-${pet.id}`,
-            weight: Number(
-              parsedWeight.toFixed(2),
-            ),
-            date: initialDate.toISOString(),
-          },
-        ];
+        const safeHistory =
+          Array.isArray(history)
+            ? history.filter(
+                item =>
+                  item &&
+                  Number.isFinite(
+                    Number(item.weight),
+                  ) &&
+                  Number(item.weight) > 0 &&
+                  !!item.date,
+              )
+            : [];
+
+        setRecords(
+          sortAscending(
+            safeHistory,
+          ),
+        );
+      } catch (error) {
+        console.error(
+          'KİLO GEÇMİŞİ YÜKLEME HATASI:',
+          error,
+        );
+
+        setRecords([]);
+
+        showPopup(
+          'Kayıtlar yüklenemedi',
+          'Kilo geçmişi alınırken bir sorun oluştu.',
+          'error',
+        );
+      } finally {
+        setLoading(false);
       }
+    };
 
-      return [];
-    }
 
-    return sortedHistory;
-  }, [
-    pet.id,
-    pet.weight,
-    pet.weightHistory,
-    pet.createdAt,
-  ]);
+  useEffect(() => {
+    loadWeightHistory();
+  }, [pet.id]);
 
+
+  /* ---------------------------------------------------------
+     FILTERED RECORDS
+  --------------------------------------------------------- */
 
   const filteredRecords =
     useMemo(() => {
       return getFilteredRecords(
-        allRecords,
+        records,
         activeFilter,
       );
     }, [
-      allRecords,
+      records,
       activeFilter,
     ]);
 
@@ -604,20 +657,20 @@ export default function WeightHistoryScreen({
   --------------------------------------------------------- */
 
   const latestRecord =
-    allRecords.length > 0
-      ? allRecords[
-          allRecords.length - 1
+    records.length > 0
+      ? records[
+          records.length - 1
         ]
       : null;
 
 
   const currentWeight =
     latestRecord
-      ? latestRecord.weight
-      : Number(
-          String(
-            pet.weight ?? '',
-          ).replace(',', '.'),
+      ? Number(
+          latestRecord.weight,
+        )
+      : parsePetWeight(
+          pet.weight,
         );
 
 
@@ -629,57 +682,8 @@ export default function WeightHistoryScreen({
 
 
   /* ---------------------------------------------------------
-     MODAL
+     POPUPS
   --------------------------------------------------------- */
-
-  const openAddModal = () => {
-    setEditingRecord(null);
-
-    setWeightInput(
-      hasCurrentWeight
-        ? String(
-            currentWeight,
-          )
-        : '',
-    );
-
-    setDateInput(
-      getTodayText(),
-    );
-setModalVisible(true);
-  };
-
-
-  const openEditModal = (
-    record: WeightRecord,
-  ) => {
-    setEditingRecord(
-      record,
-    );
-
-    setWeightInput(
-      String(record.weight),
-    );
-
-    setDateInput(
-      dateToInput(
-        record.date,
-      ),
-    );
-setModalVisible(true);
-  };
-
-
-  const closeModal = () => {
-    if (saving) {
-      return;
-    }
-
-    setModalVisible(false);
-
-    setEditingRecord(null);
-  };
-
 
   const showPopup = (
     title: string,
@@ -699,19 +703,23 @@ setModalVisible(true);
     setPopupVisible(true);
   };
 
+
   const closePopup = () => {
     setPopupVisible(false);
   };
 
-  const handlePopupButtonPress = async (
-    button: PopupButton,
-  ) => {
-    setPopupVisible(false);
 
-    if (button.onPress) {
-      await button.onPress();
-    }
-  };
+  const handlePopupButtonPress =
+    async (
+      button: PopupButton,
+    ) => {
+      setPopupVisible(false);
+
+      if (button.onPress) {
+        await button.onPress();
+      }
+    };
+
 
   const renderPopupIcon = () => {
     if (popupType === 'weight') {
@@ -783,37 +791,99 @@ setModalVisible(true);
     );
   };
 
-  const getPopupIconStyle = () => {
-    switch (popupType) {
-      case 'success':
-        return styles.popupIconSuccess;
-      case 'weight':
-      case 'date':
-      case 'info':
-        return styles.popupIconInfo;
-      case 'delete':
-      case 'error':
-        return styles.popupIconDanger;
-      case 'warning':
-        return styles.popupIconWarning;
-      default:
-        return styles.popupIconInfo;
-    }
+
+  const getPopupIconStyle =
+    () => {
+      switch (popupType) {
+        case 'success':
+          return styles.popupIconSuccess;
+
+        case 'weight':
+        case 'date':
+        case 'info':
+          return styles.popupIconInfo;
+
+        case 'delete':
+        case 'error':
+          return styles.popupIconDanger;
+
+        case 'warning':
+          return styles.popupIconWarning;
+
+        default:
+          return styles.popupIconInfo;
+      }
+    };
+
+
+  /* ---------------------------------------------------------
+     MODAL
+  --------------------------------------------------------- */
+
+  const openAddModal = () => {
+    setEditingRecord(null);
+
+    setWeightInput(
+      hasCurrentWeight
+        ? String(currentWeight)
+        : '',
+    );
+
+    setDateInput(
+      getTodayText(),
+    );
+
+    setModalVisible(true);
   };
+
+
+  const openEditModal = (
+    record: WeightRecord,
+  ) => {
+    setEditingRecord(
+      record,
+    );
+
+    setWeightInput(
+      String(record.weight),
+    );
+
+    setDateInput(
+      dateToInput(
+        record.date,
+      ),
+    );
+
+    setModalVisible(true);
+  };
+
+
+  const closeModal = () => {
+    if (saving) {
+      return;
+    }
+
+    setModalVisible(false);
+    setEditingRecord(null);
+  };
+
 
   /* ---------------------------------------------------------
      SAVE RECORD
   --------------------------------------------------------- */
 
   const saveRecord = async () => {
-    const parsedWeight = Number(
-      weightInput
-        .trim()
-        .replace(',', '.'),
-    );
+    const parsedWeight =
+      Number(
+        weightInput
+          .trim()
+          .replace(',', '.'),
+      );
 
     if (
-      !Number.isFinite(parsedWeight) ||
+      !Number.isFinite(
+        parsedWeight,
+      ) ||
       parsedWeight <= 0
     ) {
       showPopup(
@@ -835,7 +905,10 @@ setModalVisible(true);
       return;
     }
 
-    const isoDate = inputToISO(dateInput);
+    const isoDate =
+      inputToISO(
+        dateInput,
+      );
 
     if (!isoDate) {
       showPopup(
@@ -847,80 +920,65 @@ setModalVisible(true);
       return;
     }
 
-    const record: WeightRecord = {
-      id:
-        editingRecord?.id ??
-        `weight-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
-
-      weight: Number(
-        parsedWeight.toFixed(2),
-      ),
-
-      date: isoDate,
-    };
-
-    let nextRecords: WeightRecord[];
-
-    if (editingRecord) {
-      /*
-       * Düzenleme
-       */
-      nextRecords = allRecords.map(item =>
-        item.id === editingRecord.id
-          ? record
-          : item,
+    if (!user?.uid) {
+      showPopup(
+        'Oturum bulunamadı',
+        'Kilo kaydetmek için giriş yapmış olman gerekiyor.',
+        'error',
       );
-    } else {
-      /*
-       * Yeni kayıt
-       *
-       * Eğer allRecords içindeki tek kayıt
-       * initial-weight ile oluşturulmuş geçici
-       * ilk kayıt ise onu gerçek kayıtla değiştir.
-       */
-      const hasOnlyInitialRecord =
-        allRecords.length === 1 &&
-        allRecords[0].id ===
-          `initial-weight-${pet.id}`;
 
-      if (hasOnlyInitialRecord) {
-        nextRecords = [record];
-      } else {
-        nextRecords = [
-          ...allRecords,
-          record,
-        ];
-      }
+      return;
     }
-
-    nextRecords = sortAscending(
-      nextRecords,
-    );
-
-    const newestRecord =
-      nextRecords[
-        nextRecords.length - 1
-      ];
 
     try {
       setSaving(true);
 
-      await updatePet({
-        ...pet,
+      const finalWeight =
+        Number(
+          parsedWeight.toFixed(2),
+        );
 
-        weightHistory: nextRecords,
 
-        weight: String(
-          newestRecord.weight,
-        ),
-      });
+      /* =====================================================
+         YENİ KAYIT
+      ===================================================== */
+
+      if (!editingRecord) {
+        await addWeightRecordToFirestore(
+          pet.id,
+          finalWeight,
+          isoDate,
+          user.uid,
+        );
+      } else {
+        await updateWeightRecordInFirestore(
+          pet.id,
+          editingRecord.id,
+          finalWeight,
+          isoDate,
+          user.uid,
+        );
+      }
+
+      await loadWeightHistory();
+      await reloadPets();
 
       setModalVisible(false);
       setEditingRecord(null);
       setWeightInput('');
+      setDateInput(
+        getTodayText(),
+      );
 
+      showPopup(
+        editingRecord
+          ? 'Kayıt güncellendi'
+          : 'Kilo kaydedildi',
+        editingRecord
+          ? 'Kilo kaydı başarıyla güncellendi.'
+          : 'Yeni kilo kaydı başarıyla eklendi.',
+        'success',
+      );
     } catch (error) {
       console.error(
         'KİLO KAYIT HATASI:',
@@ -929,7 +987,7 @@ setModalVisible(true);
 
       showPopup(
         'Kayıt başarısız',
-        'Kilo kaydı güncellenirken bir sorun oluştu.',
+        'Kilo kaydı kaydedilirken bir sorun oluştu.',
         'error',
       );
     } finally {
@@ -945,10 +1003,20 @@ setModalVisible(true);
   const deleteRecord = (
     record: WeightRecord,
   ) => {
+    if (!user?.uid) {
+      showPopup(
+        'Oturum bulunamadı',
+        'Kilo kaydını silmek için giriş yapmış olman gerekiyor.',
+        'error',
+      );
+
+      return;
+    }
+
     showPopup(
       'Kilo kaydını sil',
       `${formatWeight(
-        record.weight,
+        Number(record.weight),
       )} kg olan bu kayıt silinsin mi?`,
       'delete',
       [
@@ -960,37 +1028,23 @@ setModalVisible(true);
           text: 'Sil',
           variant: 'danger',
           onPress: async () => {
-            const nextRecords =
-              sortAscending(
-                allRecords.filter(
-                  item =>
-                    item.id !==
-                    record.id,
-                ),
+            try {
+              await deleteWeightRecordFromFirestore(
+                pet.id,
+                record.id,
+                user.uid,
               );
 
-            const newestRecord =
-              nextRecords.length > 0
-                ? nextRecords[
-                    nextRecords.length - 1
-                  ]
-                : null;
+              await loadWeightHistory();
 
-            try {
-              await updatePet({
-                ...pet,
-                weightHistory:
-                  nextRecords,
-                weight:
-                  newestRecord
-                    ? String(
-                        newestRecord.weight,
-                      )
-                    : '',
-              });
+              showPopup(
+                'Kayıt silindi',
+                'Kilo kaydı başarıyla silindi.',
+                'success',
+              );
             } catch (error) {
-              console.log(
-                'Kilo kaydı silinemedi:',
+              console.error(
+                'KİLO KAYDI SİLME HATASI:',
                 error,
               );
 
@@ -1006,15 +1060,19 @@ setModalVisible(true);
     );
   };
 
+
   /* ---------------------------------------------------------
      CHART
   --------------------------------------------------------- */
 
-  const chartHeight = 165;
+  const chartHeight =
+    165;
 
-  const chartPaddingX = 16;
+  const chartPaddingX =
+    16;
 
-  const chartPaddingY = 18;
+  const chartPaddingY =
+    18;
 
 
   const chartPoints:
@@ -1028,13 +1086,11 @@ setModalVisible(true);
         return [];
       }
 
-
       const weights =
         filteredRecords.map(
           item =>
-            item.weight,
+            Number(item.weight),
         );
-
 
       let minWeight =
         Math.min(...weights);
@@ -1042,16 +1098,13 @@ setModalVisible(true);
       let maxWeight =
         Math.max(...weights);
 
-
       if (
         minWeight ===
         maxWeight
       ) {
         minWeight -= 0.5;
-
         maxWeight += 0.5;
       }
-
 
       const usableWidth =
         chartWidth -
@@ -1061,9 +1114,11 @@ setModalVisible(true);
         chartHeight -
         chartPaddingY * 2;
 
-
       return filteredRecords.map(
-        (record, index) => {
+        (
+          record,
+          index,
+        ) => {
           const x =
             filteredRecords.length ===
             1
@@ -1074,20 +1129,17 @@ setModalVisible(true);
                     1)) *
                   usableWidth;
 
-
           const normalized =
-            (record.weight -
+            (Number(record.weight) -
               minWeight) /
             (maxWeight -
               minWeight);
-
 
           const y =
             chartPaddingY +
             usableHeight -
             normalized *
               usableHeight;
-
 
           return {
             x,
@@ -1102,9 +1154,9 @@ setModalVisible(true);
     ]);
 
 
-  /* ---------------------------------------------------------
+  /* =========================================================
      RENDER
-  --------------------------------------------------------- */
+  ========================================================= */
 
   return (
     <View style={styles.screen}>
@@ -1119,7 +1171,6 @@ setModalVisible(true);
           styles.backgroundBlob
         }
       />
-
 
       <ScrollView
         showsVerticalScrollIndicator={
@@ -1152,8 +1203,8 @@ setModalVisible(true);
               color="#172348"
               strokeWidth={2.4}
             />
-          </Pressable>
 
+          </Pressable>
 
           <View
             style={
@@ -1173,7 +1224,6 @@ setModalVisible(true);
             </Text>
 
           </View>
-
         </View>
 
 
@@ -1199,7 +1249,6 @@ setModalVisible(true);
 
           </View>
 
-
           <View
             style={
               styles.currentContent
@@ -1211,7 +1260,6 @@ setModalVisible(true);
               }>
               GÜNCEL KİLO
             </Text>
-
 
             <View
               style={
@@ -1240,7 +1288,6 @@ setModalVisible(true);
 
             </View>
 
-
             <Text
               style={
                 styles.currentDescription
@@ -1252,7 +1299,6 @@ setModalVisible(true);
 
           </View>
 
-
           <View
             pointerEvents="none"
             style={
@@ -1261,7 +1307,9 @@ setModalVisible(true);
 
             <Image
               source={require('../assets/images/weight/weight-kettlebell.png')}
-              style={styles.kettlebellImage}
+              style={
+                styles.kettlebellImage
+              }
               resizeMode="contain"
             />
 
@@ -1357,7 +1405,6 @@ setModalVisible(true);
               </Text>
             </View>
 
-
             <View
               style={
                 styles.graphBadge
@@ -1374,17 +1421,106 @@ setModalVisible(true);
           </View>
 
 
-          {filteredRecords.length === 0 ? (
-            <View style={styles.graphEmpty}>
-              {[0, 1, 2, 3].map(item => (
-                <View key={`empty-h-${item}`} style={[styles.horizontalGrid, {top: 18 + item * 37}]} />
-              ))}
-              {[0, 1, 2, 3, 4].map(item => (
-                <View key={`empty-v-${item}`} style={[styles.verticalGrid, {left: `${item * 25}%`}]} />
-              ))}
+          {loading ? (
+            <View
+              style={
+                styles.graphEmpty
+              }>
 
-              <View style={styles.graphPreparingBadge}>
-                <Text style={styles.graphPreparingText}>Grafik hazırlanıyor</Text>
+              {[0, 1, 2, 3].map(
+                item => (
+                  <View
+                    key={`loading-h-${item}`}
+                    style={[
+                      styles.horizontalGrid,
+                      {
+                        top:
+                          18 +
+                          item * 37,
+                      },
+                    ]}
+                  />
+                ),
+              )}
+
+              {[0, 1, 2, 3, 4].map(
+                item => (
+                  <View
+                    key={`loading-v-${item}`}
+                    style={[
+                      styles.verticalGrid,
+                      {
+                        left:
+                          `${item * 25}%`,
+                      },
+                    ]}
+                  />
+                ),
+              )}
+
+              <View
+                style={
+                  styles.graphPreparingBadge
+                }>
+
+                <Text
+                  style={
+                    styles.graphPreparingText
+                  }>
+                  Kayıtlar yükleniyor
+                </Text>
+
+              </View>
+            </View>
+          ) : filteredRecords.length === 0 ? (
+            <View
+              style={
+                styles.graphEmpty
+              }>
+
+              {[0, 1, 2, 3].map(
+                item => (
+                  <View
+                    key={`empty-h-${item}`}
+                    style={[
+                      styles.horizontalGrid,
+                      {
+                        top:
+                          18 +
+                          item * 37,
+                      },
+                    ]}
+                  />
+                ),
+              )}
+
+              {[0, 1, 2, 3, 4].map(
+                item => (
+                  <View
+                    key={`empty-v-${item}`}
+                    style={[
+                      styles.verticalGrid,
+                      {
+                        left:
+                          `${item * 25}%`,
+                      },
+                    ]}
+                  />
+                ),
+              )}
+
+              <View
+                style={
+                  styles.graphPreparingBadge
+                }>
+
+                <Text
+                  style={
+                    styles.graphPreparingText
+                  }>
+                  Grafik hazırlanıyor
+                </Text>
+
               </View>
             </View>
           ) : (
@@ -1400,26 +1536,21 @@ setModalVisible(true);
                   )
                 }>
 
-                {/* GRID */}
-
                 {[0, 1, 2, 3].map(
                   item => (
                     <View
                       key={`h-${item}`}
                       style={[
                         styles.horizontalGrid,
-
                         {
                           top:
                             15 +
-                            item *
-                              42,
+                            item * 42,
                         },
                       ]}
                     />
                   ),
                 )}
-
 
                 {[0, 1, 2, 3, 4].map(
                   item => (
@@ -1427,43 +1558,49 @@ setModalVisible(true);
                       key={`v-${item}`}
                       style={[
                         styles.verticalGrid,
-
                         {
-                          left: `${
-                            item *
-                            25
-                          }%`,
+                          left:
+                            `${item * 25}%`,
                         },
                       ]}
                     />
                   ),
                 )}
 
+                {chartWidth > 0 &&
+                  chartPoints.length > 0 && (
+                    <Svg
+                      pointerEvents="none"
+                      width={
+                        chartWidth
+                      }
+                      height={
+                        chartHeight
+                      }
+                      style={
+                        StyleSheet.absoluteFill
+                      }>
 
-                {/* SMOOTH LINE */}
+                      {chartPoints.length >
+                        1 && (
+                        <Path
+                          d={createSmoothPath(
+                            chartPoints,
+                          )}
+                          fill="none"
+                          stroke={
+                            PURPLE
+                          }
+                          strokeWidth={
+                            2.5
+                          }
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
 
-                {chartWidth > 0 && chartPoints.length > 0 && (
-                  <Svg
-                    pointerEvents="none"
-                    width={chartWidth}
-                    height={chartHeight}
-                    style={StyleSheet.absoluteFill}
-                  >
-                    {chartPoints.length > 1 && (
-                      <Path
-                        d={createSmoothPath(chartPoints)}
-                        fill="none"
-                        stroke={PURPLE}
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    )}
-                  </Svg>
-                )}
-
-
-                {/* DOTS */}
+                    </Svg>
+                  )}
 
                 {chartPoints.map(
                   point => (
@@ -1473,12 +1610,10 @@ setModalVisible(true);
                       }
                       style={[
                         styles.chartDotOuter,
-
                         {
                           left:
                             point.x -
                             6,
-
                           top:
                             point.y -
                             6,
@@ -1496,7 +1631,6 @@ setModalVisible(true);
                 )}
 
               </View>
-
 
               <View
                 style={
@@ -1528,7 +1662,6 @@ setModalVisible(true);
               </View>
             </>
           )}
-
 
         </View>
 
@@ -1563,7 +1696,6 @@ setModalVisible(true);
               </Text>
             </View>
 
-
             {filteredRecords.length >
               0 && (
               <View
@@ -1586,19 +1718,39 @@ setModalVisible(true);
           </View>
 
 
-          {listRecords.length ===
-          0 ? (
+          {loading ? (
             <View
               style={
                 styles.emptyHistory
               }>
 
-              <View style={styles.emptyScaleWrapper}>
+              <Text
+                style={
+                  styles.emptyTitle
+                }>
+                Kayıtlar yükleniyor...
+              </Text>
+
+            </View>
+          ) : listRecords.length === 0 ? (
+            <View
+              style={
+                styles.emptyHistory
+              }>
+
+              <View
+                style={
+                  styles.emptyScaleWrapper
+                }>
+
                 <Image
                   source={require('../assets/images/weight/weight-empty-scale.png')}
-                  style={styles.emptyScaleImage}
+                  style={
+                    styles.emptyScaleImage
+                  }
                   resizeMode="contain"
                 />
+
               </View>
 
               <Text
@@ -1636,7 +1788,6 @@ setModalVisible(true);
                     }
                     style={[
                       styles.recordRow,
-
                       index !==
                         listRecords.length -
                           1 &&
@@ -1655,7 +1806,6 @@ setModalVisible(true);
                       />
 
                     </View>
-
 
                     <View
                       style={
@@ -1677,7 +1827,9 @@ setModalVisible(true);
                               styles.recordWeight
                             }>
                             {formatWeight(
-                              record.weight,
+                              Number(
+                                record.weight,
+                              ),
                             )}
                           </Text>
 
@@ -1689,7 +1841,6 @@ setModalVisible(true);
                           </Text>
 
                         </View>
-
 
                         <View
                           style={
@@ -1715,7 +1866,6 @@ setModalVisible(true);
 
                       </View>
 
-
                       <View
                         style={
                           styles.recordActions
@@ -1731,7 +1881,6 @@ setModalVisible(true);
                             pressed,
                           }) => [
                             styles.editAction,
-
                             pressed &&
                               styles.pressed,
                           ]}>
@@ -1751,7 +1900,6 @@ setModalVisible(true);
 
                         </Pressable>
 
-
                         <Pressable
                           onPress={() =>
                             deleteRecord(
@@ -1762,7 +1910,6 @@ setModalVisible(true);
                             pressed,
                           }) => [
                             styles.deleteAction,
-
                             pressed &&
                               styles.pressed,
                           ]}>
@@ -1793,10 +1940,28 @@ setModalVisible(true);
           )}
 
           <Pressable
-            onPress={openAddModal}
-            style={({pressed}) => [styles.addButton, pressed && styles.addButtonPressed]}>
-            <Plus size={20} color="#FFFFFF" strokeWidth={2.6} />
-            <Text style={styles.addButtonText}>Yeni Kilo Ekle</Text>
+            onPress={
+              openAddModal
+            }
+            style={({pressed}) => [
+              styles.addButton,
+              pressed &&
+                styles.addButtonPressed,
+            ]}>
+
+            <Plus
+              size={20}
+              color="#FFFFFF"
+              strokeWidth={2.6}
+            />
+
+            <Text
+              style={
+                styles.addButtonText
+              }>
+              Yeni Kilo Ekle
+            </Text>
+
           </Pressable>
 
         </View>
@@ -1836,7 +2001,6 @@ setModalVisible(true);
             }
           />
 
-
           <View
             style={
               styles.modalCard
@@ -1866,7 +2030,6 @@ setModalVisible(true);
                 </Text>
               </View>
 
-
               <Pressable
                 onPress={
                   closeModal
@@ -1875,7 +2038,6 @@ setModalVisible(true);
                   pressed,
                 }) => [
                   styles.modalClose,
-
                   pressed &&
                     styles.pressed,
                 ]}>
@@ -1887,6 +2049,7 @@ setModalVisible(true);
                 />
 
               </Pressable>
+
             </View>
 
 
@@ -1972,7 +2135,6 @@ setModalVisible(true);
 
             </View>
 
-
             <Text
               style={
                 styles.inputHint
@@ -1980,7 +2142,8 @@ setModalVisible(true);
               Örnek: 2026-09-23
             </Text>
 
-            {/* MODAL ACTIONS */}
+
+            {/* ACTIONS */}
 
             <View
               style={
@@ -1988,7 +2151,9 @@ setModalVisible(true);
               }>
 
               <Pressable
-                disabled={saving}
+                disabled={
+                  saving
+                }
                 onPress={
                   closeModal
                 }
@@ -1996,7 +2161,6 @@ setModalVisible(true);
                   pressed,
                 }) => [
                   styles.cancelButton,
-
                   pressed &&
                     styles.pressed,
                 ]}>
@@ -2010,9 +2174,10 @@ setModalVisible(true);
 
               </Pressable>
 
-
               <Pressable
-                disabled={saving}
+                disabled={
+                  saving
+                }
                 onPress={
                   saveRecord
                 }
@@ -2020,10 +2185,8 @@ setModalVisible(true);
                   pressed,
                 }) => [
                   styles.saveButton,
-
                   pressed &&
                     styles.addButtonPressed,
-
                   saving &&
                     styles.disabledButton,
                 ]}>
@@ -2054,36 +2217,64 @@ setModalVisible(true);
         </KeyboardAvoidingView>
       </Modal>
 
+
       {/* ===================================================
           CUSTOM POPUPS
       =================================================== */}
+
       <Modal
         visible={popupVisible}
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={closePopup}>
-        <View style={styles.popupOverlay}>
-          <View style={styles.popupCard}>
+        onRequestClose={
+          closePopup
+        }>
+
+        <View
+          style={
+            styles.popupOverlay
+          }>
+
+          <View
+            style={
+              styles.popupCard
+            }>
+
             <View
               style={[
                 styles.popupIcon,
                 getPopupIconStyle(),
               ]}>
+
               {renderPopupIcon()}
+
             </View>
 
-            <Text style={styles.popupTitle}>
+            <Text
+              style={
+                styles.popupTitle
+              }>
               {popupTitle}
             </Text>
 
-            <Text style={styles.popupMessage}>
+            <Text
+              style={
+                styles.popupMessage
+              }>
               {popupMessage}
             </Text>
 
-            <View style={styles.popupActions}>
+            <View
+              style={
+                styles.popupActions
+              }>
+
               {popupButtons.map(
-                (button, index) => (
+                (
+                  button,
+                  index,
+                ) => (
                   <Pressable
                     key={`${button.text}-${index}`}
                     onPress={() =>
@@ -2091,18 +2282,25 @@ setModalVisible(true);
                         button,
                       )
                     }
-                    style={({pressed}) => [
+                    style={({
+                      pressed,
+                    }) => [
                       styles.popupButton,
+
                       button.variant ===
                         'secondary' &&
                         styles.popupButtonSecondary,
+
                       button.variant ===
                         'danger' &&
                         styles.popupButtonDanger,
+
                       pressed &&
                         styles.popupButtonPressed,
                     ]}>
-                    {button.variant === 'danger' && (
+
+                    {button.variant ===
+                      'danger' && (
                       <Trash2
                         size={17}
                         color="#FFFFFF"
@@ -2113,17 +2311,24 @@ setModalVisible(true);
                     <Text
                       style={[
                         styles.popupButtonText,
+
                         button.variant ===
                           'secondary' &&
                           styles.popupButtonTextSecondary,
                       ]}>
-                      {button.text}
+                      {
+                        button.text
+                      }
                     </Text>
+
                   </Pressable>
                 ),
               )}
+
             </View>
+
           </View>
+
         </View>
       </Modal>
 
@@ -2145,25 +2350,18 @@ const styles =
         '#F9F8FF',
     },
 
-
     backgroundBlob: {
       position:
         'absolute',
-
       width: 270,
       height: 270,
-
       borderRadius: 135,
-
       backgroundColor:
         '#EEE9FF',
-
       top: -135,
       right: -115,
-
       opacity: 0.9,
     },
-
 
     scrollContent: {
       paddingTop: 60,
@@ -2181,96 +2379,46 @@ const styles =
       marginBottom: 14,
     },
 
-
     backButton: {
       width: 40,
       height: 40,
       borderRadius: 24,
-
       backgroundColor:
         '#FFFFFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      alignItems: 'center',
+      justifyContent: 'center',
       borderWidth: 1,
-
       borderColor:
         '#EFEDF6',
-
       shadowColor:
         '#6C63A8',
-
       shadowOffset: {
         width: 0,
         height: 4,
       },
-
       shadowOpacity: 0.1,
       shadowRadius: 9,
-
       elevation: 3,
     },
 
-
     headerText: {
       flex: 1,
-
       paddingHorizontal: 14,
     },
 
-
     title: {
       color: '#172348',
-
       fontSize: 21,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     subtitle: {
       marginTop: 1,
-
       color: '#8A90A3',
-
       fontSize: 11.5,
-
       fontFamily:
         'Quicksand-Medium',
-    },
-
-
-    headerAddButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-
-      backgroundColor:
-        PURPLE,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      shadowColor:
-        PURPLE,
-
-      shadowOffset: {
-        width: 0,
-        height: 5,
-      },
-
-      shadowOpacity: 0.23,
-      shadowRadius: 9,
-
-      elevation: 5,
     },
 
 
@@ -2278,151 +2426,95 @@ const styles =
 
     currentCard: {
       height: 112,
-
       borderRadius: 22,
-
       backgroundColor:
         '#F0ECFF',
-
       borderWidth: 1,
-
       borderColor:
         '#DDD4FF',
-
       padding: 14,
-
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       overflow: 'hidden',
-
       shadowColor:
         '#7766D0',
-
       shadowOffset: {
         width: 0,
         height: 5,
       },
-
       shadowOpacity: 0.08,
-
       shadowRadius: 11,
-
       elevation: 2,
     },
-
 
     currentIcon: {
       width: 42,
       height: 42,
-
       borderRadius: 14,
-
       backgroundColor:
         '#E1DAFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      alignItems: 'center',
+      justifyContent: 'center',
       marginRight: 11,
-
       zIndex: 2,
     },
-
 
     currentContent: {
       flex: 1,
-
       zIndex: 2,
     },
 
-
     currentLabel: {
       color: '#7968C8',
-
       fontSize: 10,
-
       fontFamily:
         'Quicksand-Bold',
-
       letterSpacing: 0.8,
     },
 
-
     currentValueRow: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'baseline',
-
+      flexDirection: 'row',
+      alignItems: 'baseline',
       marginTop: 1,
     },
-
 
     currentValue: {
       color:
         DARK_PURPLE,
-
       fontSize: 38,
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     currentUnit: {
       marginLeft: 4,
-
       color: '#7467A5',
-
       fontSize: 13,
-
       fontFamily:
         'Quicksand-Bold',
-
       marginBottom: 5,
     },
 
-
     currentDescription: {
       maxWidth: 180,
-
       color: '#8177A4',
-
       fontSize: 9.5,
-
       lineHeight: 13,
-
       fontFamily:
         'Quicksand-Medium',
-
       marginTop: 0,
     },
-
 
     decorativeWeight: {
       position:
         'absolute',
-
       right: 2,
       bottom: -8,
-
       width: 110,
       height: 110,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      alignItems: 'center',
+      justifyContent: 'center',
       zIndex: 1,
     },
-
 
     kettlebellImage: {
       width: 110,
@@ -2433,78 +2525,52 @@ const styles =
     /* FILTER */
 
     filters: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       marginTop: 10,
       marginBottom: 10,
-
       backgroundColor:
         '#FFFFFF',
-
       borderRadius: 18,
-
       padding: 4,
-
       borderWidth: 1,
-
       borderColor:
         '#ECE9F7',
-
       shadowColor:
         '#77709A',
-
       shadowOffset: {
         width: 0,
         height: 3,
       },
-
       shadowOpacity: 0.04,
-
       shadowRadius: 7,
-
       elevation: 1,
     },
 
-
     filterButton: {
       flex: 1,
-
       height: 34,
-
       borderRadius: 14,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     filterButtonActive: {
       backgroundColor:
         '#EDE8FF',
     },
 
-
     filterText: {
       color: '#9299AC',
-
       fontSize: 10.5,
-
       fontFamily:
         'Quicksand-SemiBold',
     },
 
-
     filterTextActive: {
       color: '#6652C6',
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     filterPressed: {
       opacity: 0.75,
@@ -2515,128 +2581,92 @@ const styles =
 
     graphCard: {
       borderRadius: 22,
-
       backgroundColor:
         '#FFFFFF',
-
       borderWidth: 1,
-
       borderColor:
         '#ECE9F7',
-
       padding: 14,
-
       shadowColor:
         '#6973A0',
-
       shadowOffset: {
         width: 0,
         height: 5,
       },
-
       shadowOpacity: 0.06,
-
       shadowRadius: 11,
-
       elevation: 2,
     },
 
-
     graphHeader: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       justifyContent:
         'space-between',
-
-      alignItems:
-        'center',
+      alignItems: 'center',
     },
-
 
     cardTitle: {
       color: '#172348',
-
       fontSize: 15.5,
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     cardSubtitle: {
       color: '#9299AC',
-
       fontSize: 10.5,
-
       fontFamily:
         'Quicksand-Medium',
-
       marginTop: 2,
     },
 
-
     graphBadge: {
       minWidth: 39,
-
       height: 28,
-
       paddingHorizontal: 9,
-
       borderRadius: 11,
-
       backgroundColor:
         '#F0ECFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     graphBadgeText: {
       color: PURPLE,
-
       fontSize: 10.5,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     graphEmpty: {
       height: 150,
-
       position: 'relative',
-
       overflow: 'hidden',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingHorizontal: 30,
     },
-
 
     graphPreparingBadge: {
       position: 'absolute',
       alignSelf: 'center',
       top: 58,
-      backgroundColor: 'rgba(255,255,255,0.94)',
+      backgroundColor:
+        'rgba(255,255,255,0.94)',
       borderWidth: 1,
-      borderColor: '#E8E2FF',
+      borderColor:
+        '#E8E2FF',
       paddingHorizontal: 13,
       height: 29,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#7565B5',
-      shadowOffset: {width: 0, height: 4},
+      shadowColor:
+        '#7565B5',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
       shadowOpacity: 0.08,
       shadowRadius: 8,
       elevation: 2,
@@ -2645,232 +2675,122 @@ const styles =
     graphPreparingText: {
       color: '#7867C9',
       fontSize: 9.5,
-      fontFamily: 'Quicksand-Bold',
-    },
-
-    graphEmptyIcon: {
-      width: 55,
-      height: 55,
-
-      borderRadius: 19,
-
-      backgroundColor:
-        '#F2EFFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-    },
-
-
-    graphEmptyTitle: {
-      color: '#514978',
-
-      fontSize: 12.5,
-
       fontFamily:
         'Quicksand-Bold',
-
-      marginTop: 10,
-
-      textAlign: 'center',
     },
-
-
-    graphEmptyText: {
-      color: '#9A9FB0',
-
-      fontSize: 10.5,
-
-      lineHeight: 16,
-
-      fontFamily:
-        'Quicksand-Medium',
-
-      textAlign: 'center',
-
-      marginTop: 4,
-    },
-
 
     chartContainer: {
-      position:
-        'relative',
-
+      position: 'relative',
       height: 165,
-
       marginTop: 15,
-
       overflow: 'hidden',
     },
 
-
     horizontalGrid: {
-      position:
-        'absolute',
-
+      position: 'absolute',
       left: 0,
       right: 0,
-
       height: 1,
-
       backgroundColor:
         '#F0EEF7',
     },
 
-
     verticalGrid: {
-      position:
-        'absolute',
-
+      position: 'absolute',
       top: 0,
       bottom: 0,
-
       width: 1,
-
       backgroundColor:
         '#F3F1F8',
     },
 
-
     chartDotOuter: {
-      position:
-        'absolute',
-
+      position: 'absolute',
       width: 12,
       height: 12,
-
       borderRadius: 6,
-
       backgroundColor:
         '#E3DCFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     chartDot: {
       width: 6,
       height: 6,
-
       borderRadius: 3,
-
       backgroundColor:
         PURPLE,
     },
 
-
     chartDates: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       justifyContent:
         'space-between',
-
       marginTop: 2,
     },
 
-
     chartDateText: {
       color: '#9BA0B0',
-
       fontSize: 9.5,
-
       fontFamily:
         'Quicksand-Medium',
     },
+
 
     /* HISTORY */
 
     historyCard: {
       marginTop: 13,
-
       borderRadius: 22,
-
       backgroundColor:
         '#FFFFFF',
-
       borderWidth: 1,
-
       borderColor:
         '#ECE9F7',
-
       padding: 14,
-
       shadowColor:
         '#6973A0',
-
       shadowOffset: {
         width: 0,
         height: 5,
       },
-
       shadowOpacity: 0.05,
-
       shadowRadius: 10,
-
       elevation: 2,
     },
 
-
     historyHeader: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent:
         'space-between',
     },
 
-
     countBadge: {
       minWidth: 30,
       height: 30,
-
       borderRadius: 12,
-
       paddingHorizontal: 8,
-
       backgroundColor:
         '#F0ECFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     countBadgeText: {
       color: PURPLE,
-
       fontSize: 11,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     emptyHistory: {
-      alignItems:
-        'center',
-
+      alignItems: 'center',
       paddingTop: 18,
-
       paddingBottom: 12,
-
       paddingHorizontal: 24,
     },
-
 
     emptyScaleWrapper: {
       width: 108,
@@ -2879,218 +2799,138 @@ const styles =
       justifyContent: 'center',
     },
 
-
     emptyScaleImage: {
       width: 108,
       height: 92,
     },
 
-
     emptyTitle: {
       marginTop: 12,
-
       color: '#343956',
-
       fontSize: 13.5,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     emptyText: {
       marginTop: 5,
-
       color: '#9299AC',
-
       fontSize: 10.5,
-
       lineHeight: 16,
-
       fontFamily:
         'Quicksand-Medium',
-
       textAlign: 'center',
     },
-
 
     recordsContainer: {
       marginTop: 10,
     },
 
-
     recordRow: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       paddingVertical: 14,
     },
 
-
     recordRowBorder: {
       borderBottomWidth: 1,
-
       borderBottomColor:
         '#F0EDF6',
     },
 
-
     recordWeightIcon: {
       width: 40,
       height: 40,
-
       borderRadius: 14,
-
       backgroundColor:
         '#F0ECFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      alignItems: 'center',
+      justifyContent: 'center',
       marginRight: 11,
     },
-
 
     recordContent: {
       flex: 1,
     },
 
-
     recordTop: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       justifyContent:
         'space-between',
-
-      alignItems:
-        'center',
+      alignItems: 'center',
     },
-
 
     recordWeightRow: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'baseline',
+      flexDirection: 'row',
+      alignItems: 'baseline',
     },
-
 
     recordWeight: {
       color: '#34345A',
-
       fontSize: 18,
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     recordUnit: {
       color: '#898EA0',
-
       fontSize: 10,
-
       fontFamily:
         'Quicksand-Bold',
-
       marginLeft: 3,
     },
 
-
     recordDateRow: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 4,
     },
 
-
     recordDate: {
       color: '#9096A7',
-
       fontSize: 9.5,
-
       fontFamily:
         'Quicksand-Medium',
     },
 
-
     recordActions: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       marginTop: 9,
-
       gap: 8,
     },
 
-
     editAction: {
       height: 31,
-
       paddingHorizontal: 10,
-
       borderRadius: 11,
-
       backgroundColor:
         '#F0ECFF',
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 5,
     },
 
-
     editActionText: {
       color: '#6F5BD3',
-
       fontSize: 9.5,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     deleteAction: {
       height: 31,
-
       paddingHorizontal: 10,
-
       borderRadius: 11,
-
       backgroundColor:
         '#FFF1F2',
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 5,
     },
 
-
     deleteActionText: {
       color: '#D96B73',
-
       fontSize: 9.5,
-
       fontFamily:
         'Quicksand-Bold',
     },
@@ -3100,42 +2940,26 @@ const styles =
 
     addButton: {
       height: 52,
-
       borderRadius: 50,
-
       marginTop: 16,
-
       backgroundColor:
         PURPLE,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       shadowColor:
         '#7257D9',
-
       shadowOffset: {
         width: 0,
         height: 7,
       },
-
       shadowOpacity: 0.22,
-
       shadowRadius: 11,
-
       elevation: 6,
     },
 
-
     addButtonPressed: {
       opacity: 0.86,
-
       transform: [
         {
           scale: 0.985,
@@ -3143,14 +2967,10 @@ const styles =
       ],
     },
 
-
     addButtonText: {
       marginLeft: 7,
-
       color: '#FFFFFF',
-
       fontSize: 14,
-
       fontFamily:
         'Quicksand-Bold',
     },
@@ -3160,7 +2980,8 @@ const styles =
 
     popupOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(28, 25, 48, 0.48)',
+      backgroundColor:
+        'rgba(28, 25, 48, 0.48)',
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 24,
@@ -3170,12 +2991,14 @@ const styles =
       width: '100%',
       maxWidth: 360,
       borderRadius: 28,
-      backgroundColor: '#FFFFFF',
+      backgroundColor:
+        '#FFFFFF',
       paddingHorizontal: 22,
       paddingTop: 24,
       paddingBottom: 18,
       alignItems: 'center',
-      shadowColor: '#27203D',
+      shadowColor:
+        '#27203D',
       shadowOffset: {
         width: 0,
         height: 14,
@@ -3195,25 +3018,30 @@ const styles =
     },
 
     popupIconInfo: {
-      backgroundColor: '#EEE9FF',
+      backgroundColor:
+        '#EEE9FF',
     },
 
     popupIconWarning: {
-      backgroundColor: '#FFF3DA',
+      backgroundColor:
+        '#FFF3DA',
     },
 
     popupIconDanger: {
-      backgroundColor: '#FFF0F1',
+      backgroundColor:
+        '#FFF0F1',
     },
 
     popupIconSuccess: {
-      backgroundColor: '#EAF7EF',
+      backgroundColor:
+        '#EAF7EF',
     },
 
     popupTitle: {
       color: '#252844',
       fontSize: 18,
-      fontFamily: 'Quicksand-Bold',
+      fontFamily:
+        'Quicksand-Bold',
       textAlign: 'center',
     },
 
@@ -3221,7 +3049,8 @@ const styles =
       color: '#777D91',
       fontSize: 12.5,
       lineHeight: 19,
-      fontFamily: 'Quicksand-Medium',
+      fontFamily:
+        'Quicksand-Medium',
       textAlign: 'center',
       marginTop: 8,
       maxWidth: 305,
@@ -3238,7 +3067,8 @@ const styles =
       flex: 1,
       minHeight: 48,
       borderRadius: 16,
-      backgroundColor: PURPLE,
+      backgroundColor:
+        PURPLE,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -3247,17 +3077,20 @@ const styles =
     },
 
     popupButtonSecondary: {
-      backgroundColor: '#F2F0F7',
+      backgroundColor:
+        '#F2F0F7',
     },
 
     popupButtonDanger: {
-      backgroundColor: '#D96B73',
+      backgroundColor:
+        '#D96B73',
     },
 
     popupButtonText: {
       color: '#FFFFFF',
       fontSize: 12.5,
-      fontFamily: 'Quicksand-Bold',
+      fontFamily:
+        'Quicksand-Bold',
     },
 
     popupButtonTextSecondary: {
@@ -3266,305 +3099,196 @@ const styles =
 
     popupButtonPressed: {
       opacity: 0.78,
-      transform: [{scale: 0.985}],
+      transform: [
+        {
+          scale: 0.985,
+        },
+      ],
     },
+
 
     /* MODAL */
 
     modalOverlay: {
       flex: 1,
-
       backgroundColor:
         'rgba(30, 28, 55, 0.45)',
-
-      justifyContent:
-        'center',
-
+      justifyContent: 'center',
       paddingHorizontal: 20,
     },
 
-
     modalCard: {
       width: '100%',
-
       maxWidth: 430,
-
-      alignSelf:
-        'center',
-
+      alignSelf: 'center',
       borderRadius: 29,
-
       backgroundColor:
         '#FFFFFF',
-
       padding: 20,
-
       shadowColor:
         '#28203D',
-
       shadowOffset: {
         width: 0,
         height: 12,
       },
-
       shadowOpacity: 0.18,
-
       shadowRadius: 25,
-
       elevation: 14,
     },
 
-
     modalHeader: {
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent:
         'space-between',
-
       marginBottom: 20,
     },
 
-
     modalTitle: {
       color: '#222443',
-
       fontSize: 17,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     modalSubtitle: {
       color: '#9499AA',
-
       fontSize: 10.5,
-
       fontFamily:
         'Quicksand-Medium',
-
       marginTop: 2,
     },
-
 
     modalClose: {
       width: 38,
       height: 38,
-
       borderRadius: 14,
-
       backgroundColor:
         '#F4F2FA',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     inputLabel: {
       color: '#454A62',
-
       fontSize: 11,
-
       fontFamily:
         'Quicksand-Bold',
-
       marginBottom: 7,
       marginTop: 4,
     },
 
-
     weightInputWrapper: {
       height: 54,
-
       borderRadius: 17,
-
       borderWidth: 1,
-
       borderColor:
         '#E4DFFC',
-
       backgroundColor:
         '#FAF9FF',
-
       paddingHorizontal: 14,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 14,
     },
 
-
     weightInput: {
       flex: 1,
-
       height: '100%',
-
       color: '#343650',
-
       fontSize: 15,
-
       fontFamily:
         'Quicksand-SemiBold',
-
       marginLeft: 10,
     },
 
-
     inputUnit: {
       color: '#8175B6',
-
       fontSize: 11,
-
       fontFamily:
         'Quicksand-Bold',
     },
 
-
     normalInputWrapper: {
       height: 54,
-
       borderRadius: 17,
-
       borderWidth: 1,
-
       borderColor:
         '#E7E3F4',
-
       backgroundColor:
         '#FAF9FD',
-
       paddingHorizontal: 14,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
+      flexDirection: 'row',
+      alignItems: 'center',
     },
-
 
     normalInput: {
       flex: 1,
-
       height: '100%',
-
       color: '#42465A',
-
       fontSize: 13,
-
       fontFamily:
         'Quicksand-Medium',
-
       marginLeft: 9,
     },
 
-
     inputHint: {
       color: '#A0A5B4',
-
       fontSize: 9,
-
       fontFamily:
         'Quicksand-Medium',
-
       marginTop: 5,
       marginBottom: 11,
       marginLeft: 3,
     },
 
-
     modalActions: {
-      flexDirection:
-        'row',
-
+      flexDirection: 'row',
       gap: 10,
-
       marginTop: 15,
     },
 
-
     cancelButton: {
       flex: 0.85,
-
       height: 51,
-
       borderRadius: 17,
-
       backgroundColor:
         '#F2F0F7',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-
 
     cancelButtonText: {
       color: '#707589',
-
       fontSize: 12,
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     saveButton: {
       flex: 1.3,
-
       height: 51,
-
       borderRadius: 17,
-
       backgroundColor:
         PURPLE,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       gap: 6,
     },
 
-
     saveButtonText: {
       color: '#FFFFFF',
-
       fontSize: 12,
-
       fontFamily:
         'Quicksand-Bold',
     },
-
 
     disabledButton: {
       opacity: 0.55,
     },
 
-
     pressed: {
       opacity: 0.72,
     },
   });
-
-
-

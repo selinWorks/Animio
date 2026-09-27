@@ -640,6 +640,7 @@ export const addWeightRecordToFirestore = async (
       ? weight
       : Number(
           String(weight)
+            .trim()
             .replace(',', '.'),
         );
 
@@ -662,10 +663,6 @@ export const addWeightRecordToFirestore = async (
     .collection('pets')
     .doc(petId);
 
-  /*
-   * Kullanıcının pet üyesi olup olmadığını
-   * kontrol ediyoruz.
-   */
   const petSnapshot =
     await petRef.get();
 
@@ -748,50 +745,84 @@ export const getWeightHistoryFromFirestore = async (
     .collection('weightHistory')
     .get();
 
-  const records = snapshot.docs
-    .map(doc => {
-      const data =
-        doc.data() || {};
+  const records =
+    snapshot.docs
+      .map(doc => {
+        const data =
+          doc.data() || {};
 
-      return {
-        id:
-          doc.id,
+        let numericWeight = 0;
 
-        weight:
+        if (
           typeof data.weight === 'number'
-            ? data.weight
-            : Number(data.weight) || 0,
+        ) {
+          numericWeight =
+            data.weight;
+        } else {
+          numericWeight =
+            Number(
+              String(
+                data.weight ?? '',
+              )
+                .trim()
+                .replace(',', '.'),
+            );
+        }
 
-        date:
-          data.date || '',
+        return {
+          id:
+            doc.id,
 
-        createdBy:
-          data.createdBy || '',
+          weight:
+            Number.isFinite(
+              numericWeight,
+            )
+              ? numericWeight
+              : 0,
 
-        createdAt:
-          data.createdAt || null,
+          date:
+            data.date || '',
 
-        updatedAt:
-          data.updatedAt || null,
-      };
-    })
-    .sort((a, b) => {
-      if (a.date !== b.date) {
-        return b.date.localeCompare(a.date);
-      }
+          createdBy:
+            data.createdBy || '',
 
-      const aTime =
-        a.createdAt?.toMillis
-          ? a.createdAt.toMillis()
-          : 0;
+          createdAt:
+            data.createdAt || null,
 
-      const bTime =
-        b.createdAt?.toMillis
-          ? b.createdAt.toMillis()
-          : 0;
+          updatedAt:
+            data.updatedAt || null,
+        };
+      })
+      .filter(
+        record =>
+          record.weight > 0,
+      )
+      .sort((a, b) => {
+        /*
+         * Önce tarihe göre yeni → eski
+         */
+        if (a.date !== b.date) {
+          return b.date.localeCompare(
+            a.date,
+          );
+        }
 
-      return bTime - aTime;
-    });
+        /*
+         * Aynı gündeyse oluşturulma zamanına göre
+         * yeni → eski
+         */
+        const aTime =
+          a.createdAt?.toMillis
+            ? a.createdAt.toMillis()
+            : 0;
+
+        const bTime =
+          b.createdAt?.toMillis
+            ? b.createdAt.toMillis()
+            : 0;
+
+        return bTime - aTime;
+      });
 
   return records;
 };
@@ -803,6 +834,7 @@ export const getWeightHistoryFromFirestore = async (
 export const deleteWeightRecordFromFirestore = async (
   petId,
   recordId,
+  uid,
 ) => {
   if (!petId || !recordId) {
     throw new Error(
@@ -810,33 +842,87 @@ export const deleteWeightRecordFromFirestore = async (
     );
   }
 
+  if (!uid) {
+    throw new Error(
+      'Kullanıcı bilgisi gerekli.',
+    );
+  }
+
   const petRef = firestore()
     .collection('pets')
     .doc(petId);
+
+  const petSnapshot =
+    await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
+
+  const petData =
+    petSnapshot.data() || {};
+
+  const petMembers =
+    Array.isArray(petData.petMembers)
+      ? petData.petMembers
+      : petData.ownerId
+        ? [petData.ownerId]
+        : [];
+
+  if (!petMembers.includes(uid)) {
+    throw new Error(
+      'Bu pet için kilo kaydı silme yetkiniz yok.',
+    );
+  }
 
   const weightRef = petRef
     .collection('weightHistory')
     .doc(recordId);
 
+  const weightSnapshot =
+    await weightRef.get();
+
+  if (!weightSnapshot.exists) {
+    throw new Error(
+      'Kilo kaydı bulunamadı.',
+    );
+  }
+
   await weightRef.delete();
 
+  /*
+   * Silme işleminden sonra kalan kayıtları al.
+   */
   const remainingHistory =
     await getWeightHistoryFromFirestore(
       petId,
     );
 
-  if (remainingHistory.length > 0) {
+  /*
+   * En güncel kilo kaydını pet.weight alanına yaz.
+   */
+  if (
+    remainingHistory.length > 0
+  ) {
     const latestRecord =
       remainingHistory[0];
 
     await petRef.update({
       weight:
-        String(latestRecord.weight),
+        String(
+          latestRecord.weight,
+        ),
 
       updatedAt:
         firestore.FieldValue.serverTimestamp(),
     });
   } else {
+    /*
+     * Hiç kilo kaydı kalmadıysa
+     * pet.weight temizlenir.
+     */
     await petRef.update({
       weight:
         '',
@@ -856,10 +942,17 @@ export const updateWeightRecordInFirestore = async (
   recordId,
   weight,
   date,
+  uid,
 ) => {
   if (!petId || !recordId) {
     throw new Error(
       'Pet ve kilo kaydı bilgisi gerekli.',
+    );
+  }
+
+  if (!uid) {
+    throw new Error(
+      'Kullanıcı bilgisi gerekli.',
     );
   }
 
@@ -868,6 +961,7 @@ export const updateWeightRecordInFirestore = async (
       ? weight
       : Number(
           String(weight)
+            .trim()
             .replace(',', '.'),
         );
 
@@ -884,9 +978,43 @@ export const updateWeightRecordInFirestore = async (
     .collection('pets')
     .doc(petId);
 
+  const petSnapshot =
+    await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
+
+  const petData =
+    petSnapshot.data() || {};
+
+  const petMembers =
+    Array.isArray(petData.petMembers)
+      ? petData.petMembers
+      : petData.ownerId
+        ? [petData.ownerId]
+        : [];
+
+  if (!petMembers.includes(uid)) {
+    throw new Error(
+      'Bu pet için kilo kaydı güncelleme yetkiniz yok.',
+    );
+  }
+
   const weightRef = petRef
     .collection('weightHistory')
     .doc(recordId);
+
+  const weightSnapshot =
+    await weightRef.get();
+
+  if (!weightSnapshot.exists) {
+    throw new Error(
+      'Kilo kaydı bulunamadı.',
+    );
+  }
 
   await weightRef.update({
     weight:
@@ -900,8 +1028,10 @@ export const updateWeightRecordInFirestore = async (
   });
 
   /*
-   * Güncellemeden sonra en güncel kayıt
-   * pet.weight alanına aktarılır.
+   * Güncellemeden sonra tekrar sıralıyoruz.
+   *
+   * Örneğin eski bir kaydın tarihini bugüne
+   * çekersen pet.weight de doğru kaydı alacak.
    */
   const history =
     await getWeightHistoryFromFirestore(
@@ -911,7 +1041,17 @@ export const updateWeightRecordInFirestore = async (
   if (history.length > 0) {
     await petRef.update({
       weight:
-        String(history[0].weight),
+        String(
+          history[0].weight,
+        ),
+
+      updatedAt:
+        firestore.FieldValue.serverTimestamp(),
+    });
+  } else {
+    await petRef.update({
+      weight:
+        '',
 
       updatedAt:
         firestore.FieldValue.serverTimestamp(),
