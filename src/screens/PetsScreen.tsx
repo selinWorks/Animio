@@ -712,10 +712,10 @@ function PetCard({
 
       <View style={styles.petAvatar}>
 
-        {(pet as Pet & {photoUri?: string}).photoUri ? (
+        {pet.photoUrl || pet.photoUri ? (
           <Image
             source={{
-              uri: (pet as Pet & {photoUri?: string}).photoUri,
+              uri: pet.photoUrl || pet.photoUri,
             }}
             style={styles.petAvatarImage}
             resizeMode="cover"

@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   Animated,
+  Image,
 } from 'react-native';
 
 import {Calendar} from 'react-native-calendars';
@@ -25,6 +26,7 @@ import notifee, {
 } from '@notifee/react-native';
 
 import {useAuth} from '../data/AuthContext';
+import {usePets} from '../data/PetContext';
 
 import {
   FileText,
@@ -68,10 +70,39 @@ const PASTEL_COLORS = [
   '#FDBA74',
 ];
 
+function getDefaultPetImage(type?: string) {
+  const value = (type || '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+
+  if (value.includes('kedi') || value.includes('cat')) {
+    return require('../assets/images/pets/default-cat-pixel.png');
+  }
+
+  if (value.includes('köpek') || value.includes('kopek') || value.includes('dog')) {
+    return require('../assets/images/pets/default-dog-pixel.png');
+  }
+
+  if (value.includes('kuş') || value.includes('kus') || value.includes('bird')) {
+    return require('../assets/images/pets/default-bird-pixel.png');
+  }
+
+  if (value.includes('tavşan') || value.includes('tavsan') || value.includes('rabbit')) {
+    return require('../assets/images/pets/default-rabbit-pixel.png');
+  }
+
+  if (value.includes('hamster')) {
+    return require('../assets/images/pets/default-hamster-pixel.png');
+  }
+
+  return require('../assets/images/pets/default-other-pixel.png');
+}
+
 export default function CalendarScreen() {
   const today = new Date().toISOString().split('T')[0];
 
   const {user} = useAuth();
+  const {pets} = usePets();
 
   /* =========================================================
      STATE
@@ -87,6 +118,7 @@ export default function CalendarScreen() {
 
   const [title, setTitle] = useState('');
   const [petName, setPetName] = useState('');
+  const [petDropdownOpen, setPetDropdownOpen] = useState(false);
   const [note, setNote] = useState('');
   const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[2]);
   const [selectedType, setSelectedType] = useState<CareEventType>('Custom');
@@ -415,6 +447,7 @@ export default function CalendarScreen() {
   const resetForm = () => {
     setTitle('');
     setPetName('');
+    setPetDropdownOpen(false);
     setNote('');
     setSelectedColor(PASTEL_COLORS[2]);
     setSelectedType('Custom');
@@ -1149,15 +1182,151 @@ export default function CalendarScreen() {
 
               {/* PET */}
 
-              <TextInput
-                value={petName}
-                onChangeText={setPetName}
+              <Text style={styles.petPickerLabel}>
+                Dostunu seç
+              </Text>
 
-                placeholder="Pet adı"
-                placeholderTextColor="#9CA3AF"
+              <View style={styles.petDropdownContainer}>
 
-                style={styles.input}
-              />
+                <Pressable
+                  onPress={() =>
+                    setPetDropdownOpen(prev => !prev)
+                  }
+                  style={[
+                    styles.petSelectButton,
+                    petDropdownOpen &&
+                      styles.petSelectButtonOpen,
+                  ]}>
+
+                  {petName ? (
+                    <>
+                      {(() => {
+                        const selectedPet = pets.find(
+                          pet => pet.name === petName,
+                        );
+
+                        if (!selectedPet) {
+                          return null;
+                        }
+
+                        return (
+                          <>
+                            {selectedPet.photoUrl ||
+                            selectedPet.photoUri ? (
+                              <Image
+                                source={{
+                                  uri:
+                                    selectedPet.photoUrl ||
+                                    selectedPet.photoUri,
+                                }}
+                                style={styles.petSelectImage}
+                                resizeMode="cover"
+                              />
+
+                            ) : (
+                              <Image
+                                source={getDefaultPetImage(selectedPet.type)}
+                                style={styles.petSelectImage}
+                              />
+                            )}
+
+                            <Text style={styles.petSelectText}>
+                              {selectedPet.name}
+                            </Text>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.petSelectIcon}>
+                        <PawPrint
+                          size={20}
+                          color="#7C3AED"
+                          strokeWidth={2}
+                        />
+                      </View>
+
+                      <Text style={styles.petPlaceholderText}>
+                        Bir dost seç
+                      </Text>
+                    </>
+                  )}
+
+                  <Text style={styles.petArrow}>
+                    {petDropdownOpen ? '⌃' : '⌄'}
+                  </Text>
+
+                </Pressable>
+
+                {petDropdownOpen && (
+                  <View style={styles.petDropdownList}>
+
+                    {pets.length > 0 ? (
+                      pets.map(pet => {
+                        const isSelected =
+                          petName === pet.name;
+
+                        const petPhoto =
+                          pet.photoUrl || pet.photoUri;
+
+                        return (
+                          <Pressable
+                            key={pet.name}
+                            onPress={() => {
+                              setPetName(pet.name);
+                              setPetDropdownOpen(false);
+                            }}
+                            style={[
+                              styles.petDropdownItem,
+                              isSelected &&
+                                styles.petDropdownItemSelected,
+                            ]}>
+
+                            {petPhoto ? (
+                              <Image
+                                source={{
+                                  uri: petPhoto,
+                                }}
+                                style={styles.petDropdownImage}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Image
+                                source={getDefaultPetImage(pet.type)}
+                                style={styles.petDropdownImage}
+                                resizeMode="contain"
+                              />
+                            )}
+
+                            <Text
+                              style={[
+                                styles.petDropdownText,
+                                isSelected &&
+                                  styles.petDropdownTextSelected,
+                              ]}>
+                              {pet.name}
+                            </Text>
+
+                            {isSelected && (
+                              <Text style={styles.petCheck}>
+                                ✓
+                              </Text>
+                            )}
+
+                          </Pressable>
+                        );
+                      })
+                    ) : (
+                      <Text style={styles.noPetsText}>
+                        Kayıtlı dostun bulunmuyor.
+                      </Text>
+                    )}
+
+                  </View>
+                )}
+
+              </View>
 
               <Text style={styles.typePickerLabel}>
                 Görev türü
@@ -2518,4 +2687,135 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 18,
   },
+
+  petPickerLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 10,
+  },
+
+  petDropdownContainer: {
+    position: 'relative',
+    zIndex: 20,
+    marginBottom: 14,
+  },
+
+  petSelectButton: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+
+  petSelectButtonOpen: {
+    borderColor: '#C4B5FD',
+    backgroundColor: '#FAF9FF',
+  },
+
+  petSelectImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
+  },
+
+  petSelectIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  petSelectText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+
+  petPlaceholderText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+
+  petArrow: {
+    fontSize: 22,
+    color: '#7C3AED',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
+  petDropdownList: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+
+  petDropdownItem: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+
+  petDropdownItemSelected: {
+    backgroundColor: '#FAF9FF',
+  },
+
+  petDropdownImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginRight: 11,
+  },
+
+  petDropdownText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+  },
+
+  petDropdownTextSelected: {
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+
+  petCheck: {
+    fontSize: 18,
+    color: '#7C3AED',
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+
+  noPetsText: {
+    padding: 16,
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+
 });

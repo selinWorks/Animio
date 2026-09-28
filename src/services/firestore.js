@@ -312,6 +312,12 @@ export const getPetsFromFirestore = async uid => {
       async doc => {
         const data = doc.data() || {};
 
+             console.log(
+                  'FIRESTORE PET:',
+                  doc.id,
+                  data,
+             );
+
         /*
          * ---------------------------------------------------
          * PET MEMBERS
@@ -447,7 +453,14 @@ export const getPetsFromFirestore = async uid => {
             data.notes || '',
 
           photoUrl:
-            data.photoUrl || '',
+            data.photoUrl ||
+            data.photoUri ||
+            '',
+
+          photoUri:
+            data.photoUri ||
+            data.photoUrl ||
+            '',
 
           createdAt:
             data.createdAt || null,
