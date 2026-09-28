@@ -1,4 +1,10 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
 import {
   View,
   TextInput,
@@ -134,6 +140,52 @@ export default function EditPetScreen({route}: Props) {
   const [age, setAge] = useState(String(pet ? getPetAge(pet) : 0));
   const [gender, setGender] = useState(pet?.gender || '');
   const [weight, setWeight] = useState(pet?.weight || '');
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] =
+    useState(false);
+
+  const allowNavigationRef = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener(
+      'beforeRemove',
+      e => {
+        if (
+          !hasUnsavedChanges ||
+          allowNavigationRef.current
+        ) {
+          return;
+        }
+
+        e.preventDefault();
+
+        showPopup(
+          'Kaydedilmemiş değişiklikler',
+          'Kaydedilmemiş veriler var. Çıkmak istediğinize emin misiniz?',
+          [
+            {
+              text: 'Vazgeç',
+              style: 'cancel',
+            },
+            {
+              text: 'Çık',
+              style: 'destructive',
+              onPress: () => {
+                allowNavigationRef.current = true;
+                navigation.dispatch(e.data.action);
+              },
+            },
+          ],
+        );
+      },
+    );
+
+    return unsubscribe;
+  }, [
+    navigation,
+    hasUnsavedChanges,
+  ]);
+
   const [lastVetVisit] = useState(pet?.lastVetVisit || '');
   const healthPet = (pet ?? {}) as NonNullable<typeof pet> & {
     allergies?: string;
@@ -331,17 +383,13 @@ export default function EditPetScreen({route}: Props) {
   const currentAge = Number(age) || 0;
 
   const decreaseAge = () => {
-    setAge(
-      String(
-        Math.max(currentAge - 1, 0),
-      ),
-    );
+    setAge(String(Math.max(currentAge - 1, 0)));
+    setHasUnsavedChanges(true);
   };
 
   const increaseAge = () => {
-    setAge(
-      String(currentAge + 1),
-    );
+    setAge(String(currentAge + 1));
+    setHasUnsavedChanges(true);
   };
 
   /*
@@ -385,9 +433,9 @@ export default function EditPetScreen({route}: Props) {
       }
 
       const uri = result.assets?.[0]?.uri;
-
       if (uri) {
         setPhotoUri(uri);
+        setHasUnsavedChanges(true);
       }
     } catch (error) {
       console.log('Galeri hatası:', error);
@@ -421,9 +469,9 @@ export default function EditPetScreen({route}: Props) {
       }
 
       const uri = result.assets?.[0]?.uri;
-
       if (uri) {
         setPhotoUri(uri);
+        setHasUnsavedChanges(true);
       }
     } catch (error) {
       console.log('Kamera hatası:', error);
@@ -452,7 +500,10 @@ export default function EditPetScreen({route}: Props) {
               {
                 text: 'Fotoğrafı Kaldır',
                 style: 'destructive' as const,
-                onPress: () => setPhotoUri(''),
+                onPress: () => {
+                  setPhotoUri('');
+                  setHasUnsavedChanges(true);
+                },
               },
             ]
           : []),
@@ -519,6 +570,8 @@ export default function EditPetScreen({route}: Props) {
         allergies: allergies.trim(),
         photoUri,
       } as Parameters<typeof updatePet>[0]);
+
+      setHasUnsavedChanges(false);
 
       showPopup(
         'Başarılı',
@@ -878,11 +931,10 @@ export default function EditPetScreen({route}: Props) {
                         key={
                           item.key
                         }
-                        onPress={() =>
-                          setType(
-                            item.key,
-                          )
-                        }
+                        onPress={() => {
+                          setType(item.key);
+                          setHasUnsavedChanges(true);
+                        }}
                         style={[
                           styles.typeCard,
 
@@ -976,6 +1028,7 @@ export default function EditPetScreen({route}: Props) {
                         onChangeText={value => {
                           const numericValue = value.replace(/[^0-9]/g, '');
                           setAge(numericValue);
+                          setHasUnsavedChanges(true);
                         }}
                         onBlur={() => {
                           if (!age.trim()) {
@@ -1036,11 +1089,10 @@ export default function EditPetScreen({route}: Props) {
                     }>
 
                     <Pressable
-                      onPress={() =>
-                        setGender(
-                          'Erkek',
-                        )
-                      }
+                      onPress={() => {
+                        setGender('Erkek');
+                        setHasUnsavedChanges(true);
+                      }}
                       style={[
                         styles.genderButton,
                         styles.maleButton,
@@ -1086,11 +1138,10 @@ export default function EditPetScreen({route}: Props) {
                     </Pressable>
 
                     <Pressable
-                      onPress={() =>
-                        setGender(
-                          'Dişi',
-                        )
-                      }
+                      onPress={() => {
+                        setGender('Dişi');
+                        setHasUnsavedChanges(true);
+                      }}
                       style={[
                         styles.genderButton,
                         styles.femaleButton,
@@ -1227,7 +1278,10 @@ export default function EditPetScreen({route}: Props) {
 
                 <TextInput
                   value={allergies}
-                  onChangeText={setAllergies}
+                  onChangeText={value => {
+                    setAllergies(value);
+                    setHasUnsavedChanges(true);
+                  }}
                   multiline
                   placeholder="Örn. Tavuklu mamaya karşı hassasiyet"
                   placeholderTextColor="#A7838D"
