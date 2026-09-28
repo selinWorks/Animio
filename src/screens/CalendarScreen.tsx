@@ -1244,17 +1244,20 @@ export default function CalendarScreen() {
                     onChangeText={text => {
                       const digits = text.replace(/\D/g, '');
 
-                      if (digits === '') {
+                      if (digits.length === 0) {
                         setSelectedHour('');
+                        return;
+                      }
+
+                      if (digits.length === 1) {
+                        setSelectedHour(digits);
                         return;
                       }
 
                       const value = Number(digits);
 
                       if (value >= 0 && value <= 23) {
-                        setSelectedHour(
-                          digits.padStart(2, '0').slice(-2),
-                        );
+                        setSelectedHour(digits);
                       }
                     }}
                     keyboardType="number-pad"
@@ -1346,17 +1349,20 @@ export default function CalendarScreen() {
                     onChangeText={text => {
                       const digits = text.replace(/\D/g, '');
 
-                      if (digits === '') {
+                      if (digits.length === 0) {
                         setSelectedMinute('');
+                        return;
+                      }
+
+                      if (digits.length === 1) {
+                        setSelectedMinute(digits);
                         return;
                       }
 
                       const value = Number(digits);
 
                       if (value >= 0 && value <= 59) {
-                        setSelectedMinute(
-                          digits.padStart(2, '0').slice(-2),
-                        );
+                        setSelectedMinute(digits);
                       }
                     }}
                     keyboardType="number-pad"
