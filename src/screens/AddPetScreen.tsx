@@ -1,4 +1,5 @@
 
+
 import React, {useCallback, useState} from 'react';
 import {
   Alert,
@@ -31,6 +32,9 @@ import {
   Sparkles,
   CircleAlert,
   UserRound,
+  Plus,
+  ChevronRight,
+  ArrowLeft as TypeArrowLeft,
 } from 'lucide-react-native';
 
 import {usePets} from '../data/PetContext';
@@ -63,25 +67,115 @@ const PET_TYPES = [
   },
 ];
 
-const VALID_ANIMAL_TYPES = [
-  'tavşan',
-  'hamster',
-  'balık',
-  'kaplumbağa',
-  'at',
-  'inek',
-  'koyun',
-  'keçi',
-  'ördek',
-  'tavuk',
-  'papağan',
-  'muhabbet kuşu',
-  'kanarya',
-  'kobay',
-  'kirpi',
-  'fare',
-  'sincap',
-];
+const ANIMAL_SUBTYPES: Record<string, string[]> = {
+  Kedi: [
+    'British Shorthair',
+    'Scottish Fold',
+    'Siyam',
+    'İran Kedisi',
+    'Maine Coon',
+    'Ragdoll',
+    'Van Kedisi',
+    'Tekir',
+    'Sfenks',
+    'Bengal',
+    'Birman',
+    'Abyssinian',
+    'Diğer',
+  ],
+  Köpek: [
+    'Golden Retriever',
+    'Labrador Retriever',
+    'Alman Kurdu',
+    'French Bulldog',
+    'Poodle',
+    'Chihuahua',
+    'Beagle',
+    'Husky',
+    'Pomeranian',
+    'Rottweiler',
+    'Cocker Spaniel',
+    'Dachshund',
+    'Maltese',
+    'Shih Tzu',
+    'Border Collie',
+    'Diğer',
+  ],
+  Kuş: [
+    'Muhabbet Kuşu',
+    'Papağan',
+    'Kanarya',
+    'Sultan Papağanı',
+    'Sevda Papağanı',
+    'İspinoz',
+    'Güvercin',
+    'Serçe',
+    'Bülbül',
+    'Hint Bülbülü',
+    'Diğer',
+  ],
+  Balık: [
+    'Japon Balığı',
+    'Beta',
+    'Lepistes',
+    'Melek Balığı',
+    'Koi',
+    'Çöpçü Balığı',
+    'Neon Tetra',
+    'Moli',
+    'Plati',
+  ],
+  Kemirgen: [
+    'Hamster',
+    'Kobay',
+    'Çinçilla',
+    'Fare',
+    'Sıçan',
+    'Gerbil',
+    'Sincap',
+  ],
+  Sürüngen: [
+    'Kaplumbağa',
+    'Yılan',
+    'Kertenkele',
+    'İguana',
+    'Geko',
+    'Sakallı Ejder',
+    'Bukalemun',
+  ],
+  'Çiftlik Hayvanı': [
+    'At',
+    'İnek',
+    'Koyun',
+    'Keçi',
+    'Ördek',
+    'Tavuk',
+    'Kaz',
+    'Manda',
+    'Eşek',
+    'Deve',
+  ],
+  Amfibi: [
+    'Kurbağa',
+    'Semender',
+    'Aksolotl',
+  ],
+  Omurgasız: [
+    'Örümcek',
+    'Akrep',
+    'Salyangoz',
+    'Yengeç',
+  ],
+  'Diğer Memeliler': [
+    'Tavşan',
+    'Kirpi',
+    'Gelincik',
+  ],
+};
+
+const GENERAL_ANIMAL_TYPES = Object.keys(ANIMAL_SUBTYPES).filter(
+  item => !['Kedi', 'Köpek', 'Kuş'].includes(item),
+);
 
 const GENDERS = [
   {label: 'Dişi'},
@@ -96,6 +190,9 @@ export default function AddPetScreen({navigation}: any) {
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [customType, setCustomType] = useState('');
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [typePickerCategory, setTypePickerCategory] = useState<string | null>(null);
+  const [selectedOtherCategory, setSelectedOtherCategory] = useState<string | null>(null);
 
   // Doğum tarihi bilgisi ne kadar biliniyor?
   // day   = tam tarih (GG.AA.YYYY)
@@ -171,6 +268,9 @@ export default function AddPetScreen({navigation}: any) {
     setName('');
     setType('');
     setCustomType('');
+    setTypePickerVisible(false);
+    setTypePickerCategory(null);
+    setSelectedOtherCategory(null);
     setBirthDatePrecision('year');
     setBirthDate('');
     setBirthYear('');
@@ -248,22 +348,9 @@ export default function AddPetScreen({navigation}: any) {
       return;
     }
 
-    if (type === 'Diğer') {
-      const enteredType = customType
-        .trim()
-        .toLocaleLowerCase('tr-TR');
-
-      /* Tür boşsa özel popup */
-      if (!enteredType) {
-        setTypeErrorVisible(true);
-        return;
-      }
-
-      /* Geçersiz türse özel popup */
-      if (!VALID_ANIMAL_TYPES.includes(enteredType)) {
-        setInvalidTypeVisible(true);
-        return;
-      }
+    if (!customType.trim()) {
+      setTypeErrorVisible(true);
+      return;
     }
 
     setStep(2);
@@ -678,10 +765,7 @@ export default function AddPetScreen({navigation}: any) {
     }
 
     try {
-      const finalType =
-        type === 'Diğer'
-          ? customType.trim()
-          : type;
+      const finalType = customType.trim() || type;
 
       const trimmedWeight = weight.trim();
       const trimmedWeightGrams = weightGrams.trim();
@@ -1105,30 +1189,34 @@ export default function AddPetScreen({navigation}: any) {
             </Text>
 
             <View style={styles.typeGrid}>
-
               {PET_TYPES.map(item => {
-
-                const selected =
-                  type === item.name;
+                const selected = type === item.name;
 
                 return (
                   <Pressable
                     key={item.name}
-                    onPress={() =>
-                      setType(item.name)
-                    }
+                    onPress={() => {
+                      setType(item.name);
+                      setCustomType('');
+                      setTypePickerCategory(
+                        item.name === 'Diğer'
+                          ? null
+                          : item.name,
+                      );
+                      if (item.name === 'Diğer') {
+                        setSelectedOtherCategory(null);
+                      }
+                      setTypePickerVisible(true);
+                    }}
                     style={styles.typeCardWrapper}>
-
                     <LinearGradient
                       colors={item.bgGradient}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 1}}
                       style={[
                         styles.typeCard,
-                        selected &&
-                          styles.typeCardSelected,
+                        selected && styles.typeCardSelected,
                       ]}>
-
                       {item.image ? (
                         <Image
                           source={item.image}
@@ -1136,10 +1224,13 @@ export default function AddPetScreen({navigation}: any) {
                           resizeMode="contain"
                         />
                       ) : (
-                        <PawPrint
-                          size={30}
-                          color="#2D3436"
-                        />
+                        <View style={styles.otherTypePlusCircle}>
+                          <Plus
+                            size={27}
+                            color="#00A884"
+                            strokeWidth={2.5}
+                          />
+                        </View>
                       )}
 
                       <Text style={styles.typeText}>
@@ -1148,53 +1239,103 @@ export default function AddPetScreen({navigation}: any) {
 
                       {selected ? (
                         <LinearGradient
-                          colors={[
-                            '#6C5CE7',
-                            '#4F46E5',
-                          ]}
-                          style={
-                            styles.checkBadgeSelected
-                          }>
-
+                          colors={['#6C5CE7', '#4F46E5']}
+                          style={styles.checkBadgeSelected}>
                           <Check
                             size={11}
                             color="#FFFFFF"
                             strokeWidth={3}
                           />
-
                         </LinearGradient>
                       ) : (
-                        <View
-                          style={
-                            styles.checkBadgeUnselected
-                          }
-                        />
+                        <View style={styles.checkBadgeUnselected} />
                       )}
-
                     </LinearGradient>
-
                   </Pressable>
                 );
               })}
-
             </View>
 
-            {type === 'Diğer' && (
-              <View
-                style={[
-                  styles.inputGlowBox,
-                  styles.customTypeMargin,
-                ]}>
+            {type && customType ? (
+              <Pressable
+                onPress={() => {
+                  setTypePickerCategory(
+                    type === 'Diğer'
+                      ? selectedOtherCategory
+                      : type,
+                  );
+                  setTypePickerVisible(true);
+                }}
+                style={styles.selectedSubtypeCard}>
+                <View style={styles.selectedSubtypeIcon}>
+                  <Check
+                    size={18}
+                    color="#6C5CE7"
+                    strokeWidth={2.5}
+                  />
+                </View>
 
-                <TextInput
-                  value={customType}
-                  onChangeText={setCustomType}
-                  placeholder="Türünü yaz"
-                  placeholderTextColor="#A0A5B5"
-                  style={styles.input}
+                <View style={styles.selectedSubtypeContent}>
+                  <Text style={styles.selectedSubtypeLabel}>
+                    Seçilen tür
+                  </Text>
+                  <Text style={styles.selectedSubtypeValue}>
+                    {customType}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  size={21}
+                  color="#8B7BC7"
                 />
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  if (type) {
+                    setTypePickerCategory(
+                      type === 'Diğer'
+                        ? selectedOtherCategory
+                        : type,
+                    );
+                    setTypePickerVisible(true);
+                  }
+                }}
+                disabled={!type}
+                style={[
+                  styles.chooseSubtypeCard,
+                  !type && styles.chooseSubtypeCardDisabled,
+                ]}>
+                <View style={styles.chooseSubtypeIcon}>
+                  <Plus
+                    size={20}
+                    color={type ? '#6C5CE7' : '#B9B3CC'}
+                    strokeWidth={2.4}
+                  />
+                </View>
 
-              </View>
+                <View style={styles.chooseSubtypeContent}>
+                  <Text
+                    style={[
+                      styles.chooseSubtypeTitle,
+                      !type && styles.chooseSubtypeTitleDisabled,
+                    ]}>
+                    {type
+                      ? `${type} türünü seç`
+                      : 'Önce genel türünü seç'}
+                  </Text>
+                  <Text style={styles.chooseSubtypeDescription}>
+                    {type
+                      ? 'Listeden sana uygun türü seçmek için dokun'
+                      : 'Kedi, köpek, kuş veya diğer seçimini yap'}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  size={21}
+                  color={type ? '#8B7BC7' : '#C8C3D4'}
+                />
+              </Pressable>
             )}
 
             <Pressable
@@ -2046,9 +2187,9 @@ export default function AddPetScreen({navigation}: any) {
             </Text>
 
             <Text style={styles.popupMessage}>
-              Dostunun türünü henüz yazmadın.
+              Dostunun türünü henüz seçmedin.
               {'\n'}
-              Lütfen aşağıdaki alana türünü yaz.
+              Lütfen önce listeden bir tür seç.
             </Text>
 
             <Pressable
@@ -2067,7 +2208,7 @@ export default function AddPetScreen({navigation}: any) {
                     styles.popupButtonText
                   }>
 
-                  Tamam, türünü yazayım
+                  Tamam, tür seçeyim
 
                 </Text>
 
@@ -2301,6 +2442,140 @@ export default function AddPetScreen({navigation}: any) {
 
         </View>
 
+      </Modal>
+
+      <Modal
+        visible={typePickerVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          setTypePickerVisible(false);
+          setTypePickerCategory(null);
+        }}>
+        <Pressable
+          style={styles.typePickerOverlay}
+          onPress={() => {
+            setTypePickerVisible(false);
+            setTypePickerCategory(null);
+          }}>
+          <Pressable
+            style={styles.typePickerCard}
+            onPress={() => {}}>
+            <View style={styles.typePickerHeader}>
+              <View style={styles.typePickerHeaderIcon}>
+                <PawPrint
+                  size={21}
+                  color="#6C5CE7"
+                  strokeWidth={1.9}
+                />
+              </View>
+
+              <View style={styles.typePickerHeaderText}>
+                <Text style={styles.typePickerTitle}>
+                  {typePickerCategory
+                    ? `${typePickerCategory} türünü seç`
+                    : 'Genel türünü seç'}
+                </Text>
+                <Text style={styles.typePickerSubtitle}>
+                  {typePickerCategory
+                    ? 'Sana uygun olan türü listeden seç'
+                    : 'Önce hayvanının genel grubunu seç'}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView
+              style={styles.typePickerScroll}
+              contentContainerStyle={styles.typePickerList}
+              showsVerticalScrollIndicator={false}>
+              {(typePickerCategory
+                ? ANIMAL_SUBTYPES[typePickerCategory] || []
+                : GENERAL_ANIMAL_TYPES
+              ).map(item => (
+                <Pressable
+                  key={item}
+                  onPress={() => {
+                    if (
+                      !typePickerCategory &&
+                      GENERAL_ANIMAL_TYPES.includes(item)
+                    ) {
+                      setType('Diğer');
+                      setCustomType('');
+                      setSelectedOtherCategory(item);
+                      setTypePickerCategory(item);
+                      return;
+                    }
+
+                    setCustomType(item);
+                    setTypePickerVisible(false);
+                    setTypePickerCategory(null);
+                  }}
+                  style={styles.typePickerOption}>
+                  <View style={styles.typePickerOptionIcon}>
+                    <PawPrint
+                      size={18}
+                      color="#8B7BC7"
+                      strokeWidth={1.8}
+                    />
+                  </View>
+
+                  <Text style={styles.typePickerOptionText}>
+                    {item}
+                  </Text>
+
+                  <ChevronRight
+                    size={19}
+                    color="#B3A8D6"
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <View style={styles.typePickerBottomRow}>
+              {typePickerCategory ? (
+                <Pressable
+                  onPress={() => {
+                    if (
+                      ['Kedi', 'Köpek', 'Kuş'].includes(
+                        typePickerCategory,
+                      )
+                    ) {
+                      setTypePickerVisible(false);
+                      setTypePickerCategory(null);
+                      return;
+                    }
+
+                    setTypePickerCategory(null);
+                  }}
+                  style={styles.typePickerBackButton}>
+                  <TypeArrowLeft
+                    size={18}
+                    color="#6C5CE7"
+                  />
+                  <Text style={styles.typePickerBackText}>
+                    {['Kedi', 'Köpek', 'Kuş'].includes(
+                      typePickerCategory,
+                    )
+                      ? 'Kapat'
+                      : 'Genel türlere dön'}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    setTypePickerVisible(false);
+                    setTypePickerCategory(null);
+                  }}
+                  style={styles.typePickerCloseButton}>
+                  <Text style={styles.typePickerCloseText}>
+                    Vazgeç
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal
@@ -3159,6 +3434,237 @@ const styles = StyleSheet.create({
     borderColor: '#6C5CE7',
   },
 
+  otherTypePlusCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
+
+  chooseSubtypeCard: {
+    marginTop: 12,
+    minHeight: 70,
+    borderRadius: 20,
+    backgroundColor: '#F7F5FF',
+    borderWidth: 1.5,
+    borderColor: '#DDD7F5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+
+  chooseSubtypeCardDisabled: {
+    backgroundColor: '#F5F4F8',
+    borderColor: '#E7E4ED',
+  },
+
+  chooseSubtypeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#ECE8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  chooseSubtypeContent: {
+    flex: 1,
+  },
+
+  chooseSubtypeTitle: {
+    color: '#4F46A5',
+    fontSize: 14,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  chooseSubtypeTitleDisabled: {
+    color: '#8D8999',
+  },
+
+  chooseSubtypeDescription: {
+    marginTop: 3,
+    color: '#8A91A8',
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: 'Quicksand-Regular',
+  },
+
+  selectedSubtypeCard: {
+    marginTop: 12,
+    minHeight: 70,
+    borderRadius: 20,
+    backgroundColor: '#F3F0FF',
+    borderWidth: 1.5,
+    borderColor: '#CFC7F5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+
+  selectedSubtypeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#E4DFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  selectedSubtypeContent: {
+    flex: 1,
+  },
+
+  selectedSubtypeLabel: {
+    color: '#8A82B3',
+    fontSize: 10,
+    fontFamily: 'Quicksand-Bold',
+    marginBottom: 2,
+  },
+
+  selectedSubtypeValue: {
+    color: '#4F46A5',
+    fontSize: 15,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  typePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(31, 27, 52, 0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+
+  typePickerCard: {
+    width: '100%',
+    maxWidth: 390,
+    maxHeight: '82%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    paddingTop: 18,
+    paddingBottom: 12,
+    shadowColor: '#201A3B',
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+
+  typePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+
+  typePickerHeaderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  typePickerHeaderText: {
+    flex: 1,
+  },
+
+  typePickerTitle: {
+    color: '#1E2022',
+    fontSize: 18,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  typePickerSubtitle: {
+    color: '#858B9B',
+    fontSize: 12,
+    fontFamily: 'Quicksand-Regular',
+    marginTop: 2,
+  },
+
+  typePickerScroll: {
+    flexGrow: 0,
+  },
+
+  typePickerList: {
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
+
+  typePickerOption: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#FAF9FF',
+    borderWidth: 1,
+    borderColor: '#ECE9F8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+
+  typePickerOptionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+
+  typePickerOptionText: {
+    flex: 1,
+    color: '#2D3436',
+    fontSize: 14,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  typePickerBottomRow: {
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
+
+  typePickerBackButton: {
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#F0EDFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+
+  typePickerBackText: {
+    color: '#6C5CE7',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  typePickerCloseButton: {
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  typePickerCloseText: {
+    color: '#6C5CE7',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
+  },
+
   petCharacter: {
     width: 46,
     height: 46,
@@ -3669,3 +4175,4 @@ const styles = StyleSheet.create({
   },
 
 });
+
