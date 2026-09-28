@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {Calendar as RNCalendar} from 'react-native-calendars';
 import auth from '@react-native-firebase/auth';
 import {launchImageLibrary} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
@@ -98,9 +99,17 @@ export default function AddPetScreen({navigation}: any) {
   const [birthYear, setBirthYear] = useState('');
   const currentYear = new Date().getFullYear();
   const [gender, setGender] = useState('');
+
   const [weight, setWeight] = useState('');
+  const [weightGrams, setWeightGrams] = useState('');
+
   const [vaccines, setVaccines] = useState('');
+
   const [lastVetVisit, setLastVetVisit] = useState('');
+  const [vetDate, setVetDate] = useState(new Date());
+  const [showVetDatePicker, setShowVetDatePicker] =
+    useState(false);
+
   const [notes, setNotes] = useState('');
 
   const [nameErrorVisible, setNameErrorVisible] =
@@ -130,6 +139,12 @@ export default function AddPetScreen({navigation}: any) {
   const [saveErrorVisible, setSaveErrorVisible] =
     useState(false);
 
+  const [vetDateErrorVisible, setVetDateErrorVisible] =
+    useState(false);
+
+  const [vetDateErrorMessage, setVetDateErrorMessage] =
+    useState('');
+
   /* =====================================================
      FORM RESET
   ===================================================== */
@@ -142,9 +157,16 @@ export default function AddPetScreen({navigation}: any) {
     setCustomType('');
     setBirthYear('');
     setGender('');
+
     setWeight('');
+    setWeightGrams('');
+
     setVaccines('');
+
     setLastVetVisit('');
+    setVetDate(new Date());
+    setShowVetDatePicker(false);
+
     setNotes('');
 
     setNameErrorVisible(false);
@@ -155,6 +177,9 @@ export default function AddPetScreen({navigation}: any) {
     setBirthYearErrorVisible(false);
     setSuccessVisible(false);
     setSaveErrorVisible(false);
+
+    setVetDateErrorVisible(false);
+    setVetDateErrorMessage('');
   }, []);
 
   // AddPet ekranına her yeniden gelindiğinde form temiz başlar.
@@ -252,11 +277,110 @@ export default function AddPetScreen({navigation}: any) {
      SAVE
   ===================================================== */
 
-  /* =====================================================
-     SAVE
-  ===================================================== */
+  const formatVetDate = (date: Date) => {
+    return [
+      String(date.getDate()).padStart(2, '0'),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      date.getFullYear(),
+    ].join('.');
+  };
 
-  const handleSave = async () => {
+  const isValidVetDate = (value: string) => {
+    const match =
+      value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+
+    if (!match) {
+      return false;
+    }
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+
+    const date =
+      new Date(year, month - 1, day);
+
+    return (
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
+    );
+  };
+
+  const getVetDateErrorMessage = (
+    value: string,
+  ) => {
+    if (!isValidVetDate(value)) {
+      return 'Lütfen geçerli bir tarih gir.\nÖrn. 18.09.2026';
+    }
+
+    const match =
+      value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+
+    if (!match) {
+      return 'Lütfen geçerli bir tarih gir.';
+    }
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+
+    const selectedDate =
+      new Date(year, month - 1, day);
+
+    selectedDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    // Gelecek tarih kontrolü
+    if (selectedDate > today) {
+      return 'Veteriner ziyaret tarihi gelecek bir tarih olamaz.';
+    }
+
+    // Dostun doğum tarihinden önce olamaz
+    const petBirthDate =
+      new Date(Number(birthYear), 0, 1);
+
+    petBirthDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < petBirthDate) {
+      return 'Veteriner ziyaret tarihi dostunun doğum yılından önce olamaz.';
+    }
+
+      return null;
+      };
+
+      const handleVetDateTextChange = (text: string) => {
+        const numbers = text.replace(/[^0-9]/g, '');
+
+        if (numbers.length > 8) {
+          return;
+        }
+
+        let formatted = numbers;
+
+        if (numbers.length > 2) {
+          formatted =
+            numbers.slice(0, 2) +
+            '.' +
+            numbers.slice(2);
+        }
+
+        if (numbers.length > 4) {
+          formatted =
+            numbers.slice(0, 2) +
+            '.' +
+            numbers.slice(2, 4) +
+            '.' +
+            numbers.slice(4);
+        }
+
+        setLastVetVisit(formatted);
+      };
+
+      const handleSave = async () => {
     const currentUser = auth().currentUser;
 
     if (!currentUser) {
@@ -275,16 +399,30 @@ export default function AddPetScreen({navigation}: any) {
       const trimmedWeight =
         weight.trim();
 
-      const normalizedWeightText =
-        trimmedWeight.replace(',', '.');
+      const trimmedWeightGrams =
+        weightGrams.trim();
 
-      const numericWeight =
-        Number(normalizedWeightText);
+      const numericWeightKg =
+        Number(trimmedWeight);
+
+      const numericWeightGrams =
+        trimmedWeightGrams === ''
+          ? 0
+          : Number(trimmedWeightGrams);
 
       const hasValidWeight =
         trimmedWeight !== '' &&
-        Number.isFinite(numericWeight) &&
-        numericWeight > 0;
+        Number.isFinite(numericWeightKg) &&
+        numericWeightKg > 0 &&
+        Number.isFinite(numericWeightGrams) &&
+        numericWeightGrams >= 0 &&
+        numericWeightGrams <= 999;
+
+      const numericWeight =
+        hasValidWeight
+          ? numericWeightKg +
+            numericWeightGrams / 1000
+          : 0;
 
       const normalizedWeight =
         hasValidWeight
@@ -303,6 +441,20 @@ export default function AddPetScreen({navigation}: any) {
           today.getDate(),
         ).padStart(2, '0'),
       ].join('-');
+
+      const trimmedVetDate =
+        lastVetVisit.trim();
+
+      if (trimmedVetDate !== '') {
+        const vetDateError =
+          getVetDateErrorMessage(trimmedVetDate);
+
+        if (vetDateError) {
+          setVetDateErrorMessage(vetDateError);
+          setVetDateErrorVisible(true);
+          return;
+        }
+      }
 
       const initialWeightHistory =
         hasValidWeight
@@ -978,30 +1130,58 @@ export default function AddPetScreen({navigation}: any) {
 
               </View>
 
-              <View
-                style={
-                  styles.inputBoxWithBadge
-                }>
+              <View style={styles.weightInputRow}>
 
-                <TextInput
-                  value={weight}
-                  onChangeText={setWeight}
-                  placeholder="Örn. 4"
-                  placeholderTextColor="#A0A5B5"
-                  keyboardType="numeric"
-                  style={styles.innerInput}
-                />
+                <View style={styles.weightInputBox}>
 
-                <View
-                  style={styles.unitBadge}>
+                  <TextInput
+                    value={weight}
+                    onChangeText={text =>
+                      setWeight(
+                        text.replace(/[^0-9]/g, ''),
+                      )
+                    }
+                    placeholder="Örn. 4"
+                    placeholderTextColor="#A0A5B5"
+                    keyboardType="numeric"
+                    style={styles.weightInput}
+                    maxLength={3}
+                  />
 
-                  <Text
-                    style={
-                      styles.unitBadgeText
-                    }>
-
+                  <Text style={styles.weightUnitText}>
                     kg
+                  </Text>
 
+                </View>
+
+                <Text style={styles.weightSlash}>
+                  /
+                </Text>
+
+                <View style={styles.weightInputBox}>
+
+                  <TextInput
+                    value={weightGrams}
+                    onChangeText={text => {
+                      const numeric =
+                        text.replace(/[^0-9]/g, '');
+
+                      if (
+                        numeric === '' ||
+                        Number(numeric) <= 999
+                      ) {
+                        setWeightGrams(numeric);
+                      }
+                    }}
+                    placeholder="Örn. 250"
+                    placeholderTextColor="#A0A5B5"
+                    keyboardType="numeric"
+                    style={styles.weightInput}
+                    maxLength={3}
+                  />
+
+                  <Text style={styles.weightUnitText}>
+                    gr
                   </Text>
 
                 </View>
@@ -1020,8 +1200,7 @@ export default function AddPetScreen({navigation}: any) {
                 style={[
                   styles.iconCircle,
                   {
-                    backgroundColor:
-                      '#FFE2E8',
+                    backgroundColor: '#FFE2E8',
                   },
                 ]}>
 
@@ -1037,7 +1216,7 @@ export default function AddPetScreen({navigation}: any) {
                 <TextInput
                   value={vaccines}
                   onChangeText={setVaccines}
-                  placeholder="Örn. Karma, kuduz"
+                  placeholder="Örn. Karma aşı, kuduz aşısı"
                   placeholderTextColor="#A0A5B5"
                   style={styles.innerInput}
                 />
@@ -1056,8 +1235,7 @@ export default function AddPetScreen({navigation}: any) {
                 style={[
                   styles.iconCircle,
                   {
-                    backgroundColor:
-                      '#E0F2FE',
+                    backgroundColor: '#E0F2FE',
                   },
                 ]}>
 
@@ -1068,17 +1246,30 @@ export default function AddPetScreen({navigation}: any) {
 
               </View>
 
-              <View style={styles.inputBox}>
+              <View style={styles.vetInputBox}>
 
                 <TextInput
                   value={lastVetVisit}
-                  onChangeText={
-                    setLastVetVisit
-                  }
-                  placeholder="Örn. 18 Nisan 2026"
+                  onChangeText={handleVetDateTextChange}
+                  placeholder="Örn. 18.09.2026"
                   placeholderTextColor="#A0A5B5"
+                  keyboardType="number-pad"
+                  maxLength={10}
                   style={styles.innerInput}
                 />
+
+                <Pressable
+                  onPress={() =>
+                    setShowVetDatePicker(true)
+                  }
+                  style={styles.vetCalendarButton}>
+
+                  <Calendar
+                    size={20}
+                    color="#0EA5E9"
+                  />
+
+                </Pressable>
 
               </View>
 
@@ -1724,6 +1915,211 @@ export default function AddPetScreen({navigation}: any) {
 
       </Modal>
 
+      <Modal
+        visible={showVetDatePicker}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setShowVetDatePicker(false)
+        }>
+
+        <Pressable
+          style={styles.datePickerOverlay}
+          onPress={() =>
+            setShowVetDatePicker(false)
+          }>
+
+          <Pressable
+            style={styles.datePickerCard}
+            onPress={() => {}}>
+
+            {/* HEADER */}
+
+            <View style={styles.datePickerHeader}>
+
+              <View style={styles.datePickerHeaderIcon}>
+
+                <Calendar
+                  size={21}
+                  color="#6C5CE7"
+                  strokeWidth={2}
+                />
+
+              </View>
+
+              <View style={styles.datePickerHeaderText}>
+
+                <Text style={styles.datePickerTitle}>
+                  Veteriner ziyareti
+                </Text>
+
+                <Text style={styles.datePickerSubtitle}>
+                  Ziyaret tarihini seç
+                </Text>
+
+              </View>
+
+            </View>
+
+            {/* CALENDAR */}
+
+            <RNCalendar
+              current={vetDate
+                .toISOString()
+                .split('T')[0]}
+
+              minDate={`${birthYear}-01-01`}
+
+              maxDate={new Date()
+                .toISOString()
+                .split('T')[0]}
+
+              onDayPress={day => {
+                const selectedDate =
+                  new Date(
+                    day.year,
+                    day.month - 1,
+                    day.day,
+                  );
+
+                setVetDate(selectedDate);
+
+                setLastVetVisit(
+                  formatVetDate(selectedDate),
+                );
+
+                setShowVetDatePicker(false);
+              }}
+
+              markedDates={{
+                [vetDate
+                  .toISOString()
+                  .split('T')[0]]: {
+                  selected: true,
+                  selectedColor: '#6C5CE7',
+                  selectedTextColor: '#FFFFFF',
+                },
+              }}
+
+              theme={{
+                backgroundColor: '#FFFFFF',
+                calendarBackground: '#FFFFFF',
+
+                textSectionTitleColor: '#858B9B',
+
+                selectedDayBackgroundColor: '#6C5CE7',
+                selectedDayTextColor: '#FFFFFF',
+
+                todayTextColor: '#6C5CE7',
+
+                dayTextColor: '#1E2022',
+
+                textDisabledColor: '#D6D3E8',
+
+                monthTextColor: '#1E2022',
+
+                arrowColor: '#6C5CE7',
+
+                textMonthFontFamily:
+                  'Quicksand-Bold',
+
+                textDayFontFamily:
+                  'Quicksand-Regular',
+
+                textDayHeaderFontFamily:
+                  'Quicksand-Bold',
+
+                textMonthFontSize: 17,
+                textDayFontSize: 14,
+                textDayHeaderFontSize: 12,
+              }}
+
+              enableSwipeMonths
+
+              firstDay={1}
+
+              hideExtraDays
+
+            />
+
+            {/* KAPAT */}
+
+            <Pressable
+              style={styles.datePickerCloseButton}
+              onPress={() =>
+                setShowVetDatePicker(false)
+              }>
+
+              <Text style={styles.datePickerCloseText}>
+                Kapat
+              </Text>
+
+            </Pressable>
+
+          </Pressable>
+
+        </Pressable>
+
+      </Modal>
+
+      <Modal
+        visible={vetDateErrorVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setVetDateErrorVisible(false)
+        }>
+
+        <View style={styles.popupOverlay}>
+
+          <View style={styles.popupCard}>
+
+            <View
+              style={[
+                styles.popupIconCircle,
+                styles.vetDateErrorIconCircle,
+              ]}>
+
+              <Calendar
+                size={42}
+                color="#6C5CE7"
+                strokeWidth={1.7}
+              />
+
+            </View>
+
+            <Text style={styles.popupTitle}>
+              Geçersiz tarih
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              {vetDateErrorMessage}
+            </Text>
+
+            <Pressable
+              style={styles.popupButton}
+              onPress={() =>
+                setVetDateErrorVisible(false)
+              }>
+
+              <View style={styles.popupButtonGradient}>
+
+                <Text style={styles.popupButtonText}>
+                  Tamam
+                </Text>
+
+              </View>
+
+            </Pressable>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
     </LinearGradient>
   );
 }
@@ -1864,6 +2260,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 24,
     elevation: 10,
+  },
+
+  vetDateErrorIconCircle: {
+    backgroundColor: '#F0EDFF',
   },
 
   /* ================================================= */
@@ -2477,6 +2877,44 @@ const styles = StyleSheet.create({
   /* HEALTH INPUTS                                      */
   /* ================================================= */
 
+  weightInputRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  weightInputBox: {
+    flex: 1,
+    height: 54,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  weightInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Quicksand-Regular',
+    color: '#1E2022',
+  },
+
+  weightUnitText: {
+    fontSize: 14,
+    fontFamily: 'Quicksand-Bold',
+    color: '#64748B',
+  },
+
+  weightSlash: {
+    fontSize: 18,
+    fontFamily: 'Quicksand-Bold',
+    color: '#94A3B8',
+  },
+
   iconInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2508,7 +2946,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  inputBoxWithBadge: {
+  vetInputBox: {
     flex: 1,
     height: 54,
     backgroundColor: '#FFFFFF',
@@ -2519,7 +2957,152 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+
+  vetCalendarButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(24, 20, 45, 0.50)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+
+  datePickerCard: {
+    width: '100%',
+    maxWidth: 370,
+
+    backgroundColor: '#FFFFFF',
+
+    borderRadius: 30,
+
+    paddingHorizontal: 14,
+    paddingTop: 18,
+    paddingBottom: 14,
+
+    shadowColor: '#1E2022',
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+
+    elevation: 12,
+  },
+
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+
+  datePickerHeaderIcon: {
+    width: 44,
+    height: 44,
+
+    borderRadius: 22,
+
+    backgroundColor: '#F0EDFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginRight: 12,
+  },
+
+  datePickerHeaderText: {
+    flex: 1,
+  },
+
+  datePickerTitle: {
+    fontSize: 18,
+    fontFamily: 'Quicksand-Bold',
+    color: '#1E2022',
+  },
+
+  datePickerSubtitle: {
+    marginTop: 2,
+
+    fontSize: 13,
+
+    fontFamily: 'Quicksand-Regular',
+
+    color: '#858B9B',
+  },
+
+  datePickerCloseButton: {
+    height: 48,
+
+    borderRadius: 17,
+
+    backgroundColor: '#F0EDFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginTop: 8,
+    marginHorizontal: 8,
+  },
+
+  datePickerCloseText: {
+    color: '#6C5CE7',
+
+    fontSize: 14,
+
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+
+  datePickerHeaderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  datePickerHeaderText: {
+    flex: 1,
+  },
+
+  datePickerSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    fontFamily: 'Quicksand-Regular',
+    color: '#858B9B',
+  },
+
+  datePickerCloseButton: {
+    height: 48,
+    borderRadius: 17,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginHorizontal: 8,
+  },
+
+  datePickerCloseText: {
+    color: '#6C5CE7',
+    fontSize: 14,
+    fontFamily: 'Quicksand-Bold',
   },
 
   innerInput: {
@@ -2527,19 +3110,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Quicksand-Regular',
     color: '#1E2022',
-  },
-
-  unitBadge: {
-    backgroundColor: '#E2E8F0',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-
-  unitBadgeText: {
-    fontSize: 14,
-    fontFamily: 'Quicksand-Bold',
-    color: '#475569',
   },
 
   notesInputBox: {
