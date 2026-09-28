@@ -96,8 +96,21 @@ export default function AddPetScreen({navigation}: any) {
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [customType, setCustomType] = useState('');
+
+  // Doğum tarihi bilgisi ne kadar biliniyor?
+  // day   = tam tarih (GG.AA.YYYY)
+  // month = ay/yıl (AA.YYYY)
+  // year  = yalnızca yıl (YYYY)
+  const [birthDatePrecision, setBirthDatePrecision] =
+    useState<'day' | 'month' | 'year'>('year');
+  const [birthDate, setBirthDate] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const currentYear = new Date().getFullYear();
+  const [birthPickerDate, setBirthPickerDate] =
+    useState(new Date());
+  const [showBirthDatePicker, setShowBirthDatePicker] =
+    useState(false);
+
   const [gender, setGender] = useState('');
 
   const [weight, setWeight] = useState('');
@@ -130,8 +143,11 @@ export default function AddPetScreen({navigation}: any) {
   const [invalidTypeVisible, setInvalidTypeVisible] =
     useState(false);
 
-  const [birthYearErrorVisible, setBirthYearErrorVisible] =
+  const [birthDateErrorVisible, setBirthDateErrorVisible] =
     useState(false);
+
+  const [birthDateErrorMessage, setBirthDateErrorMessage] =
+    useState('');
 
   const [successVisible, setSuccessVisible] =
     useState(false);
@@ -155,7 +171,11 @@ export default function AddPetScreen({navigation}: any) {
     setName('');
     setType('');
     setCustomType('');
+    setBirthDatePrecision('year');
+    setBirthDate('');
     setBirthYear('');
+    setBirthPickerDate(new Date());
+    setShowBirthDatePicker(false);
     setGender('');
 
     setWeight('');
@@ -174,7 +194,8 @@ export default function AddPetScreen({navigation}: any) {
     setMissingTypeVisible(false);
     setGenderErrorVisible(false);
     setInvalidTypeVisible(false);
-    setBirthYearErrorVisible(false);
+    setBirthDateErrorVisible(false);
+    setBirthDateErrorMessage('');
     setSuccessVisible(false);
     setSaveErrorVisible(false);
 
@@ -252,32 +273,7 @@ export default function AddPetScreen({navigation}: any) {
      STEP 2
   ===================================================== */
 
-  const goNextFromStepTwo = () => {
-    const numericBirthYear = Number(birthYear);
-
-    if (
-      !birthYear.trim() ||
-      isNaN(numericBirthYear) ||
-      numericBirthYear < 1900 ||
-      numericBirthYear > currentYear
-    ) {
-      setBirthYearErrorVisible(true);
-      return;
-    }
-
-    if (!gender) {
-      setGenderErrorVisible(true);
-      return;
-    }
-
-    setStep(3);
-  };
-
-  /* =====================================================
-     SAVE
-  ===================================================== */
-
-  const formatVetDate = (date: Date) => {
+  const formatFullDate = (date: Date) => {
     return [
       String(date.getDate()).padStart(2, '0'),
       String(date.getMonth() + 1).padStart(2, '0'),
@@ -285,7 +281,30 @@ export default function AddPetScreen({navigation}: any) {
     ].join('.');
   };
 
-  const isValidVetDate = (value: string) => {
+  const formatMonthYear = (date: Date) => {
+    return [
+      String(date.getMonth() + 1).padStart(2, '0'),
+      date.getFullYear(),
+    ].join('.');
+  };
+
+  const normalizeDate = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  const getToday = () =>
+    normalizeDate(new Date());
+
+  const getDateKey = (date: Date) =>
+    [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+
+  const isValidFullDate = (value: string) => {
     const match =
       value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
 
@@ -297,14 +316,265 @@ export default function AddPetScreen({navigation}: any) {
     const month = Number(match[2]);
     const year = Number(match[3]);
 
-    const date =
-      new Date(year, month - 1, day);
+    const date = new Date(year, month - 1, day);
 
     return (
       date.getFullYear() === year &&
       date.getMonth() === month - 1 &&
       date.getDate() === day
     );
+  };
+
+  const parseFullDate = (value: string) => {
+    if (!isValidFullDate(value)) {
+      return null;
+    }
+
+    const [day, month, year] = value
+      .split('.')
+      .map(Number);
+
+    return new Date(year, month - 1, day);
+  };
+
+  const getBirthDateErrorMessage = () => {
+    if (!birthDate.trim()) {
+      return 'Doğum tarihi bilgisini girmen gerekiyor.';
+    }
+
+    if (birthDatePrecision === 'year') {
+      const year = Number(birthDate);
+
+      if (!/^\d{4}$/.test(birthDate)) {
+        return 'Geçerli bir doğum yılı gir.\nÖrn. 2026';
+      }
+
+      if (year < 1900) {
+        return 'Doğum yılı 1900 yılından önce olamaz.';
+      }
+
+      if (year > currentYear) {
+        return 'Doğum yılı gelecek bir yıl olamaz.';
+      }
+
+      return null;
+    }
+
+    if (birthDatePrecision === 'month') {
+      const match =
+        birthDate.match(/^(\d{2})\.(\d{4})$/);
+
+      if (!match) {
+        return 'Geçerli bir ay ve yıl gir.\nÖrn. 05.2026';
+      }
+
+      const month = Number(match[1]);
+      const year = Number(match[2]);
+
+      if (month < 1 || month > 12) {
+        return 'Ay 01 ile 12 arasında olmalı.';
+      }
+
+      if (year < 1900) {
+        return 'Doğum yılı 1900 yılından önce olamaz.';
+      }
+
+      if (year > currentYear) {
+        return 'Doğum tarihi gelecek bir tarih olamaz.';
+      }
+
+      const today = getToday();
+
+      if (
+        year === today.getFullYear() &&
+        month > today.getMonth() + 1
+      ) {
+        return 'Doğum ayı gelecek bir ay olamaz.';
+      }
+
+      return null;
+    }
+
+    if (!isValidFullDate(birthDate)) {
+      return 'Geçerli bir doğum tarihi gir.\nÖrn. 18.05.2026';
+    }
+
+    const selectedDate = normalizeDate(
+      parseFullDate(birthDate) as Date,
+    );
+
+    const today = getToday();
+
+    if (selectedDate.getFullYear() < 1900) {
+      return 'Doğum yılı 1900 yılından önce olamaz.';
+    }
+
+    if (selectedDate > today) {
+      return 'Doğum tarihi gelecek bir tarih olamaz.';
+    }
+
+    return null;
+  };
+
+  const getBirthDateLowerBoundForVet = () => {
+    if (birthDatePrecision === 'day') {
+      const exactDate = parseFullDate(birthDate);
+
+      if (exactDate) {
+        return normalizeDate(exactDate);
+      }
+    }
+
+    if (birthDatePrecision === 'month') {
+      const match =
+        birthDate.match(/^(\d{2})\.(\d{4})$/);
+
+      if (match) {
+        const month = Number(match[1]);
+        const year = Number(match[2]);
+
+        return normalizeDate(
+          new Date(year, month - 1, 1),
+        );
+      }
+    }
+
+    const year = Number(birthYear);
+
+    return normalizeDate(
+      new Date(year, 0, 1),
+    );
+  };
+
+  const goNextFromStepTwo = () => {
+    const birthDateError =
+      getBirthDateErrorMessage();
+
+    if (birthDateError) {
+      setBirthDateErrorMessage(birthDateError);
+      setBirthDateErrorVisible(true);
+      return;
+    }
+
+    if (!gender) {
+      setGenderErrorVisible(true);
+      return;
+    }
+
+    setStep(3);
+  };
+
+  const changeBirthDatePrecision = (
+    precision: 'day' | 'month' | 'year',
+  ) => {
+    setBirthDatePrecision(precision);
+
+    // Mevcut bilinen yılı koruyalım. Kullanıcı sadece
+    // hassasiyetini değiştirsin; tarih yeniden girilebilir.
+    if (precision === 'year') {
+      if (birthYear) {
+        setBirthDate(birthYear);
+      } else {
+        setBirthDate('');
+      }
+      return;
+    }
+
+    setBirthDate('');
+  };
+
+  const handleBirthDateTextChange = (text: string) => {
+    const numbers = text.replace(/[^0-9]/g, '');
+
+    if (birthDatePrecision === 'day') {
+      if (numbers.length > 8) {
+        return;
+      }
+
+      let formatted = numbers;
+
+      if (numbers.length > 2) {
+        formatted =
+          numbers.slice(0, 2) +
+          '.' +
+          numbers.slice(2);
+      }
+
+      if (numbers.length > 4) {
+        formatted =
+          numbers.slice(0, 2) +
+          '.' +
+          numbers.slice(2, 4) +
+          '.' +
+          numbers.slice(4);
+      }
+
+      setBirthDate(formatted);
+
+      if (numbers.length >= 8) {
+        setBirthYear(numbers.slice(4, 8));
+      } else if (!numbers) {
+        setBirthYear('');
+      }
+
+      return;
+    }
+
+    if (birthDatePrecision === 'month') {
+      if (numbers.length > 6) {
+        return;
+      }
+
+      let formatted = numbers;
+
+      if (numbers.length > 2) {
+        formatted =
+          numbers.slice(0, 2) +
+          '.' +
+          numbers.slice(2);
+      }
+
+      setBirthDate(formatted);
+
+      if (numbers.length >= 6) {
+        setBirthYear(numbers.slice(2, 6));
+      } else if (!numbers) {
+        setBirthYear('');
+      }
+
+      return;
+    }
+
+    if (numbers.length > 4) {
+      return;
+    }
+
+    setBirthDate(numbers);
+    setBirthYear(numbers);
+  };
+
+  const openBirthDatePicker = () => {
+    const existingDate = parseFullDate(birthDate);
+
+    if (existingDate) {
+      setBirthPickerDate(existingDate);
+    } else {
+      setBirthPickerDate(getToday());
+    }
+
+    setShowBirthDatePicker(true);
+  };
+
+  /* =====================================================
+     SAVE
+  ===================================================== */
+
+  const formatVetDate = (date: Date) => {
+    return formatFullDate(date);
+  };
+
+  const isValidVetDate = (value: string) => {
+    return isValidFullDate(value);
   };
 
   const getVetDateErrorMessage = (
@@ -314,73 +584,90 @@ export default function AddPetScreen({navigation}: any) {
       return 'Lütfen geçerli bir tarih gir.\nÖrn. 18.09.2026';
     }
 
-    const match =
-      value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    const selectedDate = normalizeDate(
+      parseFullDate(value) as Date,
+    );
 
-    if (!match) {
-      return 'Lütfen geçerli bir tarih gir.';
-    }
+    const today = getToday();
 
-    const day = Number(match[1]);
-    const month = Number(match[2]);
-    const year = Number(match[3]);
-
-    const selectedDate =
-      new Date(year, month - 1, day);
-
-    selectedDate.setHours(0, 0, 0, 0);
-
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-
-    // Gelecek tarih kontrolü
     if (selectedDate > today) {
       return 'Veteriner ziyaret tarihi gelecek bir tarih olamaz.';
     }
 
-    // Dostun doğum tarihinden önce olamaz
-    const petBirthDate =
-      new Date(Number(birthYear), 0, 1);
+    const birthDateError =
+      getBirthDateErrorMessage();
 
-    petBirthDate.setHours(0, 0, 0, 0);
+    if (birthDateError) {
+      return 'Önce doğum tarihi bilgisini düzeltmelisin.';
+    }
+
+    const petBirthDate =
+      getBirthDateLowerBoundForVet();
 
     if (selectedDate < petBirthDate) {
+      if (birthDatePrecision === 'day') {
+        return 'Veteriner ziyaret tarihi dostunun doğum tarihinden önce olamaz.';
+      }
+
+      if (birthDatePrecision === 'month') {
+        return 'Veteriner ziyaret tarihi dostunun bilinen doğum ayından önce olamaz.';
+      }
+
       return 'Veteriner ziyaret tarihi dostunun doğum yılından önce olamaz.';
     }
 
-      return null;
-      };
+    return null;
+  };
 
-      const handleVetDateTextChange = (text: string) => {
-        const numbers = text.replace(/[^0-9]/g, '');
+  const handleVetDateTextChange = (text: string) => {
+    const numbers = text.replace(/[^0-9]/g, '');
 
-        if (numbers.length > 8) {
-          return;
-        }
+    if (numbers.length > 8) {
+      return;
+    }
 
-        let formatted = numbers;
+    let formatted = numbers;
 
-        if (numbers.length > 2) {
-          formatted =
-            numbers.slice(0, 2) +
-            '.' +
-            numbers.slice(2);
-        }
+    if (numbers.length > 2) {
+      formatted =
+        numbers.slice(0, 2) +
+        '.' +
+        numbers.slice(2);
+    }
 
-        if (numbers.length > 4) {
-          formatted =
-            numbers.slice(0, 2) +
-            '.' +
-            numbers.slice(2, 4) +
-            '.' +
-            numbers.slice(4);
-        }
+    if (numbers.length > 4) {
+      formatted =
+        numbers.slice(0, 2) +
+        '.' +
+        numbers.slice(2, 4) +
+        '.' +
+        numbers.slice(4);
+    }
 
-        setLastVetVisit(formatted);
-      };
+    setLastVetVisit(formatted);
+  };
 
-      const handleSave = async () => {
+  const openVetDatePicker = () => {
+    const existingDate =
+      parseFullDate(lastVetVisit);
+
+    if (existingDate) {
+      const error =
+        getVetDateErrorMessage(lastVetVisit);
+
+      if (!error) {
+        setVetDate(existingDate);
+      } else {
+        setVetDate(getToday());
+      }
+    } else {
+      setVetDate(getToday());
+    }
+
+    setShowVetDatePicker(true);
+  };
+
+  const handleSave = async () => {
     const currentUser = auth().currentUser;
 
     if (!currentUser) {
@@ -483,8 +770,19 @@ export default function AddPetScreen({navigation}: any) {
         type:
           finalType,
 
+        // Eski alanı koruyoruz; mevcut ekranlar/servisler
+        // birthYear kullanmaya devam edebilir.
         birthYear:
           Number(birthYear),
+
+        // Yeni doğum tarihi bilgisi:
+        // day   -> GG.AA.YYYY
+        // month -> AA.YYYY
+        // year  -> YYYY
+        birthDate:
+          birthDate.trim(),
+
+        birthDatePrecision,
 
         gender,
 
@@ -965,13 +1263,81 @@ export default function AddPetScreen({navigation}: any) {
             </View>
 
             <Text style={styles.label}>
-              Doğum Yılı
+              Doğum tarihi
             </Text>
 
-            <View
-              style={
-                styles.ageInputContainer
-              }>
+            <Text style={styles.birthDateDescription}>
+              Ne kadarını bildiğine göre bir seçenek seçebilirsin.
+            </Text>
+
+            <View style={styles.birthPrecisionRow}>
+
+              <Pressable
+                onPress={() =>
+                  changeBirthDatePrecision('day')
+                }
+                style={[
+                  styles.birthPrecisionButton,
+                  birthDatePrecision === 'day' &&
+                    styles.birthPrecisionButtonSelected,
+                ]}>
+
+                <Text
+                  style={[
+                    styles.birthPrecisionText,
+                    birthDatePrecision === 'day' &&
+                      styles.birthPrecisionTextSelected,
+                  ]}>
+                  Tam tarih
+                </Text>
+
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  changeBirthDatePrecision('month')
+                }
+                style={[
+                  styles.birthPrecisionButton,
+                  birthDatePrecision === 'month' &&
+                    styles.birthPrecisionButtonSelected,
+                ]}>
+
+                <Text
+                  style={[
+                    styles.birthPrecisionText,
+                    birthDatePrecision === 'month' &&
+                      styles.birthPrecisionTextSelected,
+                  ]}>
+                  Ay / Yıl
+                </Text>
+
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  changeBirthDatePrecision('year')
+                }
+                style={[
+                  styles.birthPrecisionButton,
+                  birthDatePrecision === 'year' &&
+                    styles.birthPrecisionButtonSelected,
+                ]}>
+
+                <Text
+                  style={[
+                    styles.birthPrecisionText,
+                    birthDatePrecision === 'year' &&
+                      styles.birthPrecisionTextSelected,
+                  ]}>
+                  Yıl
+                </Text>
+
+              </Pressable>
+
+            </View>
+
+            <View style={styles.ageInputContainer}>
 
               <Cake
                 size={20}
@@ -980,32 +1346,48 @@ export default function AddPetScreen({navigation}: any) {
               />
 
               <TextInput
-                value={birthYear}
-                onChangeText={text =>
-                  setBirthYear(
-                    text.replace(
-                      /[^0-9]/g,
-                      '',
-                    ),
-                  )
-                }
+                value={birthDate}
+                onChangeText={handleBirthDateTextChange}
                 keyboardType="numeric"
-                maxLength={4}
-                placeholder="Örn. 2026"
+                maxLength={
+                  birthDatePrecision === 'day'
+                    ? 10
+                    : birthDatePrecision === 'month'
+                    ? 7
+                    : 4
+                }
+                placeholder={
+                  birthDatePrecision === 'day'
+                    ? 'Örn. 18.05.2026'
+                    : birthDatePrecision === 'month'
+                    ? 'Örn. 05.2026'
+                    : 'Örn. 2026'
+                }
                 placeholderTextColor="#A0A5B5"
                 style={styles.ageInput}
               />
 
+              {birthDatePrecision === 'day' && (
+                <Pressable
+                  onPress={openBirthDatePicker}
+                  style={styles.birthCalendarButton}>
+
+                  <Calendar
+                    size={20}
+                    color="#6C5CE7"
+                  />
+
+                </Pressable>
+              )}
+
             </View>
 
-            <Text
-              style={
-                styles.birthYearHelper
-              }>
-
-              Tam olarak bilmiyorsan yaklaşık yılı
-              girebilirsin.
-
+            <Text style={styles.birthYearHelper}>
+              {birthDatePrecision === 'day'
+                ? 'Tam tarihi biliyorsan gün, ay ve yılı girebilirsin.'
+                : birthDatePrecision === 'month'
+                ? 'Sadece ay ve yılı biliyorsan bu seçeneği kullanabilirsin.'
+                : 'Sadece yılı biliyorsan yaklaşık doğum tarihi olarak kaydedilir.'}
             </Text>
 
             <Text style={styles.label}>
@@ -1259,9 +1641,7 @@ export default function AddPetScreen({navigation}: any) {
                 />
 
                 <Pressable
-                  onPress={() =>
-                    setShowVetDatePicker(true)
-                  }
+                  onPress={openVetDatePicker}
                   style={styles.vetCalendarButton}>
 
                   <Calendar
@@ -1448,12 +1828,12 @@ export default function AddPetScreen({navigation}: any) {
       {/* ================================================= */}
 
       <Modal
-        visible={birthYearErrorVisible}
+        visible={birthDateErrorVisible}
         transparent
         animationType="fade"
         statusBarTranslucent
         onRequestClose={() =>
-          setBirthYearErrorVisible(false)
+          setBirthDateErrorVisible(false)
         }>
 
         <View style={styles.popupOverlay}>
@@ -1475,19 +1855,17 @@ export default function AddPetScreen({navigation}: any) {
             </View>
 
             <Text style={styles.popupTitle}>
-              Eksik bilgi
+              Geçersiz doğum tarihi
             </Text>
 
             <Text style={styles.popupMessage}>
-              Geçerli bir doğum yılı gir.
-              {'\n'}
-              Örn. {currentYear - 2}
+              {birthDateErrorMessage}
             </Text>
 
             <Pressable
               style={styles.popupButton}
               onPress={() =>
-                setBirthYearErrorVisible(false)
+                setBirthDateErrorVisible(false)
               }>
 
               <View
@@ -1916,6 +2294,130 @@ export default function AddPetScreen({navigation}: any) {
       </Modal>
 
       <Modal
+        visible={showBirthDatePicker}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setShowBirthDatePicker(false)
+        }>
+
+        <Pressable
+          style={styles.datePickerOverlay}
+          onPress={() =>
+            setShowBirthDatePicker(false)
+          }>
+
+          <Pressable
+            style={styles.datePickerCard}
+            onPress={() => {}}>
+
+            <View style={styles.datePickerHeader}>
+
+              <View style={styles.datePickerHeaderIcon}>
+
+                <Cake
+                  size={21}
+                  color="#6C5CE7"
+                  strokeWidth={2}
+                />
+
+              </View>
+
+              <View style={styles.datePickerHeaderText}>
+
+                <Text style={styles.datePickerTitle}>
+                  Doğum tarihi
+                </Text>
+
+                <Text style={styles.datePickerSubtitle}>
+                  Tam doğum tarihini seç
+                </Text>
+
+              </View>
+
+            </View>
+
+            <RNCalendar
+              current={getDateKey(birthPickerDate)}
+
+              minDate="1900-01-01"
+
+              maxDate={getDateKey(getToday())}
+
+              onDayPress={day => {
+                const selectedDate =
+                  new Date(
+                    day.year,
+                    day.month - 1,
+                    day.day,
+                  );
+
+                setBirthPickerDate(selectedDate);
+                setBirthDatePrecision('day');
+                setBirthDate(
+                  formatFullDate(selectedDate),
+                );
+                setBirthYear(
+                  String(day.year),
+                );
+                setShowBirthDatePicker(false);
+              }}
+
+              markedDates={{
+                [getDateKey(birthPickerDate)]: {
+                  selected: true,
+                  selectedColor: '#6C5CE7',
+                  selectedTextColor: '#FFFFFF',
+                },
+              }}
+
+              theme={{
+                backgroundColor: '#FFFFFF',
+                calendarBackground: '#FFFFFF',
+                textSectionTitleColor: '#858B9B',
+                selectedDayBackgroundColor: '#6C5CE7',
+                selectedDayTextColor: '#FFFFFF',
+                todayTextColor: '#6C5CE7',
+                dayTextColor: '#1E2022',
+                textDisabledColor: '#D6D3E8',
+                monthTextColor: '#1E2022',
+                arrowColor: '#6C5CE7',
+                textMonthFontFamily:
+                  'Quicksand-Bold',
+                textDayFontFamily:
+                  'Quicksand-Regular',
+                textDayHeaderFontFamily:
+                  'Quicksand-Bold',
+                textMonthFontSize: 17,
+                textDayFontSize: 14,
+                textDayHeaderFontSize: 12,
+              }}
+
+              enableSwipeMonths
+              firstDay={1}
+              hideExtraDays
+            />
+
+            <Pressable
+              style={styles.datePickerCloseButton}
+              onPress={() =>
+                setShowBirthDatePicker(false)
+              }>
+
+              <Text style={styles.datePickerCloseText}>
+                Kapat
+              </Text>
+
+            </Pressable>
+
+          </Pressable>
+
+        </Pressable>
+
+      </Modal>
+
+      <Modal
         visible={showVetDatePicker}
         transparent
         animationType="fade"
@@ -1969,7 +2471,9 @@ export default function AddPetScreen({navigation}: any) {
                 .toISOString()
                 .split('T')[0]}
 
-              minDate={`${birthYear}-01-01`}
+              minDate={getDateKey(
+                getBirthDateLowerBoundForVet(),
+              )}
 
               maxDate={new Date()
                 .toISOString()
@@ -2791,8 +3295,50 @@ const styles = StyleSheet.create({
   },
 
   /* ================================================= */
-  /* BIRTH YEAR                                         */
+  /* BIRTH DATE                                        */
   /* ================================================= */
+
+  birthDateDescription: {
+    marginTop: -3,
+    marginBottom: 10,
+    color: '#8A91A8',
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: 'Quicksand-Regular',
+  },
+
+  birthPrecisionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  birthPrecisionButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E5ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+
+  birthPrecisionButtonSelected: {
+    backgroundColor: '#EEF0FF',
+    borderColor: '#6C5CE7',
+  },
+
+  birthPrecisionText: {
+    fontSize: 12,
+    fontFamily: 'Quicksand-Bold',
+    color: '#6B7280',
+  },
+
+  birthPrecisionTextSelected: {
+    color: '#6C5CE7',
+  },
 
   ageInputContainer: {
     height: 56,
@@ -2802,7 +3348,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E5ED',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 8,
   },
 
   ageIcon: {
@@ -2816,13 +3363,22 @@ const styles = StyleSheet.create({
     color: '#1E2022',
   },
 
+  birthCalendarButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0EDFF',
+  },
+
   birthYearHelper: {
     marginTop: 7,
     marginBottom: 2,
     color: '#8A91A8',
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: 'Quicksand-Regular',
   },
 
   /* ================================================= */
@@ -3058,50 +3614,6 @@ const styles = StyleSheet.create({
 
     fontSize: 14,
 
-    fontFamily: 'Quicksand-Bold',
-  },
-
-  datePickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    marginBottom: 8,
-  },
-
-  datePickerHeaderIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#F0EDFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-
-  datePickerHeaderText: {
-    flex: 1,
-  },
-
-  datePickerSubtitle: {
-    marginTop: 2,
-    fontSize: 13,
-    fontFamily: 'Quicksand-Regular',
-    color: '#858B9B',
-  },
-
-  datePickerCloseButton: {
-    height: 48,
-    borderRadius: 17,
-    backgroundColor: '#F0EDFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginHorizontal: 8,
-  },
-
-  datePickerCloseText: {
-    color: '#6C5CE7',
-    fontSize: 14,
     fontFamily: 'Quicksand-Bold',
   },
 
