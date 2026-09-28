@@ -34,11 +34,14 @@ import {
   Stethoscope,
   Syringe,
   Trash2,
+  Plus,
+  ChevronRight,
   Utensils,
   X,
   ArrowRight,
   Frown,
   Moon,
+  Check,
 } from 'lucide-react-native';
 
 import {useAuth} from '../data/AuthContext';
@@ -66,9 +69,143 @@ type PetType =
   | 'Köpek'
   | 'Kuş'
   | 'Balık'
-  | 'Küçük Hayvan'
-  | 'Diğer'
+  | 'Kemirgen'
+  | 'Sürüngen'
+  | 'Çiftlik Hayvanı'
+  | 'Amfibi'
+  | 'Omurgasız'
+  | 'Diğer Memeliler'
   | '';
+
+  /* =========================================================
+     HAYVAN TÜRLERİ
+     AddPetScreen ile aynı yapı
+  ========================================================= */
+
+  const ANIMAL_SUBTYPES: Record<string, string[]> = {
+    Kedi: [
+      'British Shorthair',
+      'Scottish Fold',
+      'Siyam',
+      'İran Kedisi',
+      'Maine Coon',
+      'Ragdoll',
+      'Van Kedisi',
+      'Tekir',
+      'Sfenks',
+      'Bengal',
+      'Birman',
+      'Abyssinian',
+      'Diğer',
+    ],
+
+    Köpek: [
+      'Golden Retriever',
+      'Labrador Retriever',
+      'Alman Kurdu',
+      'French Bulldog',
+      'Poodle',
+      'Chihuahua',
+      'Beagle',
+      'Husky',
+      'Pomeranian',
+      'Rottweiler',
+      'Cocker Spaniel',
+      'Dachshund',
+      'Maltese',
+      'Shih Tzu',
+      'Border Collie',
+      'Diğer',
+    ],
+
+    Kuş: [
+      'Muhabbet Kuşu',
+      'Papağan',
+      'Kanarya',
+      'Sultan Papağanı',
+      'Sevda Papağanı',
+      'İspinoz',
+      'Güvercin',
+      'Serçe',
+      'Bülbül',
+      'Hint Bülbülü',
+      'Diğer',
+    ],
+
+    Balık: [
+      'Japon Balığı',
+      'Beta',
+      'Lepistes',
+      'Melek Balığı',
+      'Koi',
+      'Çöpçü Balığı',
+      'Neon Tetra',
+      'Moli',
+      'Plati',
+    ],
+
+    Kemirgen: [
+      'Hamster',
+      'Kobay',
+      'Çinçilla',
+      'Fare',
+      'Sıçan',
+      'Gerbil',
+      'Sincap',
+    ],
+
+    Sürüngen: [
+      'Kaplumbağa',
+      'Yılan',
+      'Kertenkele',
+      'İguana',
+      'Geko',
+      'Sakallı Ejder',
+      'Bukalemun',
+    ],
+
+    'Çiftlik Hayvanı': [
+      'At',
+      'İnek',
+      'Koyun',
+      'Keçi',
+      'Ördek',
+      'Tavuk',
+      'Kaz',
+      'Manda',
+      'Eşek',
+      'Deve',
+    ],
+
+    Amfibi: [
+      'Kurbağa',
+      'Semender',
+      'Aksolotl',
+    ],
+
+    Omurgasız: [
+      'Örümcek',
+      'Akrep',
+      'Salyangoz',
+      'Yengeç',
+    ],
+
+    'Diğer Memeliler': [
+      'Tavşan',
+      'Kirpi',
+      'Gelincik',
+    ],
+  };
+
+  const GENERAL_ANIMAL_TYPES = [
+    'Balık',
+    'Kemirgen',
+    'Sürüngen',
+    'Çiftlik Hayvanı',
+    'Amfibi',
+    'Omurgasız',
+    'Diğer Memeliler',
+  ];
 
 type ProblemType =
   | 'İştahsızlık'
@@ -177,14 +314,6 @@ const durationLabelMap: Record<DurationType, string> = {
   '1_hafta': '1 haftadır',
   uzun: 'Uzun süredir',
 };
-
-const PETS: PetType[] = [
-  'Köpek',
-  'Kedi',
-  'Küçük Hayvan',
-  'Kuş',
-  'Diğer',
-];
 
 const SYMPTOMS: ProblemType[] = [
   'İştahsızlık',
@@ -341,6 +470,15 @@ const URGENCIES: UrgencyType[] = [
 /* =========================================================
    SCREEN
    ========================================================= */
+const OTHER_ANIMAL_TYPES = [
+  'Balık',
+  'Kemirgen',
+  'Sürüngen',
+  'Çiftlik Hayvanı',
+  'Amfibi',
+  'Omurgasız',
+  'Diğer Memeliler',
+];
 
 const AssistantScreen = () => {
   const tabBarHeight = 80;
@@ -348,6 +486,20 @@ const AssistantScreen = () => {
 
   const [petType, setPetType] =
     useState<PetType>('');
+
+  const [
+    otherAnimalTypesVisible,
+    setOtherAnimalTypesVisible,
+  ] = useState(false);
+
+  const [animalTypeListVisible, setAnimalTypeListVisible] =
+    useState(false);
+
+  const [animalCategory, setAnimalCategory] =
+    useState<string>('');
+
+  const [selectedAnimalSubtype, setSelectedAnimalSubtype] =
+    useState<string>('');
 
   const [problemTypes, setProblemTypes] =
     useState<ProblemType[]>([]);
@@ -363,6 +515,7 @@ const AssistantScreen = () => {
 
   const [result, setResult] =
     useState<RiskResult | null>(null);
+
 
   const [aiMessage, setAiMessage] =
     useState('');
@@ -501,6 +654,71 @@ const AssistantScreen = () => {
   /* =======================================================
      AI REQUEST
      ======================================================= */
+
+  const selectDirectAnimalType = (
+    type: 'Kedi' | 'Köpek' | 'Kuş',
+  ) => {
+    setPetType(type);
+    setSelectedAnimalSubtype('');
+    setAnimalCategory('');
+
+    setResult(null);
+    setAiMessage('');
+  };
+
+  const openOtherAnimalTypes = () => {
+    setAnimalCategory('');
+    setSelectedAnimalSubtype('');
+    setOtherAnimalTypesVisible(true);
+  };
+
+  const closeOtherAnimalTypes = () => {
+    setOtherAnimalTypesVisible(false);
+  };
+
+  const selectGeneralAnimalType = (
+    type: string,
+  ) => {
+    setPetType(type as PetType);
+    setAnimalCategory(type);
+    setSelectedAnimalSubtype('');
+
+    setResult(null);
+    setAiMessage('');
+  };
+
+  const selectAnimalSubtype = (
+    subtype: string,
+  ) => {
+    setSelectedAnimalSubtype(subtype);
+
+    setResult(null);
+    setAiMessage('');
+
+    setAnimalTypeListVisible(false);
+  };
+
+  /*
+   * AI'ya gönderilecek hayvan türü.
+   *
+   * Örneğin:
+   * Kedi + British Shorthair
+   * -> "Kedi - British Shorthair"
+   *
+   * Balık + Beta
+   * -> "Balık - Beta"
+   */
+  const getAssistantPetType = () => {
+    if (!petType) {
+      return '';
+    }
+
+    if (selectedAnimalSubtype) {
+      return `${petType} - ${selectedAnimalSubtype}`;
+    }
+
+    return petType;
+  };
 
   const fetchRisk = async () => {
     if (!canShowSummary) {
@@ -1213,105 +1431,189 @@ const AssistantScreen = () => {
                 PET TYPE
                 ================================================= */}
 
-            <View
-              style={styles.mainCard}>
+            <View style={styles.petTypeGrid}>
 
-              <View
-                style={
-                  styles.sectionHeading
-                }>
+              {/* =====================================================
+                  KEDİ
+              ===================================================== */}
 
-                <View
-                  style={
-                    styles.sectionHeadingIcon
-                  }>
-
-                  <PawPrint
-                    size={25}
-                    color="#B78328"
-                    strokeWidth={2.4}
-                  />
-
-                </View>
-
-                <View
-                  style={
-                    styles.sectionHeadingTexts
-                  }>
-
-                  <Text
-                    style={
-                      styles.sectionTitle
-                    }>
-                    Evcil Hayvan Türü
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.sectionSubtitle
-                    }>
-                    Danışacağın dostunu seç
-                  </Text>
-
-                </View>
-
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={
-                  false
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() =>
+                  selectDirectAnimalType('Kedi')
                 }
-                contentContainerStyle={
-                  styles.petRow
-                }>
+                style={[
+                  styles.petTypeOption,
+                  petType === 'Kedi' &&
+                    styles.petTypeOptionSelected,
+                ]}>
 
-                {PETS.map(item => {
-                  const selected =
-                    petType === item;
+                <Text
+                  style={[
+                    styles.petTypeOptionText,
+                    petType === 'Kedi' &&
+                      styles.petTypeOptionTextSelected,
+                  ]}>
+                  Kedi
+                </Text>
 
-                  return (
-                    <TouchableOpacity
-                      key={item}
-                      activeOpacity={0.86}
-                      onPress={() => {
-                        setPetType(item);
-                        setResult(null);
-                        setAiMessage('');
-                      }}
+                {petType === 'Kedi' && (
+                  <View
+                    style={
+                      styles.petTypeCheck
+                    }>
+                    <Check
+                      size={14}
+                      color="#FFFFFF"
+                      strokeWidth={3}
+                    />
+                  </View>
+                )}
+
+              </TouchableOpacity>
+
+
+              {/* =====================================================
+                  KÖPEK
+              ===================================================== */}
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() =>
+                  selectDirectAnimalType('Köpek')
+                }
+                style={[
+                  styles.petTypeOption,
+                  petType === 'Köpek' &&
+                    styles.petTypeOptionSelected,
+                ]}>
+
+                <Text
+                  style={[
+                    styles.petTypeOptionText,
+                    petType === 'Köpek' &&
+                      styles.petTypeOptionTextSelected,
+                  ]}>
+                  Köpek
+                </Text>
+
+                {petType === 'Köpek' && (
+                  <View
+                    style={
+                      styles.petTypeCheck
+                    }>
+                    <Check
+                      size={14}
+                      color="#FFFFFF"
+                      strokeWidth={3}
+                    />
+                  </View>
+                )}
+
+              </TouchableOpacity>
+
+
+              {/* =====================================================
+                  KUŞ
+              ===================================================== */}
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() =>
+                  selectDirectAnimalType('Kuş')
+                }
+                style={[
+                  styles.petTypeOption,
+                  petType === 'Kuş' &&
+                    styles.petTypeOptionSelected,
+                ]}>
+
+                <Text
+                  style={[
+                    styles.petTypeOptionText,
+                    petType === 'Kuş' &&
+                      styles.petTypeOptionTextSelected,
+                  ]}>
+                  Kuş
+                </Text>
+
+                {petType === 'Kuş' && (
+                  <View
+                    style={
+                      styles.petTypeCheck
+                    }>
+                    <Check
+                      size={14}
+                      color="#FFFFFF"
+                      strokeWidth={3}
+                    />
+                  </View>
+                )}
+
+              </TouchableOpacity>
+
+
+              {/* =====================================================
+                  DİĞER / +
+              ===================================================== */}
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={
+                  openOtherAnimalTypes
+                }
+                style={[
+                  styles.petTypeOption,
+                  styles.petTypeOtherOption,
+                  !['Kedi', 'Köpek', 'Kuş'].includes(
+                    petType,
+                  ) &&
+                    petType &&
+                    styles.petTypeOptionSelected,
+                ]}>
+
+                {!['Kedi', 'Köpek', 'Kuş'].includes(
+                  petType,
+                ) && petType ? (
+                  <>
+                    <Text
+                      numberOfLines={1}
                       style={[
-                        styles.petItem,
-                        selected &&
-                          styles.petItemSelected,
+                        styles.petTypeOptionText,
+                        styles.petTypeOptionTextSelected,
                       ]}>
+                      {petType}
+                    </Text>
 
-                      <View
-                        style={
-                          styles.petIconArea
-                        }>
-                        {renderPetIcon(
-                          item,
-                        )}
-                      </View>
+                    <ChevronRight
+                      size={16}
+                      color="#FFFFFF"
+                      strokeWidth={2.5}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <View
+                      style={
+                        styles.petTypePlusCircle
+                      }>
+                      <Plus
+                        size={18}
+                        color="#7562E8"
+                        strokeWidth={2.5}
+                      />
+                    </View>
 
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.petText,
-                          selected &&
-                            styles.petTextSelected,
-                          item ===
-                            'Küçük Hayvan' &&
-                            styles.petTextSmall,
-                        ]}>
-                        {item}
-                      </Text>
+                    <Text
+                      style={
+                        styles.petTypeOtherText
+                      }>
+                      Diğer
+                    </Text>
+                  </>
+                )}
 
-                    </TouchableOpacity>
-                  );
-                })}
-
-              </ScrollView>
+              </TouchableOpacity>
 
             </View>
 
@@ -2491,6 +2793,8 @@ const AssistantScreen = () => {
 
           </ScrollView>
 
+
+
           {/* =================================================
               HISTORY DRAWER
               ================================================= */}
@@ -2713,6 +3017,86 @@ const AssistantScreen = () => {
 
             </View>
 
+          </Modal>
+
+          <Modal
+            visible={otherAnimalTypesVisible}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+              setOtherAnimalTypesVisible(false);
+            }}
+          >
+            <View style={styles.modalOverlay}>
+              <Pressable
+                style={StyleSheet.absoluteFillObject}
+                onPress={() => {
+                  setOtherAnimalTypesVisible(false);
+                }}
+              />
+
+              <View style={styles.otherAnimalModalContent}>
+                <Text style={styles.otherAnimalModalTitle}>
+                  Hayvan Türü Seç
+                </Text>
+
+                <Text style={styles.otherAnimalModalSubtitle}>
+                  Evcil hayvanının türünü seç
+                </Text>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  style={styles.otherAnimalList}
+                >
+                  {OTHER_ANIMAL_TYPES.map(type => (
+                    <TouchableOpacity
+                      key={type}
+                      activeOpacity={0.8}
+                      style={[
+                        styles.otherAnimalOption,
+                        petType === type &&
+                          styles.otherAnimalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        selectGeneralAnimalType(type);
+                        setOtherAnimalTypesVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.otherAnimalOptionText,
+                          petType === type &&
+                            styles.otherAnimalOptionTextSelected,
+                        ]}
+                      >
+                        {type}
+                      </Text>
+
+                      {petType === type && (
+                        <Check
+                          size={18}
+                          color="#FFFFFF"
+                          strokeWidth={3}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.otherAnimalCloseButton}
+                  onPress={() => {
+                    setOtherAnimalTypesVisible(false);
+                  }}
+                >
+                  <Text style={styles.otherAnimalCloseText}>
+                    Vazgeç
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </Modal>
 
           <Modal
@@ -3246,6 +3630,115 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Medium',
     marginTop: 1,
   },
+
+    /* =======================================================
+       PET TYPE
+       ======================================================= */
+
+    petTypeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+
+      marginHorizontal: -4,
+      marginBottom: 12,
+
+      rowGap: 8,
+    },
+
+    petTypeOption: {
+      width: '25%',
+      minHeight: 58,
+
+      paddingHorizontal: 4,
+
+      borderRadius: 18,
+
+      backgroundColor: '#FFFFFF',
+
+      borderWidth: 1,
+      borderColor: '#E2E6F0',
+
+      alignItems: 'center',
+      justifyContent: 'center',
+
+      position: 'relative',
+    },
+
+    petTypeOptionSelected: {
+      backgroundColor: '#EEEAFE',
+
+      borderWidth: 1.5,
+      borderColor: '#8C7AF1',
+
+      shadowColor: '#8C7AF1',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+
+      elevation: 3,
+    },
+
+    petTypeOptionText: {
+      color: '#263452',
+
+      fontSize: 12.5,
+
+      fontFamily: 'Quicksand-Bold',
+
+      textAlign: 'center',
+    },
+
+    petTypeOptionTextSelected: {
+      color: '#5141F4',
+
+      fontFamily: 'Quicksand-Bold',
+    },
+
+    petTypeCheck: {
+      position: 'absolute',
+
+      top: 5,
+      right: 5,
+
+      width: 20,
+      height: 20,
+
+      borderRadius: 10,
+
+      backgroundColor: '#8C7AF1',
+
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    petTypeOtherOption: {
+      flexDirection: 'column',
+    },
+
+    petTypePlusCircle: {
+      width: 25,
+      height: 25,
+
+      borderRadius: 13,
+
+      backgroundColor: '#F1EEFF',
+
+      alignItems: 'center',
+      justifyContent: 'center',
+
+      marginBottom: 3,
+    },
+
+    petTypeOtherText: {
+      color: '#59637C',
+
+      fontSize: 11.5,
+
+      fontFamily: 'Quicksand-Bold',
+    },
 
   /* =======================================================
      PETS
@@ -4452,5 +4945,110 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Bold',
     fontSize: 18,
     color: COLORS.white,
+  },
+
+  otherAnimalModalContent: {
+    width: '88%',
+    maxWidth: 360,
+    maxHeight: '78%',
+
+    backgroundColor: '#FFFFFF',
+
+    borderRadius: 28,
+
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 18,
+
+    alignSelf: 'center',
+
+    shadowColor: '#7257FF',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+
+    elevation: 12,
+  },
+
+  otherAnimalModalTitle: {
+    color: COLORS.navy,
+    fontSize: 20,
+    fontFamily: 'Quicksand-Bold',
+    textAlign: 'left',
+  },
+
+  otherAnimalModalSubtitle: {
+    color: '#7A849C',
+    fontSize: 11,
+    fontFamily: 'Quicksand-Medium',
+    textAlign: 'left',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+
+  otherAnimalList: {
+    width: '100%',
+    paddingTop: 0,
+    paddingBottom: 4,
+  },
+
+  otherAnimalOption: {
+    minHeight: 46,
+
+    borderRadius: 15,
+
+    backgroundColor: '#FBFAFF',
+
+    borderWidth: 1,
+    borderColor: '#E5DFFA',
+
+    paddingHorizontal: 14,
+
+    marginBottom: 8,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  otherAnimalOptionSelected: {
+    backgroundColor: '#9B86FF',
+    borderColor: '#9B86FF',
+  },
+
+  otherAnimalOptionText: {
+    flex: 1,
+
+    color: '#263452',
+    fontSize: 13,
+    fontFamily: 'Quicksand-SemiBold',
+  },
+
+  otherAnimalOptionTextSelected: {
+    color: '#FFFFFF',
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  otherAnimalCloseButton: {
+    width: '100%',
+    height: 44,
+
+    borderRadius: 14,
+
+    backgroundColor: '#EEEAFE',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginTop: 4,
+  },
+
+  otherAnimalCloseText: {
+    color: '#5A48D8',
+    fontSize: 13,
+    fontFamily: 'Quicksand-Bold',
   },
 });
