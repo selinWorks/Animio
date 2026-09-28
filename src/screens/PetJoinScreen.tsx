@@ -23,6 +23,8 @@ import {
 import {useNavigation} from '@react-navigation/native';
 
 import {useAuth} from '../data/AuthContext';
+import {usePets} from '../data/PetContext';
+
 import {
   getPetInvitationByCode,
   acceptPetInvitation,
@@ -48,6 +50,7 @@ type AppModalState = {
 const PetJoinScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const {user} = useAuth();
+  const {reloadPets} = usePets();
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -163,6 +166,8 @@ const PetJoinScreen = () => {
         user.uid,
       );
 
+      await reloadPets();
+
       showModal(
         'success',
         'Katılım Başarılı 🎉',
@@ -170,7 +175,14 @@ const PetJoinScreen = () => {
         () => {
           navigation.reset({
             index: 0,
-            routes: [{name: 'MainTabs'}],
+            routes: [
+              {
+                name: 'MainTabs',
+                params: {
+                  screen: 'Pets',
+                },
+              },
+            ],
           });
         },
         'Petlere Git',
@@ -284,17 +296,22 @@ const PetJoinScreen = () => {
             </View>
           </View>
 
-          <TextInput
-            value={code}
-            onChangeText={handleCodeChange}
-            placeholder="ABC123"
-            placeholderTextColor="#B9B0C9"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={6}
-            style={styles.codeInput}
-            textAlign="center"
-          />
+          <View style={styles.codeInputContainer}>
+            {!code && (
+              <Text style={styles.codePlaceholder}>
+                ABC123
+              </Text>
+            )}
+
+            <TextInput
+              value={code}
+              onChangeText={handleCodeChange}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={6}
+              style={styles.codeInput}
+            />
+          </View>
 
           <Pressable
             style={({pressed}) => [
@@ -640,6 +657,26 @@ const styles = StyleSheet.create({
     color: '#9B91A8',
   },
 
+  codeInputContainer: {
+    height: 62,
+    position: 'relative',
+    marginBottom: 14,
+  },
+
+  codePlaceholder: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 14,
+    textAlign: 'center',
+    fontSize: 25,
+    letterSpacing: 7,
+    fontFamily: 'Quicksand-Bold',
+    color: '#B9B0C9',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+
   codeInput: {
     height: 62,
     borderRadius: 18,
@@ -650,7 +687,8 @@ const styles = StyleSheet.create({
     letterSpacing: 7,
     fontFamily: 'Quicksand-Bold',
     color: '#5F4B8B',
-    marginBottom: 14,
+    paddingLeft: 90,
+    paddingRight: 10,
   },
 
   checkButton: {

@@ -26,7 +26,6 @@ import {
   History,
   NotebookPen,
   Pencil,
-  Trash2,
   Users,
 } from 'lucide-react-native';
 
@@ -416,7 +415,7 @@ export default function PetDetailScreen({
   const navigation =
     useNavigation<NavigationProp>();
 
-  const {pets, removePet, deletePet} = usePets();
+  const {pets, removePet} = usePets();
   const {user} = useAuth();
 
   // Route ile gelen pet objesi ekran açık kaldıkça eski kalabilir.
@@ -446,8 +445,6 @@ export default function PetDetailScreen({
   const otherMembers = memberIds.filter(
     memberId => memberId !== user?.uid,
   );
-
-  const canDelete = isOwner;
 
   const canLeave =
     memberIds.includes(user?.uid ?? '') &&
@@ -534,11 +531,6 @@ export default function PetDetailScreen({
     ]);
 
   const [
-    deleteModalVisible,
-    setDeleteModalVisible,
-  ] = useState(false);
-
-  const [
     leaveModalVisible,
     setLeaveModalVisible,
   ] = useState(false);
@@ -571,14 +563,6 @@ export default function PetDetailScreen({
       }),
     ]).start();
   }, [screenOpacity, screenTranslateY]);
-
-  const handleDelete = () => {
-    removePet(currentPet.id);
-
-    setDeleteModalVisible(false);
-
-    navigation.goBack();
-  };
 
   const displayAge = getDisplayAge(currentPet);
 
@@ -1162,30 +1146,6 @@ export default function PetDetailScreen({
 
           <View style={styles.profileActionsCard}>
 
-            {canDelete && (
-              <Pressable
-                style={({pressed}) => [
-                  styles.profileActionButton,
-                  styles.deleteActionButton,
-                  pressed && styles.actionPressed,
-                ]}
-                onPress={() =>
-                  setDeleteModalVisible(true)
-                }>
-
-                <Trash2
-                  size={20}
-                  color="#B8325A"
-                  strokeWidth={2}
-                />
-
-                <Text style={styles.deleteActionText}>
-                  Dostu Sil
-                </Text>
-
-              </Pressable>
-            )}
-
             {(canLeave || ownerCanLeave) && (
               <Pressable
                 style={({pressed}) => [
@@ -1215,85 +1175,6 @@ export default function PetDetailScreen({
 
         </ScrollView>
       </Animated.View>
-      {/* =====================================================
-          DELETE MODAL
-      ===================================================== */}
-
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() =>
-          setDeleteModalVisible(false)
-        }>
-
-        <View style={styles.modalOverlay}>
-
-          <View style={styles.modalCard}>
-
-            <View
-              style={styles.modalIconCircle}>
-
-              <Trash2
-                size={28}
-                color="#A66AD4"
-                strokeWidth={1.8}
-              />
-
-            </View>
-
-            <Text style={styles.modalTitle}>
-              Profili silmek istiyor musunuz?
-            </Text>
-
-            <Text
-              style={styles.modalDescription}>
-              {currentPet.name} için oluşturduğun profil
-              silinecek. Bu işlem geri alınamaz.
-            </Text>
-
-            <View style={styles.modalButtons}>
-
-              <Pressable
-                style={({pressed}) => [
-                  styles.cancelModalButton,
-                  pressed &&
-                    styles.actionPressed,
-                ]}
-                onPress={() =>
-                  setDeleteModalVisible(false)
-                }>
-
-                <Text
-                  style={styles.cancelModalText}>
-                  Vazgeç
-                </Text>
-
-              </Pressable>
-
-              <Pressable
-                style={({pressed}) => [
-                  styles.confirmDeleteButton,
-                  pressed &&
-                    styles.actionPressed,
-                ]}
-                onPress={handleDelete}>
-
-                <Text
-                  style={
-                    styles.confirmDeleteText
-                  }>
-                  Sil
-                </Text>
-
-              </Pressable>
-
-            </View>
-
-          </View>
-        </View>
-      </Modal>
 
       {/* =====================================================
           LEAVE FAMILY MODAL
@@ -2216,23 +2097,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Bold',
   },
 
-  confirmDeleteButton: {
-    flex: 1,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: '#FFF9FF',
-    borderWidth: 1.4,
-    borderColor: '#E8A9CF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  confirmDeleteText: {
-    color: '#B8325A',
-    fontSize: 15,
-    fontFamily: 'Quicksand-Bold',
-  },
-
   familyCard: {
     marginHorizontal: 18,
     marginBottom: 24,
@@ -2320,21 +2184,6 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       gap: 9,
     },
-
-
-    deleteActionButton: {
-      backgroundColor: '#FFF4F7',
-      borderWidth: 1,
-      borderColor: '#F1C5D5',
-    },
-
-
-    deleteActionText: {
-      color: '#B8325A',
-      fontSize: 14,
-      fontFamily: 'Quicksand-Bold',
-    },
-
 
     leaveActionButton: {
       backgroundColor: '#F3EEFF',

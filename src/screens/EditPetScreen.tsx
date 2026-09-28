@@ -49,6 +49,7 @@ import {
 
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {usePets} from '../data/PetContext';
+import {useAuth} from '../data/AuthContext';
 
 type EditPetRouteProp = RouteProp<RootStackParamList, 'EditPet'>;
 
@@ -102,6 +103,7 @@ export default function EditPetScreen({route}: Props) {
   const routePet = route.params?.pet;
 
   const {pets, updatePet, removePet} = usePets();
+  const {user} = useAuth();
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -112,6 +114,16 @@ export default function EditPetScreen({route}: Props) {
     : undefined;
 
   const pet = contextPet ?? routePet;
+
+  const memberIds = pet?.petMembers ?? [];
+
+  const isOwner =
+    pet?.ownerId === user?.uid ||
+    (
+      !pet?.ownerId &&
+      !!user?.uid &&
+      memberIds.includes(user.uid)
+    );
 
   const [activeMenu, setActiveMenu] =
     useState<MenuKey>('general');
@@ -1326,16 +1338,18 @@ export default function EditPetScreen({route}: Props) {
 
         </Pressable>
 
-        <Pressable
-          onPress={handleDelete}
-          style={({pressed}) => [
-            styles.deleteButton,
-            pressed && styles.pressed,
-          ]}>
-          <Text style={styles.deleteButtonText}>
-            Profili Sil
-          </Text>
-        </Pressable>
+        {isOwner && (
+          <Pressable
+            onPress={handleDelete}
+            style={({pressed}) => [
+              styles.deleteButton,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={styles.deleteButtonText}>
+              Profili Sil
+            </Text>
+          </Pressable>
+        )}
 
         {/* BOTTOM DECORATION */}
         <View

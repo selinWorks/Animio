@@ -2355,38 +2355,13 @@ export const createPetInvitation = async (
   let code = '';
   let invitationRef = null;
 
-  for (
-    let attempt = 0;
-    attempt < 10;
-    attempt++
-  ) {
-    const generatedCode =
-      generateInviteCode();
+  code =
+    generateInviteCode();
 
-    const candidateRef =
-      firestore()
-        .collection('petInvitations')
-        .doc(generatedCode);
-
-    const existingInvitation =
-      await candidateRef.get();
-
-    if (!existingInvitation.exists) {
-      code =
-        generatedCode;
-
-      invitationRef =
-        candidateRef;
-
-      break;
-    }
-  }
-
-  if (!code || !invitationRef) {
-    throw new Error(
-      'Davet kodu oluşturulamadı. Lütfen tekrar deneyin.',
-    );
-  }
+  invitationRef =
+    firestore()
+      .collection('petInvitations')
+      .doc(code);
 
   const now =
     firestore.FieldValue.serverTimestamp();
@@ -2435,73 +2410,73 @@ export const createPetInvitation = async (
     invitationId:
       code,
   };
-};
-
-/* =========================================================
-   GET PET INVITATION
-========================================================= */
-
-export const getPetInvitationByCode = async code => {
-  const normalizedCode =
-    (code || '')
-      .trim()
-      .toUpperCase();
-
-  if (!normalizedCode) {
-    throw new Error(
-      'Davet kodu gerekli.',
-    );
-  }
-
-  const invitationRef =
-    firestore()
-      .collection('petInvitations')
-      .doc(normalizedCode);
-
-  const snapshot =
-    await invitationRef.get();
-
-  if (!snapshot.exists) {
-    throw new Error(
-      'Bu kodla eşleşen bir davet bulunamadı.',
-    );
-  }
-
-  const data =
-    snapshot.data() || {};
-
-  /*
-   * Davet süresi dolmuş mu?
-   */
-  if (
-    data.expiresAt &&
-    data.expiresAt.toDate &&
-    data.expiresAt
-      .toDate()
-      .getTime() < Date.now()
-  ) {
-    throw new Error(
-      'Bu davetin süresi dolmuş.',
-    );
-  }
-
-  /*
-   * Kullanılmış / iptal edilmiş davetler
-   * tekrar kullanılamaz.
-   */
-  if (data.status !== 'pending') {
-    throw new Error(
-      'Bu davet artık geçerli değil.',
-    );
-  }
-
-  return {
-    id:
-      snapshot.id,
-
-    ...data,
   };
-};
+
+  /* =========================================================
+     GET PET INVITATION
+  ========================================================= */
+
+  export const getPetInvitationByCode = async code => {
+    const normalizedCode =
+      (code || '')
+        .trim()
+        .toUpperCase();
+
+    if (!normalizedCode) {
+      throw new Error(
+        'Davet kodu gerekli.',
+      );
+    }
+
+    const invitationRef =
+      firestore()
+        .collection('petInvitations')
+        .doc(normalizedCode);
+
+    const snapshot =
+      await invitationRef.get();
+
+    if (!snapshot.exists) {
+      throw new Error(
+        'Bu kodla eşleşen bir davet bulunamadı.',
+      );
+    }
+
+    const data =
+      snapshot.data() || {};
+
+    /*
+     * Davet süresi dolmuş mu?
+     */
+    if (
+      data.expiresAt &&
+      data.expiresAt.toDate &&
+      data.expiresAt
+        .toDate()
+        .getTime() < Date.now()
+    ) {
+      throw new Error(
+        'Bu davetin süresi dolmuş.',
+      );
+    }
+
+    /*
+     * Kullanılmış / iptal edilmiş davetler
+     * tekrar kullanılamaz.
+     */
+    if (data.status !== 'pending') {
+      throw new Error(
+        'Bu davet artık geçerli değil.',
+      );
+    }
+
+    return {
+      id:
+        snapshot.id,
+
+      ...data,
+    };
+  };
 
 /* =========================================================
    ACCEPT PET INVITATION
