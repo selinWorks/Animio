@@ -294,9 +294,43 @@ const sortAscending = (
   records: WeightRecord[],
 ) => {
   return [...records].sort(
-    (a, b) =>
-      new Date(a.date).getTime() -
-      new Date(b.date).getTime(),
+    (a, b) => {
+      const dateDiff =
+        new Date(a.date).getTime() -
+        new Date(b.date).getTime();
+
+      // Farklı günler
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      // Aynı günse oluşturulma zamanına bak
+      const createdAtA =
+        a.createdAt?.toDate
+          ? a.createdAt.toDate().getTime()
+          : new Date(
+              a.createdAt,
+            ).getTime();
+
+      const createdAtB =
+        b.createdAt?.toDate
+          ? b.createdAt.toDate().getTime()
+          : new Date(
+              b.createdAt,
+            ).getTime();
+
+      if (
+        Number.isFinite(createdAtA) &&
+        Number.isFinite(createdAtB)
+      ) {
+        return (
+          createdAtA -
+          createdAtB
+        );
+      }
+
+      return 0;
+    },
   );
 };
 
@@ -373,6 +407,18 @@ const parsePetWeight = (
   return 0;
 };
 
+const splitWeight = (value: number) => {
+  const totalGrams = Math.round(value * 1000);
+
+  const kg = Math.floor(totalGrams / 1000);
+  const grams = totalGrams % 1000;
+
+  return {
+    kg: kg > 0 ? String(kg) : '',
+    grams: grams > 0 ? String(grams) : '',
+  };
+};
+
 
 /* =========================================================
    SCREEN
@@ -431,6 +477,11 @@ export default function WeightHistoryScreen({
   const [
     weightInput,
     setWeightInput,
+  ] = useState('');
+
+  const [
+    weightGrams,
+    setWeightGrams,
   ] = useState('');
 
   const [
@@ -575,9 +626,11 @@ export default function WeightHistoryScreen({
 
   const latestRecord =
     records.length > 0
-      ? records[
-          records.length - 1
-        ]
+      ? [...records].sort(
+          (a, b) =>
+            new Date(b.date).getTime() -
+            new Date(a.date).getTime(),
+        )[0]
       : null;
 
 
@@ -740,11 +793,22 @@ export default function WeightHistoryScreen({
   const openAddModal = () => {
     setEditingRecord(null);
 
-    setWeightInput(
-      hasCurrentWeight
-        ? String(currentWeight)
-        : '',
-    );
+    if (hasCurrentWeight) {
+      const split = splitWeight(
+        currentWeight,
+      );
+
+      setWeightInput(
+        split.kg,
+      );
+
+      setWeightGrams(
+        split.grams,
+      );
+    } else {
+      setWeightInput('');
+      setWeightGrams('');
+    }
 
     setDateInput(
       getTodayText(),
@@ -761,8 +825,16 @@ export default function WeightHistoryScreen({
       record,
     );
 
+    const split = splitWeight(
+      Number(record.weight),
+    );
+
     setWeightInput(
-      String(record.weight),
+      split.kg,
+    );
+
+    setWeightGrams(
+      split.grams,
     );
 
     setDateInput(
@@ -790,22 +862,66 @@ export default function WeightHistoryScreen({
   --------------------------------------------------------- */
 
   const saveRecord = async () => {
-    const parsedWeight =
-      Number(
-        weightInput
-          .trim()
-          .replace(',', '.'),
-      );
+    const trimmedWeight =
+      weightInput.trim();
 
-    if (
-      !Number.isFinite(
-        parsedWeight,
-      ) ||
-      parsedWeight <= 0
-    ) {
+    const trimmedWeightGrams =
+      weightGrams.trim();
+
+    const numericWeightKg =
+      trimmedWeight === ''
+        ? 0
+        : Number(
+            trimmedWeight.replace(
+              ',',
+              '.',
+            ),
+          );
+
+    const numericWeightGrams =
+      trimmedWeightGrams === ''
+        ? 0
+        : Number(
+            trimmedWeightGrams,
+          );
+
+    const hasKg =
+      trimmedWeight !== '' &&
+      Number.isFinite(
+        numericWeightKg,
+      ) &&
+      numericWeightKg > 0;
+
+    const hasGrams =
+      trimmedWeightGrams !== '' &&
+      Number.isFinite(
+        numericWeightGrams,
+      ) &&
+      numericWeightGrams > 0 &&
+      numericWeightGrams <= 999;
+
+    const hasValidWeight =
+      (hasKg || hasGrams) &&
+      Number.isFinite(
+        numericWeightKg,
+      ) &&
+      Number.isFinite(
+        numericWeightGrams,
+      ) &&
+      numericWeightKg >= 0 &&
+      numericWeightGrams >= 0 &&
+      numericWeightGrams <= 999;
+
+    const parsedWeight =
+      hasValidWeight
+        ? numericWeightKg +
+          numericWeightGrams / 1000
+        : 0;
+
+    if (!hasValidWeight) {
       showPopup(
         'Geçersiz kilo',
-        'Lütfen geçerli bir kilo değeri gir.',
+        'Lütfen kg veya gr alanlarından en az birine geçerli bir değer gir.',
         'weight',
       );
 
@@ -831,6 +947,21 @@ export default function WeightHistoryScreen({
       showPopup(
         'Geçersiz tarih',
         'Tarihi YYYY-AA-GG biçiminde gir. Örneğin: 2026-09-23',
+        'date',
+      );
+
+      return;
+    }
+
+    const selectedDate = new Date(isoDate);
+    const today = new Date();
+
+    today.setHours(23, 59, 59, 999);
+
+    if (selectedDate.getTime() > today.getTime()) {
+      showPopup(
+        'Geçersiz tarih',
+        'Gelecekteki bir tarih için kilo kaydı ekleyemezsiniz.',
         'date',
       );
 
@@ -883,9 +1014,8 @@ export default function WeightHistoryScreen({
       setModalVisible(false);
       setEditingRecord(null);
       setWeightInput('');
-      setDateInput(
-        getTodayText(),
-      );
+      setWeightGrams('');
+      setDateInput(getTodayText());
 
       showPopup(
         editingRecord
@@ -1598,36 +1728,99 @@ export default function WeightHistoryScreen({
 
             <View
               style={
-                styles.weightInputWrapper
+                styles.weightInputRow
               }>
 
-              <Weight
-                size={19}
-                color={PURPLE}
-                strokeWidth={2}
-              />
-
-              <TextInput
-                value={
-                  weightInput
-                }
-                onChangeText={
-                  setWeightInput
-                }
-                placeholder="Örn. 4,8"
-                placeholderTextColor="#B0B4C3"
-                keyboardType="decimal-pad"
+              <View
                 style={
-                  styles.weightInput
-                }
-              />
+                  styles.weightInputWrapper
+                }>
+
+                <Weight
+                  size={19}
+                  color={PURPLE}
+                  strokeWidth={2}
+                />
+
+                <TextInput
+                  value={
+                    weightInput
+                  }
+                  onChangeText={text =>
+                    setWeightInput(
+                      text.replace(
+                        /[^0-9]/g,
+                        '',
+                      ),
+                    )
+                  }
+                  placeholder="Örn. 4"
+                  placeholderTextColor="#B0B4C3"
+                  keyboardType="numeric"
+                  style={
+                    styles.weightInput
+                  }
+                  maxLength={3}
+                />
+
+                <Text
+                  style={
+                    styles.inputUnit
+                  }>
+                  kg
+                </Text>
+
+              </View>
 
               <Text
                 style={
-                  styles.inputUnit
+                  styles.weightSlash
                 }>
-                kg
+                /
               </Text>
+
+              <View
+                style={
+                  styles.weightInputWrapper
+                }>
+
+                <TextInput
+                  value={
+                    weightGrams
+                  }
+                  onChangeText={text => {
+                    const numeric =
+                      text.replace(
+                        /[^0-9]/g,
+                        '',
+                      );
+
+                    if (
+                      numeric === '' ||
+                      Number(numeric) <= 999
+                    ) {
+                      setWeightGrams(
+                        numeric,
+                      );
+                    }
+                  }}
+                  placeholder="Örn. 250"
+                  placeholderTextColor="#B0B4C3"
+                  keyboardType="numeric"
+                  style={
+                    styles.weightInput
+                  }
+                  maxLength={3}
+                />
+
+                <Text
+                  style={
+                    styles.inputUnit
+                  }>
+                  gr
+                </Text>
+
+              </View>
 
             </View>
 
@@ -2570,27 +2763,39 @@ const styles =
     },
 
     weightInputWrapper: {
+      flex: 1,
       height: 54,
       borderRadius: 17,
       borderWidth: 1,
-      borderColor:
-        '#E4DFFC',
-      backgroundColor:
-        '#FAF9FF',
+      borderColor: '#E4DFFC',
+      backgroundColor: '#FAF9FF',
       paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+
+    weightInputRow: {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 14,
     },
 
+    weightSlash: {
+      color: '#8B84A8',
+      fontSize: 16,
+      fontFamily:
+        'Quicksand-Bold',
+      marginHorizontal: 7,
+    },
+
     weightInput: {
       flex: 1,
-      height: '100%',
+      height: 54,
       color: '#343650',
       fontSize: 15,
-      fontFamily:
-        'Quicksand-SemiBold',
+      fontFamily: 'Quicksand-SemiBold',
       marginLeft: 10,
+      paddingVertical: 0,
     },
 
     inputUnit: {

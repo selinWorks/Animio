@@ -683,25 +683,35 @@ export default function AddPetScreen({navigation}: any) {
           ? customType.trim()
           : type;
 
-      const trimmedWeight =
-        weight.trim();
-
-      const trimmedWeightGrams =
-        weightGrams.trim();
+      const trimmedWeight = weight.trim();
+      const trimmedWeightGrams = weightGrams.trim();
 
       const numericWeightKg =
-        Number(trimmedWeight);
+        trimmedWeight === ''
+          ? 0
+          : Number(trimmedWeight);
 
       const numericWeightGrams =
         trimmedWeightGrams === ''
           ? 0
           : Number(trimmedWeightGrams);
 
-      const hasValidWeight =
+      const hasKg =
         trimmedWeight !== '' &&
         Number.isFinite(numericWeightKg) &&
-        numericWeightKg > 0 &&
+        numericWeightKg > 0;
+
+      const hasGrams =
+        trimmedWeightGrams !== '' &&
         Number.isFinite(numericWeightGrams) &&
+        numericWeightGrams > 0 &&
+        numericWeightGrams <= 999;
+
+      const hasValidWeight =
+        (hasKg || hasGrams) &&
+        Number.isFinite(numericWeightKg) &&
+        Number.isFinite(numericWeightGrams) &&
+        numericWeightKg >= 0 &&
         numericWeightGrams >= 0 &&
         numericWeightGrams <= 999;
 
