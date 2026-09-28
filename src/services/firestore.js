@@ -1319,6 +1319,15 @@ export const addCareEventToFirestore = async (
       notes:
         event.notes || '',
 
+      completed:
+        Boolean(event.completed),
+
+      completedAt:
+        event.completed ? now : null,
+
+      completedBy:
+        event.completed ? uid : '',
+
       createdAt:
         now,
 
@@ -1445,6 +1454,25 @@ export const updateCareEventInFirestore = async (
       event.notes ||
       '',
 
+    completed:
+      typeof event.completed === 'boolean'
+        ? event.completed
+        : Boolean(existingData.completed),
+
+    completedAt:
+      typeof event.completed === 'boolean'
+        ? event.completed
+          ? existingData.completedAt || firestore.FieldValue.serverTimestamp()
+          : null
+        : existingData.completedAt || null,
+
+    completedBy:
+      typeof event.completed === 'boolean'
+        ? event.completed
+          ? existingData.completedBy || uid
+          : ''
+        : existingData.completedBy || '',
+
     updatedAt:
       firestore.FieldValue.serverTimestamp(),
   });
@@ -1525,6 +1553,470 @@ export const deleteCareEventFromFirestore = async (
   }
 
   await eventRef.delete();
+};
+
+/* =========================================================
+   HEALTH HISTORY
+========================================================= */
+
+const getPetAccessData = async (petId, uid) => {
+  if (!petId || !uid) {
+    throw new Error(
+      'Pet ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  const petRef = firestore()
+    .collection('pets')
+    .doc(petId);
+
+  const petSnapshot = await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error(
+      'Pet bulunamadı.',
+    );
+  }
+
+  const petData = petSnapshot.data() || {};
+
+  const petMembers =
+    Array.isArray(petData.petMembers)
+      ? petData.petMembers
+      : petData.ownerId
+        ? [petData.ownerId]
+        : [];
+
+  if (!petMembers.includes(uid)) {
+    throw new Error(
+      'Bu dost için işlem yapma yetkiniz yok.',
+    );
+  }
+
+  return {
+    petRef,
+    petData,
+  };
+};
+
+const normalizeHealthType = type =>
+  String(type || '')
+    .trim()
+    .toLowerCase();
+
+const isVetHealthType = type => {
+  const normalized = normalizeHealthType(type);
+
+  return (
+    normalized.includes('vet') ||
+    normalized.includes('veteriner') ||
+    normalized.includes('kontrol') ||
+    normalized.includes('muayene')
+  );
+};
+
+const isVaccineHealthType = type => {
+  const normalized = normalizeHealthType(type);
+
+  return (
+    normalized.includes('vaccine') ||
+    normalized.includes('vaccination') ||
+    normalized.includes('aşı') ||
+    normalized.includes('asi')
+  );
+};
+
+export const addHealthRecordToFirestore = async (
+  petId,
+  record,
+  uid,
+) => {
+  if (!record) {
+    throw new Error(
+      'Sağlık kaydı bilgisi gerekli.',
+    );
+  }
+
+  const {petRef} =
+    await getPetAccessData(petId, uid);
+
+  const now =
+    firestore.FieldValue.serverTimestamp();
+
+  const healthRef = petRef
+    .collection('healthHistory')
+    .doc();
+
+  await healthRef.set({
+    title:
+      record.title || record.name || '',
+
+    name:
+      record.name || record.title || '',
+
+    type:
+      record.type || '',
+
+    date:
+      record.date || '',
+
+    description:
+      record.description || record.notes || '',
+
+    notes:
+      record.notes || record.description || '',
+
+    source:
+      'manual',
+
+    sourceEventId:
+      '',
+
+    createdBy:
+      uid,
+
+    createdAt:
+      now,
+
+    updatedAt:
+      now,
+  });
+
+  return healthRef.id;
+};
+
+export const getHealthHistoryFromFirestore = async (
+  petId,
+  uid = null,
+) => {
+  if (!petId) {
+    return [];
+  }
+
+  if (uid) {
+    await getPetAccessData(petId, uid);
+  }
+
+  const snapshot = await firestore()
+    .collection('pets')
+    .doc(petId)
+    .collection('healthHistory')
+    .get();
+
+  return snapshot.docs
+    .map(doc => ({
+      id:
+        doc.id,
+
+      ...doc.data(),
+    }))
+    .sort((a, b) => {
+      if ((a.date || '') !== (b.date || '')) {
+        return (b.date || '').localeCompare(
+          a.date || '',
+        );
+      }
+
+      const aTime =
+        a.createdAt?.toMillis
+          ? a.createdAt.toMillis()
+          : 0;
+
+      const bTime =
+        b.createdAt?.toMillis
+          ? b.createdAt.toMillis()
+          : 0;
+
+      return bTime - aTime;
+    });
+};
+
+export const updateHealthRecordInFirestore = async (
+  petId,
+  recordId,
+  record,
+  uid,
+) => {
+  if (!recordId || !record) {
+    throw new Error(
+      'Sağlık kaydı bilgisi gerekli.',
+    );
+  }
+
+  const {petRef} =
+    await getPetAccessData(petId, uid);
+
+  const healthRef = petRef
+    .collection('healthHistory')
+    .doc(recordId);
+
+  const healthSnapshot =
+    await healthRef.get();
+
+  if (!healthSnapshot.exists) {
+    throw new Error(
+      'Sağlık kaydı bulunamadı.',
+    );
+  }
+
+  const existingData =
+    healthSnapshot.data() || {};
+
+  await healthRef.update({
+    title:
+      record.title || record.name || '',
+
+    name:
+      record.name || record.title || '',
+
+    type:
+      record.type || '',
+
+    date:
+      record.date || '',
+
+    description:
+      record.description || record.notes || '',
+
+    notes:
+      record.notes || record.description || '',
+
+    source:
+      existingData.source || 'manual',
+
+    sourceEventId:
+      existingData.sourceEventId || '',
+
+    updatedAt:
+      firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+export const deleteHealthRecordFromFirestore = async (
+  petId,
+  recordId,
+  uid,
+) => {
+  if (!recordId) {
+    throw new Error(
+      'Sağlık kaydı bilgisi gerekli.',
+    );
+  }
+
+  const {petRef} =
+    await getPetAccessData(petId, uid);
+
+  const healthRef = petRef
+    .collection('healthHistory')
+    .doc(recordId);
+
+  const healthSnapshot =
+    await healthRef.get();
+
+  if (!healthSnapshot.exists) {
+    return;
+  }
+
+  await healthRef.delete();
+};
+
+const syncCompletedCareEventToHealthHistory = async (
+  eventId,
+  eventData,
+  uid,
+) => {
+  if (!eventData?.petId) {
+    return null;
+  }
+
+  const {petRef} = await getPetAccessData(
+    eventData.petId,
+    uid,
+  );
+
+  const healthRef = petRef
+    .collection('healthHistory')
+    .doc(`careEvent_${eventId}`);
+
+  const now =
+    firestore.FieldValue.serverTimestamp();
+
+  await healthRef.set(
+    {
+      title:
+        eventData.title || eventData.name || '',
+
+      name:
+        eventData.name || eventData.title || '',
+
+      type:
+        eventData.type || '',
+
+      date:
+        eventData.date || '',
+
+      description:
+        eventData.description || eventData.notes || '',
+
+      notes:
+        eventData.notes || eventData.description || '',
+
+      source:
+        'careEvent',
+
+      sourceEventId:
+        eventId,
+
+      createdBy:
+        eventData.ownerId || uid,
+
+      completedBy:
+        uid,
+
+      completedAt:
+        now,
+
+      updatedAt:
+        now,
+    },
+    {
+      merge: true,
+    },
+  );
+
+  const savedSnapshot = await healthRef.get();
+  const savedData = savedSnapshot.data() || {};
+
+  if (!savedData.createdAt) {
+    await healthRef.update({
+      createdAt:
+        firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  return healthRef.id;
+};
+
+const removeCareEventFromHealthHistory = async (
+  eventId,
+  petId,
+  uid,
+) => {
+  if (!eventId || !petId) {
+    return;
+  }
+
+  const {petRef} =
+    await getPetAccessData(petId, uid);
+
+  await petRef
+    .collection('healthHistory')
+    .doc(`careEvent_${eventId}`)
+    .delete();
+};
+
+export const setCareEventCompletedInFirestore = async (
+  eventId,
+  completed,
+  uid,
+) => {
+  if (!eventId || !uid) {
+    throw new Error(
+      'Etkinlik ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  const eventRef = firestore()
+    .collection('careEvents')
+    .doc(eventId);
+
+  const eventSnapshot =
+    await eventRef.get();
+
+  if (!eventSnapshot.exists) {
+    throw new Error(
+      'Etkinlik bulunamadı.',
+    );
+  }
+
+  const eventData =
+    eventSnapshot.data() || {};
+
+  if (eventData.petId) {
+    await getPetAccessData(
+      eventData.petId,
+      uid,
+    );
+  } else if (eventData.ownerId !== uid) {
+    throw new Error(
+      'Bu etkinliği güncelleme yetkiniz yok.',
+    );
+  }
+
+  const now =
+    firestore.FieldValue.serverTimestamp();
+
+  await eventRef.update({
+    completed:
+      Boolean(completed),
+
+    completedAt:
+      completed ? now : null,
+
+    completedBy:
+      completed ? uid : '',
+
+    updatedAt:
+      now,
+  });
+
+  if (completed) {
+    await syncCompletedCareEventToHealthHistory(
+      eventId,
+      eventData,
+      uid,
+    );
+  } else if (eventData.petId) {
+    await removeCareEventFromHealthHistory(
+      eventId,
+      eventData.petId,
+      uid,
+    );
+  }
+};
+
+export const getLatestVetVisitFromFirestore = async (
+  petId,
+  uid = null,
+) => {
+  const history =
+    await getHealthHistoryFromFirestore(
+      petId,
+      uid,
+    );
+
+  return (
+    history.find(record =>
+      isVetHealthType(record.type),
+    ) || null
+  );
+};
+
+export const getLatestVaccineFromFirestore = async (
+  petId,
+  uid = null,
+) => {
+  const history =
+    await getHealthHistoryFromFirestore(
+      petId,
+      uid,
+    );
+
+  return (
+    history.find(record =>
+      isVaccineHealthType(record.type),
+    ) || null
+  );
 };
 
 /* =========================================================

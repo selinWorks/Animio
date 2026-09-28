@@ -19,11 +19,11 @@ import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {
-  CalendarDays,
   Camera,
   ChevronLeft,
   ChevronRight,
   FileText,
+  History,
   NotebookPen,
   Pencil,
   Trash2,
@@ -1055,16 +1055,21 @@ export default function PetDetailScreen({
           <View style={styles.reminderNotesRow}>
 
             <SmallNavigationCard
-              title="Hatırlatmalar"
-              subtitle="Yaklaşan bakım görevleri"
-              backgroundColor="#E9FAF0"
-              iconBackground="#D9F5E6"
+              title="Sağlık Geçmişi"
+              subtitle="Tamamlanan sağlık kayıtları ve kontroller"
+              backgroundColor="#EAF8F6"
+              iconBackground="#D2F0EB"
               icon={
-                <CalendarDays
+                <History
                   size={24}
-                  color="#13A968"
+                  color="#3FA99B"
                   strokeWidth={2}
                 />
+              }
+              onPress={() =>
+                navigation.navigate('HealthHistory', {
+                  pet: currentPet,
+                })
               }
             />
 
@@ -1544,7 +1549,7 @@ const styles = StyleSheet.create({
 
   heroTopBar: {
     position: 'absolute',
-    top: 25,
+    top: 55,
     left: 20,
     right: 20,
     flexDirection: 'row',

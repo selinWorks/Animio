@@ -407,8 +407,8 @@ export default function HomeScreen() {
         <View style={styles.quickGrid}>
           <View style={styles.quickRow}>
             <QuickAction
-              title="Aşı Takvimi"
-              description="Yaklaşan aşıları takip et"
+              title="Takvim"
+              description="Yaklaşan etkinlikleri takip et"
               background={C.orange}
               iconBackground="#FFE7CD"
               onPress={() => navigation.navigate('Calendar')}

@@ -16,6 +16,7 @@ import {
   addCareEventToFirestore,
   getCareEventsFromFirestore,
   deleteCareEventFromFirestore,
+  setCareEventCompletedInFirestore,
 } from '../services/firestore';
 
 import notifee, {
@@ -52,6 +53,8 @@ type CareEvent = {
   petName: string;
   note?: string;
   color?: string;
+  completed?: boolean;
+  completedAt?: any;
 };
 
 const PASTEL_COLORS = [
@@ -86,6 +89,8 @@ export default function CalendarScreen() {
   const [petName, setPetName] = useState('');
   const [note, setNote] = useState('');
   const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[2]);
+  const [selectedType, setSelectedType] = useState<CareEventType>('Custom');
+  const [completingEventId, setCompletingEventId] = useState<string | null>(null);
 
   /* SAAT */
 
@@ -412,6 +417,7 @@ export default function CalendarScreen() {
     setPetName('');
     setNote('');
     setSelectedColor(PASTEL_COLORS[2]);
+    setSelectedType('Custom');
 
     setSelectedHour('09');
     setSelectedMinute('00');
@@ -507,7 +513,7 @@ export default function CalendarScreen() {
             title: eventTitle,
             date: selectedDate,
             time: selectedTime,
-            type: 'Custom',
+            type: selectedType,
             petName: eventPetName,
             note: note.trim(),
             color: selectedColor,
@@ -608,6 +614,61 @@ export default function CalendarScreen() {
       setDeleting(false);
     }
   };
+
+  /* =========================================================
+     COMPLETE / UNCOMPLETE EVENT
+  ========================================================= */
+
+  const handleToggleCompleted = async (event: CareEvent) => {
+    if (!user?.uid) {
+      showErrorModal(
+        'Giriş gerekli',
+        'Görev durumunu değiştirmek için hesabına giriş yapman gerekiyor.',
+        'login',
+      );
+      return;
+    }
+
+    try {
+      setCompletingEventId(event.id);
+
+      const nextCompleted = !event.completed;
+
+      await setCareEventCompletedInFirestore(
+        event.id,
+        nextCompleted,
+        user.uid,
+      );
+
+      if (nextCompleted) {
+        await cancelCareNotification(event.id);
+      }
+
+      await loadEvents();
+
+      showToast(
+        nextCompleted ? 'Tamamlandı' : 'Geri alındı',
+        nextCompleted
+          ? 'Bakım görevi tamamlandı olarak işaretlendi ✨'
+          : 'Bakım görevi yeniden bekleyen duruma alındı.',
+      );
+    } catch (error: any) {
+      console.log(
+        'Görev durumu güncellenemedi:',
+        error,
+      );
+
+      showErrorModal(
+        'Görev güncellenemedi',
+        error?.message ||
+          'Görev durumu değiştirilirken bir sorun oluştu.',
+        'save',
+      );
+    } finally {
+      setCompletingEventId(null);
+    }
+  };
+
 
   /* =========================================================
      EVENTS FOR DAY
@@ -917,26 +978,58 @@ export default function CalendarScreen() {
 
                   </View>
 
-                  <Pressable
-                    onPress={() =>
-                      handleDeleteEvent(
-                        event.id,
-                      )
-                    }
-                    style={({pressed}) => [
-                      styles.deleteButton,
-                      pressed &&
-                        styles.deleteButtonPressed,
-                    ]}>
+                  <View style={styles.eventActions}>
+                    <Pressable
+                      onPress={() =>
+                        handleToggleCompleted(event)
+                      }
+                      disabled={
+                        completingEventId === event.id
+                      }
+                      style={({pressed}) => [
+                        styles.completeButton,
+                        event.completed &&
+                          styles.completeButtonDone,
+                        pressed &&
+                          styles.completeButtonPressed,
+                        completingEventId === event.id &&
+                          styles.disabledButton,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.completeButtonText,
+                          event.completed &&
+                            styles.completeButtonTextDone,
+                        ]}>
+                        {completingEventId === event.id
+                          ? '...'
+                          : event.completed
+                            ? 'Geri Al'
+                            : 'Tamamlandı'}
+                      </Text>
+                    </Pressable>
 
-                    <Text
-                      style={
-                        styles.deleteButtonText
-                      }>
-                      Sil
-                    </Text>
+                    <Pressable
+                      onPress={() =>
+                        handleDeleteEvent(
+                          event.id,
+                        )
+                      }
+                      style={({pressed}) => [
+                        styles.deleteButton,
+                        pressed &&
+                          styles.deleteButtonPressed,
+                      ]}>
 
-                  </Pressable>
+                      <Text
+                        style={
+                          styles.deleteButtonText
+                        }>
+                        Sil
+                      </Text>
+
+                    </Pressable>
+                  </View>
 
                 </View>
 
@@ -944,6 +1037,26 @@ export default function CalendarScreen() {
                   style={styles.eventPetName}>
                   🐾 {event.petName}
                 </Text>
+
+                <View style={styles.eventMetaRow}>
+                  <Text style={styles.eventTypeText}>
+                    {event.type === 'Vaccination'
+                      ? 'Aşı'
+                      : event.type === 'Vet Visit'
+                        ? 'Veteriner'
+                        : event.type === 'Medication'
+                          ? 'İlaç / Parazit'
+                          : event.type === 'Grooming'
+                            ? 'Bakım'
+                            : 'Diğer'}
+                  </Text>
+
+                  {event.completed ? (
+                    <Text style={styles.completedText}>
+                      ✓ Tamamlandı
+                    </Text>
+                  ) : null}
+                </View>
 
                 {/* SAAT */}
 
@@ -1045,6 +1158,41 @@ export default function CalendarScreen() {
 
                 style={styles.input}
               />
+
+              <Text style={styles.typePickerLabel}>
+                Görev türü
+              </Text>
+
+              <View style={styles.typeGrid}>
+                {([
+                  ['Vaccination', 'Aşı'],
+                  ['Vet Visit', 'Veteriner'],
+                  ['Medication', 'İlaç / Parazit'],
+                  ['Grooming', 'Bakım'],
+                  ['Custom', 'Diğer'],
+                ] as [CareEventType, string][]).map(([value, label]) => {
+                  const active = selectedType === value;
+
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => setSelectedType(value)}
+                      style={({pressed}) => [
+                        styles.typeOption,
+                        active && styles.typeOptionActive,
+                        pressed && styles.typeOptionPressed,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.typeOptionText,
+                          active && styles.typeOptionTextActive,
+                        ]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
               {/* =================================================
                   TIME
@@ -1731,6 +1879,41 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  eventActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+
+  completeButton: {
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+
+  completeButtonDone: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+
+  completeButtonPressed: {
+    opacity: 0.8,
+    transform: [{scale: 0.97}],
+  },
+
+  completeButtonText: {
+    color: '#7C3AED',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  completeButtonTextDone: {
+    color: '#059669',
+  },
+
   deleteButton: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
@@ -1756,6 +1939,29 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     fontWeight: '600',
     marginBottom: 6,
+  },
+
+  eventMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 7,
+  },
+
+  eventTypeText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '700',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+
+  completedText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '800',
   },
 
   eventTimeRow: {
@@ -1859,6 +2065,50 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 90,
     textAlignVertical: 'top',
+  },
+
+  typePickerLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 10,
+    marginTop: 2,
+  },
+
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  typeOption: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  typeOptionActive: {
+    backgroundColor: '#EDE9FE',
+    borderColor: '#C4B5FD',
+  },
+
+  typeOptionPressed: {
+    opacity: 0.8,
+    transform: [{scale: 0.98}],
+  },
+
+  typeOptionText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  typeOptionTextActive: {
+    color: '#7C3AED',
   },
 
   /* TIME PICKER */

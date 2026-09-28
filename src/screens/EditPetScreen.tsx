@@ -1194,20 +1194,6 @@ export default function EditPetScreen({route}: Props) {
                     {lastVetVisit || 'Henüz eklenmedi'}
                   </Text>
 
-                  <Pressable
-                    onPress={() =>
-                      showPopup(
-                        'Veteriner Geçmişi',
-                        'Geçmiş veteriner kontrollerini listeleyen ekranı bu alana bağlayacağız.',
-                      )
-                    }
-                    style={({pressed}) => [
-                      styles.quickLink,
-                      pressed && styles.pressed,
-                    ]}>
-                    <Text style={styles.quickVetLinkText}>Kontrolleri Gör</Text>
-                    <ChevronRight size={15} color="#4F8EDB" strokeWidth={2.5} />
-                  </Pressable>
                 </View>
               </View>
 
@@ -1516,7 +1502,7 @@ const styles = StyleSheet.create({
 
   editHero: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 45,
     paddingBottom: 4,
     position: 'relative',
   },

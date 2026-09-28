@@ -35,6 +35,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import PetDetailScreen from '../screens/PetDetailScreen';
 import EditPetScreen from '../screens/EditPetScreen';
 import WeightHistoryScreen from '../screens/WeightHistoryScreen';
+import HealthHistoryScreen from '../screens/HealthHistoryScreen';
 
 import CalendarScreen from '../screens/CalendarScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -107,6 +108,10 @@ export type RootStackParamList = {
   };
 
   WeightHistory: {
+    pet: Pet;
+  };
+
+  HealthHistory: {
     pet: Pet;
   };
 
@@ -751,6 +756,21 @@ function MainAppNavigator() {
         name="WeightHistory"
         component={
           WeightHistoryScreen
+        }
+        options={{
+          headerShown:
+            false,
+        }}
+      />
+
+      {/* =====================================================
+          HEALTH HISTORY
+      ===================================================== */}
+
+      <Stack.Screen
+        name="HealthHistory"
+        component={
+          HealthHistoryScreen
         }
         options={{
           headerShown:

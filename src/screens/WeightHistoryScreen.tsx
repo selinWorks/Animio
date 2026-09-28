@@ -5,8 +5,6 @@ import React, {
   useState,
 } from 'react';
 
-import Svg, {Path} from 'react-native-svg';
-
 import {
   Image,
   KeyboardAvoidingView,
@@ -131,40 +129,6 @@ const FILTERS: {
 /* =========================================================
    HELPERS
 ========================================================= */
-
-const createSmoothPath = (
-  points: ChartPoint[],
-) => {
-  if (points.length === 0) {
-    return '';
-  }
-
-  if (points.length === 1) {
-    return `M ${points[0].x} ${points[0].y}`;
-  }
-
-  let path =
-    `M ${points[0].x} ${points[0].y}`;
-
-  for (
-    let i = 0;
-    i < points.length - 1;
-    i++
-  ) {
-    const current = points[i];
-    const next = points[i + 1];
-
-    const middleX =
-      (current.x + next.x) / 2;
-
-    path +=
-      ` C ${middleX} ${current.y},` +
-      ` ${middleX} ${next.y},` +
-      ` ${next.x} ${next.y}`;
-  }
-
-  return path;
-};
 
 
 const getTodayText = () => {
@@ -307,33 +271,6 @@ const formatDate = (
   );
 };
 
-
-const formatShortDate = (
-  date: string,
-) => {
-  if (!date) {
-    return '';
-  }
-
-  const parsed =
-    new Date(date);
-
-  if (
-    Number.isNaN(
-      parsed.getTime(),
-    )
-  ) {
-    return '';
-  }
-
-  return parsed.toLocaleDateString(
-    'tr-TR',
-    {
-      day: 'numeric',
-      month: 'short',
-    },
-  );
-};
 
 
 const formatWeight = (
@@ -548,17 +485,6 @@ export default function WeightHistoryScreen({
       variant: 'primary',
     },
   ]);
-
-
-  const [
-    weightRecords,
-    setWeightRecords,
-  ] = useState<WeightRecord[]>([]);
-
-  const [
-    historyLoading,
-    setHistoryLoading,
-  ] = useState(true);
 
 
   /* ---------------------------------------------------------
@@ -1052,98 +978,6 @@ export default function WeightHistoryScreen({
   };
 
 
-  /* ---------------------------------------------------------
-     CHART
-  --------------------------------------------------------- */
-
-  const chartHeight =
-    165;
-
-  const chartPaddingX =
-    16;
-
-  const chartPaddingY =
-    18;
-
-
-  const chartPoints:
-    ChartPoint[] =
-    useMemo(() => {
-      if (
-        filteredRecords.length ===
-          0 ||
-        chartWidth <= 0
-      ) {
-        return [];
-      }
-
-      const weights =
-        filteredRecords.map(
-          item =>
-            Number(item.weight),
-        );
-
-      let minWeight =
-        Math.min(...weights);
-
-      let maxWeight =
-        Math.max(...weights);
-
-      if (
-        minWeight ===
-        maxWeight
-      ) {
-        minWeight -= 0.5;
-        maxWeight += 0.5;
-      }
-
-      const usableWidth =
-        chartWidth -
-        chartPaddingX * 2;
-
-      const usableHeight =
-        chartHeight -
-        chartPaddingY * 2;
-
-      return filteredRecords.map(
-        (
-          record,
-          index,
-        ) => {
-          const x =
-            filteredRecords.length ===
-            1
-              ? chartWidth / 2
-              : chartPaddingX +
-                (index /
-                  (filteredRecords.length -
-                    1)) *
-                  usableWidth;
-
-          const normalized =
-            (Number(record.weight) -
-              minWeight) /
-            (maxWeight -
-              minWeight);
-
-          const y =
-            chartPaddingY +
-            usableHeight -
-            normalized *
-              usableHeight;
-
-          return {
-            x,
-            y,
-            record,
-          };
-        },
-      );
-    }, [
-      filteredRecords,
-      chartWidth,
-    ]);
-
 
   /* =========================================================
      RENDER
@@ -1364,297 +1198,6 @@ export default function WeightHistoryScreen({
 
         </View>
 
-
-        {/* =================================================
-            GRAPH
-        ================================================= */}
-
-        <View
-          style={
-            styles.graphCard
-          }>
-
-          <View
-            style={
-              styles.graphHeader
-            }>
-
-            <View>
-              <Text
-                style={
-                  styles.cardTitle
-                }>
-                Kilo Değişimi
-              </Text>
-
-              <Text
-                style={
-                  styles.cardSubtitle
-                }>
-                Zaman içindeki
-                değişim
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.graphBadge
-              }>
-
-              <Text
-                style={
-                  styles.graphBadgeText
-                }>
-                kg
-              </Text>
-
-            </View>
-          </View>
-
-
-          {loading ? (
-            <View
-              style={
-                styles.graphEmpty
-              }>
-
-              {[0, 1, 2, 3].map(
-                item => (
-                  <View
-                    key={`loading-h-${item}`}
-                    style={[
-                      styles.horizontalGrid,
-                      {
-                        top:
-                          18 +
-                          item * 37,
-                      },
-                    ]}
-                  />
-                ),
-              )}
-
-              {[0, 1, 2, 3, 4].map(
-                item => (
-                  <View
-                    key={`loading-v-${item}`}
-                    style={[
-                      styles.verticalGrid,
-                      {
-                        left:
-                          `${item * 25}%`,
-                      },
-                    ]}
-                  />
-                ),
-              )}
-
-              <View
-                style={
-                  styles.graphPreparingBadge
-                }>
-
-                <Text
-                  style={
-                    styles.graphPreparingText
-                  }>
-                  Kayıtlar yükleniyor
-                </Text>
-
-              </View>
-            </View>
-          ) : filteredRecords.length === 0 ? (
-            <View
-              style={
-                styles.graphEmpty
-              }>
-
-              {[0, 1, 2, 3].map(
-                item => (
-                  <View
-                    key={`empty-h-${item}`}
-                    style={[
-                      styles.horizontalGrid,
-                      {
-                        top:
-                          18 +
-                          item * 37,
-                      },
-                    ]}
-                  />
-                ),
-              )}
-
-              {[0, 1, 2, 3, 4].map(
-                item => (
-                  <View
-                    key={`empty-v-${item}`}
-                    style={[
-                      styles.verticalGrid,
-                      {
-                        left:
-                          `${item * 25}%`,
-                      },
-                    ]}
-                  />
-                ),
-              )}
-
-              <View
-                style={
-                  styles.graphPreparingBadge
-                }>
-
-                <Text
-                  style={
-                    styles.graphPreparingText
-                  }>
-                  Grafik hazırlanıyor
-                </Text>
-
-              </View>
-            </View>
-          ) : (
-            <>
-              <View
-                style={
-                  styles.chartContainer
-                }
-                onLayout={event =>
-                  setChartWidth(
-                    event.nativeEvent
-                      .layout.width,
-                  )
-                }>
-
-                {[0, 1, 2, 3].map(
-                  item => (
-                    <View
-                      key={`h-${item}`}
-                      style={[
-                        styles.horizontalGrid,
-                        {
-                          top:
-                            15 +
-                            item * 42,
-                        },
-                      ]}
-                    />
-                  ),
-                )}
-
-                {[0, 1, 2, 3, 4].map(
-                  item => (
-                    <View
-                      key={`v-${item}`}
-                      style={[
-                        styles.verticalGrid,
-                        {
-                          left:
-                            `${item * 25}%`,
-                        },
-                      ]}
-                    />
-                  ),
-                )}
-
-                {chartWidth > 0 &&
-                  chartPoints.length > 0 && (
-                    <Svg
-                      pointerEvents="none"
-                      width={
-                        chartWidth
-                      }
-                      height={
-                        chartHeight
-                      }
-                      style={
-                        StyleSheet.absoluteFill
-                      }>
-
-                      {chartPoints.length >
-                        1 && (
-                        <Path
-                          d={createSmoothPath(
-                            chartPoints,
-                          )}
-                          fill="none"
-                          stroke={
-                            PURPLE
-                          }
-                          strokeWidth={
-                            2.5
-                          }
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      )}
-
-                    </Svg>
-                  )}
-
-                {chartPoints.map(
-                  point => (
-                    <View
-                      key={
-                        point.record.id
-                      }
-                      style={[
-                        styles.chartDotOuter,
-                        {
-                          left:
-                            point.x -
-                            6,
-                          top:
-                            point.y -
-                            6,
-                        },
-                      ]}>
-
-                      <View
-                        style={
-                          styles.chartDot
-                        }
-                      />
-
-                    </View>
-                  ),
-                )}
-
-              </View>
-
-              <View
-                style={
-                  styles.chartDates
-                }>
-
-                <Text
-                  style={
-                    styles.chartDateText
-                  }>
-                  {formatShortDate(
-                    filteredRecords[0]
-                      .date,
-                  )}
-                </Text>
-
-                <Text
-                  style={
-                    styles.chartDateText
-                  }>
-                  {formatShortDate(
-                    filteredRecords[
-                      filteredRecords.length -
-                        1
-                    ].date,
-                  )}
-                </Text>
-
-              </View>
-            </>
-          )}
-
-        </View>
 
 
         {/* =================================================
@@ -2355,7 +1898,7 @@ const styles =
     },
 
     scrollContent: {
-      paddingTop: 20,
+      paddingTop: 55,
       paddingHorizontal: 14,
       paddingBottom: 32,
     },
@@ -2371,8 +1914,8 @@ const styles =
     },
 
     backButton: {
-      width: 40,
-      height: 40,
+      width: 50,
+      height: 50,
       borderRadius: 24,
       backgroundColor:
         '#FFFFFF',
@@ -2568,40 +2111,13 @@ const styles =
     },
 
 
-    /* GRAPH */
-
-    graphCard: {
-      borderRadius: 22,
-      backgroundColor:
-        '#FFFFFF',
-      borderWidth: 1,
-      borderColor:
-        '#ECE9F7',
-      padding: 14,
-      shadowColor:
-        '#6973A0',
-      shadowOffset: {
-        width: 0,
-        height: 5,
-      },
-      shadowOpacity: 0.06,
-      shadowRadius: 11,
-      elevation: 2,
-    },
-
-    graphHeader: {
-      flexDirection: 'row',
-      justifyContent:
-        'space-between',
-      alignItems: 'center',
-    },
-
     cardTitle: {
       color: '#172348',
       fontSize: 15.5,
       fontFamily:
         'Quicksand-Bold',
     },
+
 
     cardSubtitle: {
       color: '#9299AC',
@@ -2611,122 +2127,6 @@ const styles =
       marginTop: 2,
     },
 
-    graphBadge: {
-      minWidth: 39,
-      height: 28,
-      paddingHorizontal: 9,
-      borderRadius: 11,
-      backgroundColor:
-        '#F0ECFF',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-
-    graphBadgeText: {
-      color: PURPLE,
-      fontSize: 10.5,
-      fontFamily:
-        'Quicksand-Bold',
-    },
-
-    graphEmpty: {
-      height: 150,
-      position: 'relative',
-      overflow: 'hidden',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 30,
-    },
-
-    graphPreparingBadge: {
-      position: 'absolute',
-      alignSelf: 'center',
-      top: 58,
-      backgroundColor:
-        'rgba(255,255,255,0.94)',
-      borderWidth: 1,
-      borderColor:
-        '#E8E2FF',
-      paddingHorizontal: 13,
-      height: 29,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor:
-        '#7565B5',
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-
-    graphPreparingText: {
-      color: '#7867C9',
-      fontSize: 9.5,
-      fontFamily:
-        'Quicksand-Bold',
-    },
-
-    chartContainer: {
-      position: 'relative',
-      height: 165,
-      marginTop: 15,
-      overflow: 'hidden',
-    },
-
-    horizontalGrid: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      height: 1,
-      backgroundColor:
-        '#F0EEF7',
-    },
-
-    verticalGrid: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      width: 1,
-      backgroundColor:
-        '#F3F1F8',
-    },
-
-    chartDotOuter: {
-      position: 'absolute',
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor:
-        '#E3DCFF',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-
-    chartDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor:
-        PURPLE,
-    },
-
-    chartDates: {
-      flexDirection: 'row',
-      justifyContent:
-        'space-between',
-      marginTop: 2,
-    },
-
-    chartDateText: {
-      color: '#9BA0B0',
-      fontSize: 9.5,
-      fontFamily:
-        'Quicksand-Medium',
-    },
 
 
     /* HISTORY */
