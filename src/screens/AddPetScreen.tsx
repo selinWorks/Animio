@@ -34,6 +34,7 @@ import {
   ChevronRight,
   ChevronLeft,
   ArrowLeft as TypeArrowLeft,
+  X,
 } from 'lucide-react-native';
 
 import {usePets} from '../data/PetContext';
@@ -181,6 +182,71 @@ const GENDERS = [
   {label: 'Erkek'},
 ];
 
+
+const MONTH_NAMES = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
+
+const WHEEL_ITEM_HEIGHT = 48;
+
+type WheelPickerColumnProps = {
+  items: string[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  label: string;
+};
+
+function WheelPickerColumn({
+  items,
+  selectedIndex,
+  onSelect,
+  label,
+}: WheelPickerColumnProps) {
+  const safeIndex = Math.max(0, Math.min(selectedIndex, items.length - 1));
+
+  return (
+    <View style={styles.wheelColumn}>
+      <Text style={styles.wheelLabel}>{label}</Text>
+
+      <View style={styles.wheelViewport}>
+        <View pointerEvents="none" style={styles.wheelSelection} />
+
+        <ScrollView
+          key={`${label}-${safeIndex}-${items.length}`}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={WHEEL_ITEM_HEIGHT}
+          decelerationRate="fast"
+          nestedScrollEnabled
+          contentOffset={{x: 0, y: safeIndex * WHEEL_ITEM_HEIGHT}}
+          contentContainerStyle={styles.wheelContent}
+          onMomentumScrollEnd={event => {
+            const rawIndex = Math.round(
+              event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT,
+            );
+            onSelect(Math.max(0, Math.min(rawIndex, items.length - 1)));
+          }}>
+          {items.map((item, index) => {
+            const selected = index === safeIndex;
+
+            return (
+              <View key={`${label}-${item}-${index}`} style={styles.wheelItem}>
+                <Text
+                  style={[
+                    styles.wheelItemText,
+                    selected && styles.wheelItemTextSelected,
+                  ]}>
+                  {item}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 export default function AddPetScreen({navigation}: any) {
   const {addPet} = usePets();
 
@@ -206,6 +272,8 @@ export default function AddPetScreen({navigation}: any) {
     useState(new Date());
   const [showBirthDatePicker, setShowBirthDatePicker] =
     useState(false);
+  const [birthPickerPrecision, setBirthPickerPrecision] =
+    useState<'day' | 'month' | 'year'>('day');
 
   const [gender, setGender] = useState('');
 
@@ -275,6 +343,7 @@ export default function AddPetScreen({navigation}: any) {
     setBirthYear('');
     setBirthPickerDate(new Date());
     setShowBirthDatePicker(false);
+    setBirthPickerPrecision('day');
     setGender('');
 
     setWeight('');
@@ -640,15 +709,98 @@ export default function AddPetScreen({navigation}: any) {
   };
 
   const openBirthDatePicker = () => {
-    const existingDate = parseFullDate(birthDate);
+    let initialDate = getToday();
 
-    if (existingDate) {
-      setBirthPickerDate(existingDate);
-    } else {
-      setBirthPickerDate(getToday());
+    if (birthDatePrecision === 'day') {
+      const existingDate = parseFullDate(birthDate);
+      if (existingDate) {
+        initialDate = existingDate;
+      }
+    } else if (birthDatePrecision === 'month') {
+      const match = birthDate.match(/^(\\d{2})\\.(\\d{4})$/);
+      if (match) {
+        initialDate = new Date(Number(match[2]), Number(match[1]) - 1, 1);
+      }
+    } else if (/^\\d{4}$/.test(birthDate)) {
+      initialDate = new Date(Number(birthDate), 0, 1);
     }
 
+    setBirthPickerPrecision(birthDatePrecision);
+    setBirthPickerDate(initialDate);
     setShowBirthDatePicker(true);
+  };
+
+  const getBirthPickerYears = () =>
+    Array.from(
+      {length: currentYear - 1900 + 1},
+      (_, index) => String(1900 + index),
+    );
+
+  const getBirthPickerDays = () => {
+    const year = birthPickerDate.getFullYear();
+    const month = birthPickerDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = getToday();
+
+    const maxDay =
+      year === today.getFullYear() && month === today.getMonth()
+        ? today.getDate()
+        : daysInMonth;
+
+    return Array.from(
+      {length: maxDay},
+      (_, index) => String(index + 1).padStart(2, '0'),
+    );
+  };
+
+  const getBirthPickerMonths = () => {
+    const today = getToday();
+
+    if (birthPickerDate.getFullYear() === today.getFullYear()) {
+      return MONTH_NAMES.slice(0, today.getMonth() + 1);
+    }
+
+    return MONTH_NAMES;
+  };
+
+  const updateBirthPickerDate = (
+    nextYear: number,
+    nextMonth: number,
+    nextDay: number,
+  ) => {
+    const today = getToday();
+    const year = Math.max(1900, Math.min(nextYear, today.getFullYear()));
+
+    let month = Math.max(0, Math.min(nextMonth, 11));
+    if (year === today.getFullYear() && month > today.getMonth()) {
+      month = today.getMonth();
+    }
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const maxDay =
+      year === today.getFullYear() && month === today.getMonth()
+        ? Math.min(daysInMonth, today.getDate())
+        : daysInMonth;
+
+    const day = Math.max(1, Math.min(nextDay, maxDay));
+    setBirthPickerDate(new Date(year, month, day));
+  };
+
+  const confirmBirthPicker = () => {
+    const selectedYear = birthPickerDate.getFullYear();
+
+    setBirthDatePrecision(birthPickerPrecision);
+    setBirthYear(String(selectedYear));
+
+    if (birthPickerPrecision === 'day') {
+      setBirthDate(formatFullDate(birthPickerDate));
+    } else if (birthPickerPrecision === 'month') {
+      setBirthDate(formatMonthYear(birthPickerDate));
+    } else {
+      setBirthDate(String(selectedYear));
+    }
+
+    setShowBirthDatePicker(false);
   };
 
   /* =====================================================
@@ -1506,18 +1658,16 @@ export default function AddPetScreen({navigation}: any) {
                 style={styles.ageInput}
               />
 
-              {birthDatePrecision === 'day' && (
-                <Pressable
-                  onPress={openBirthDatePicker}
-                  style={styles.birthCalendarButton}>
+              <Pressable
+                onPress={openBirthDatePicker}
+                style={styles.birthCalendarButton}>
 
-                  <Calendar
-                    size={20}
-                    color="#6C5CE7"
-                  />
+                <Calendar
+                  size={20}
+                  color="#6C5CE7"
+                />
 
-                </Pressable>
-              )}
+              </Pressable>
 
             </View>
 
@@ -2561,137 +2711,132 @@ export default function AddPetScreen({navigation}: any) {
       <Modal
         visible={showBirthDatePicker}
         transparent
-        animationType="fade"
+        animationType="slide"
         statusBarTranslucent
-        onRequestClose={() =>
-          setShowBirthDatePicker(false)
-        }>
+        onRequestClose={() => setShowBirthDatePicker(false)}>
 
-        <Pressable
-          style={styles.datePickerOverlay}
-          onPress={() =>
-            setShowBirthDatePicker(false)
-          }>
-
+        <View style={styles.birthPickerOverlay}>
           <Pressable
-            style={styles.datePickerCard}
-            onPress={() => {}}>
+            style={styles.birthPickerBackdrop}
+            onPress={() => setShowBirthDatePicker(false)}
+          />
 
-            <View style={styles.datePickerHeader}>
+          <View style={styles.birthPickerSheet}>
+            <View style={styles.birthPickerHandle} />
 
-              <View style={styles.datePickerHeaderIcon}>
-
-                <Cake
-                  size={21}
-                  color="#6C5CE7"
-                  strokeWidth={2}
-                />
-
+            <View style={styles.birthPickerHeader}>
+              <View style={styles.birthPickerHeaderIcon}>
+                <Calendar size={25} color="#6C5CE7" strokeWidth={2} />
               </View>
 
-              <View style={styles.datePickerHeaderText}>
-
-                <Text style={styles.datePickerTitle}>
-                  Doğum tarihi
+              <View style={styles.birthPickerHeaderText}>
+                <Text style={styles.birthPickerTitle}>Doğum tarihi</Text>
+                <Text style={styles.birthPickerSubtitle}>
+                  Minik dostunun doğum tarihini seçebilirsin.
                 </Text>
-
-                <Text style={styles.datePickerSubtitle}>
-                  Tam doğum tarihini seç
-                </Text>
-
               </View>
 
+              <Pressable
+                onPress={() => setShowBirthDatePicker(false)}
+                style={styles.birthPickerXButton}>
+                <X size={24} color="#686580" strokeWidth={2.2} />
+              </Pressable>
             </View>
 
-            <RNCalendar
-              current={getDateKey(birthPickerDate)}
+            <View style={styles.birthPickerTabs}>
+              {[
+                {key: 'day' as const, label: 'Tam tarih'},
+                {key: 'month' as const, label: 'Ay ve yıl'},
+                {key: 'year' as const, label: 'Sadece yıl'},
+              ].map(item => {
+                const selected = birthPickerPrecision === item.key;
 
-              minDate="1900-01-01"
-
-              maxDate={getDateKey(getToday())}
-
-              onDayPress={day => {
-                const selectedDate =
-                  new Date(
-                    day.year,
-                    day.month - 1,
-                    day.day,
-                  );
-
-                setBirthPickerDate(selectedDate);
-                setBirthDatePrecision('day');
-                setBirthDate(
-                  formatFullDate(selectedDate),
+                return (
+                  <Pressable
+                    key={item.key}
+                    onPress={() => setBirthPickerPrecision(item.key)}
+                    style={[
+                      styles.birthPickerTab,
+                      selected && styles.birthPickerTabSelected,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.birthPickerTabText,
+                        selected && styles.birthPickerTabTextSelected,
+                      ]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
                 );
-                setBirthYear(
-                  String(day.year),
-                );
-                setShowBirthDatePicker(false);
-              }}
+              })}
+            </View>
 
-              markedDates={{
-                [getDateKey(birthPickerDate)]: {
-                  selected: true,
-                  selectedColor: '#6C5CE7',
-                  selectedTextColor: '#FFFFFF',
-                },
-              }}
+            <View style={styles.birthWheelRow}>
+              {birthPickerPrecision === 'day' && (
+                <WheelPickerColumn
+                  label="Gün"
+                  items={getBirthPickerDays()}
+                  selectedIndex={birthPickerDate.getDate() - 1}
+                  onSelect={index =>
+                    updateBirthPickerDate(
+                      birthPickerDate.getFullYear(),
+                      birthPickerDate.getMonth(),
+                      index + 1,
+                    )
+                  }
+                />
+              )}
 
-              theme={{
-                backgroundColor: '#FFFFFF',
-                calendarBackground: '#FFFFFF',
-                textSectionTitleColor: '#858B9B',
-                selectedDayBackgroundColor: '#6C5CE7',
-                selectedDayTextColor: '#FFFFFF',
-                todayTextColor: '#6C5CE7',
-                dayTextColor: '#1E2022',
-                textDisabledColor: '#D6D3E8',
-                monthTextColor: '#1E2022',
-                arrowColor: '#6C5CE7',
-                textMonthFontFamily:
-                  'Quicksand-Bold',
-                textDayFontFamily:
-                  'Quicksand-Regular',
-                textDayHeaderFontFamily:
-                  'Quicksand-Bold',
-                textMonthFontSize: 17,
-                textDayFontSize: 14,
-                textDayHeaderFontSize: 12,
-              }}
+              {birthPickerPrecision !== 'year' && (
+                <WheelPickerColumn
+                  label="Ay"
+                  items={getBirthPickerMonths()}
+                  selectedIndex={birthPickerDate.getMonth()}
+                  onSelect={index =>
+                    updateBirthPickerDate(
+                      birthPickerDate.getFullYear(),
+                      index,
+                      birthPickerDate.getDate(),
+                    )
+                  }
+                />
+              )}
 
-              renderArrow={direction =>
-                direction === 'left' ? (
-                  <View style={styles.calendarArrowButton}>
-                    <ChevronLeft size={20} color="#6C5CE7" strokeWidth={2.2} />
-                  </View>
-                ) : (
-                  <View style={styles.calendarArrowButton}>
-                    <ChevronRight size={20} color="#6C5CE7" strokeWidth={2.2} />
-                  </View>
-                )
-              }
+              <WheelPickerColumn
+                label="Yıl"
+                items={getBirthPickerYears()}
+                selectedIndex={birthPickerDate.getFullYear() - 1900}
+                onSelect={index =>
+                  updateBirthPickerDate(
+                    1900 + index,
+                    birthPickerDate.getMonth(),
+                    birthPickerDate.getDate(),
+                  )
+                }
+              />
+            </View>
 
-              enableSwipeMonths
-              firstDay={1}
-              hideExtraDays
-            />
+            <View style={styles.birthPickerActions}>
+              <Pressable
+                onPress={() => setShowBirthDatePicker(false)}
+                style={styles.birthPickerCancelButton}>
+                <Text style={styles.birthPickerCancelText}>İptal</Text>
+              </Pressable>
 
-            <Pressable
-              style={styles.datePickerCloseButton}
-              onPress={() =>
-                setShowBirthDatePicker(false)
-              }>
-
-              <Text style={styles.datePickerCloseText}>
-                Kapat
-              </Text>
-
-            </Pressable>
-
-          </Pressable>
-
-        </Pressable>
-
+              <Pressable
+                onPress={confirmBirthPicker}
+                style={styles.birthPickerConfirmTouch}>
+                <LinearGradient
+                  colors={['#7C5CE7', '#6544E5']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 0}}
+                  style={styles.birthPickerConfirmButton}>
+                  <Text style={styles.birthPickerConfirmText}>Onayla</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -4040,6 +4185,216 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  birthPickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+
+  birthPickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(24, 20, 45, 0.56)',
+  },
+
+  birthPickerSheet: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    shadowColor: '#1E2022',
+    shadowOffset: {width: 0, height: -8},
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 18,
+  },
+
+  birthPickerHandle: {
+    width: 46,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#DDD9EC',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+
+  birthPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+
+  birthPickerHeaderIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: '#F0ECFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+
+  birthPickerHeaderText: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  birthPickerTitle: {
+    color: '#18162B',
+    fontSize: 23,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  birthPickerSubtitle: {
+    marginTop: 2,
+    color: '#77738A',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Quicksand-Regular',
+  },
+
+  birthPickerXButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F1F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  birthPickerTabs: {
+    minHeight: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#E7E2F5',
+    padding: 4,
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+
+  birthPickerTab: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+
+  birthPickerTabSelected: {
+    backgroundColor: '#EEE9FF',
+  },
+
+  birthPickerTabText: {
+    color: '#77738A',
+    fontSize: 12,
+    fontFamily: 'Quicksand-Bold',
+    textAlign: 'center',
+  },
+
+  birthPickerTabTextSelected: {
+    color: '#6544D9',
+  },
+
+  birthWheelRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+  },
+
+  wheelColumn: {
+    flex: 1,
+  },
+
+  wheelLabel: {
+    color: '#77738A',
+    fontSize: 12,
+    fontFamily: 'Quicksand-Regular',
+    textAlign: 'center',
+    marginBottom: 7,
+  },
+
+  wheelViewport: {
+    height: WHEEL_ITEM_HEIGHT * 3,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+
+  wheelSelection: {
+    position: 'absolute',
+    zIndex: 0,
+    left: 0,
+    right: 0,
+    top: WHEEL_ITEM_HEIGHT,
+    height: WHEEL_ITEM_HEIGHT,
+    borderRadius: 18,
+    backgroundColor: '#F1EDFF',
+  },
+
+  wheelContent: {
+    paddingVertical: WHEEL_ITEM_HEIGHT,
+  },
+
+  wheelItem: {
+    height: WHEEL_ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+
+  wheelItemText: {
+    color: '#B1ADC2',
+    fontSize: 16,
+    fontFamily: 'Quicksand-Regular',
+  },
+
+  wheelItemTextSelected: {
+    color: '#5136C8',
+    fontSize: 19,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  birthPickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  birthPickerCancelButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#CFC4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+
+  birthPickerCancelText: {
+    color: '#6C5CE7',
+    fontSize: 15,
+    fontFamily: 'Quicksand-Bold',
+  },
+
+  birthPickerConfirmTouch: {
+    flex: 1,
+    borderRadius: 20,
+  },
+
+  birthPickerConfirmButton: {
+    height: 54,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  birthPickerConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: 'Quicksand-Bold',
   },
 
   datePickerOverlay: {
