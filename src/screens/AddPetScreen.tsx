@@ -1,5 +1,3 @@
-
-
 import React, {useCallback, useState} from 'react';
 import {
   Alert,
@@ -34,6 +32,7 @@ import {
   UserRound,
   Plus,
   ChevronRight,
+  ChevronLeft,
   ArrowLeft as TypeArrowLeft,
 } from 'lucide-react-native';
 
@@ -1090,12 +1089,6 @@ export default function AddPetScreen({navigation}: any) {
             },
           ]}>
 
-          <Sparkles
-            size={25}
-            color="#D8B4FE"
-            strokeWidth={1.7}
-          />
-
         </View>
 
         <View
@@ -1108,11 +1101,6 @@ export default function AddPetScreen({navigation}: any) {
             },
           ]}>
 
-          <PawPrint
-            size={25}
-            color="#E9D5FF"
-            strokeWidth={1.7}
-          />
 
         </View>
 
@@ -2512,14 +2500,6 @@ export default function AddPetScreen({navigation}: any) {
                     setTypePickerCategory(null);
                   }}
                   style={styles.typePickerOption}>
-                  <View style={styles.typePickerOptionIcon}>
-                    <PawPrint
-                      size={18}
-                      color="#8B7BC7"
-                      strokeWidth={1.8}
-                    />
-                  </View>
-
                   <Text style={styles.typePickerOptionText}>
                     {item}
                   </Text>
@@ -2679,6 +2659,18 @@ export default function AddPetScreen({navigation}: any) {
                 textDayHeaderFontSize: 12,
               }}
 
+              renderArrow={direction =>
+                direction === 'left' ? (
+                  <View style={styles.calendarArrowButton}>
+                    <ChevronLeft size={20} color="#6C5CE7" strokeWidth={2.2} />
+                  </View>
+                ) : (
+                  <View style={styles.calendarArrowButton}>
+                    <ChevronRight size={20} color="#6C5CE7" strokeWidth={2.2} />
+                  </View>
+                )
+              }
+
               enableSwipeMonths
               firstDay={1}
               hideExtraDays
@@ -2823,6 +2815,18 @@ export default function AddPetScreen({navigation}: any) {
                 textDayFontSize: 14,
                 textDayHeaderFontSize: 12,
               }}
+
+              renderArrow={direction =>
+                direction === 'left' ? (
+                  <View style={styles.calendarArrowButton}>
+                    <ChevronLeft size={20} color="#6C5CE7" strokeWidth={2.2} />
+                  </View>
+                ) : (
+                  <View style={styles.calendarArrowButton}>
+                    <ChevronRight size={20} color="#6C5CE7" strokeWidth={2.2} />
+                  </View>
+                )
+              }
 
               enableSwipeMonths
 
@@ -4111,6 +4115,15 @@ const styles = StyleSheet.create({
     color: '#858B9B',
   },
 
+  calendarArrowButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F0EDFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   datePickerCloseButton: {
     height: 48,
 
@@ -4175,4 +4188,3 @@ const styles = StyleSheet.create({
   },
 
 });
-
