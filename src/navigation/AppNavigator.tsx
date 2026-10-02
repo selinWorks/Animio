@@ -47,6 +47,8 @@ import PetJoinScreen from '../screens/PetJoinScreen';
 
 import FamilyManagementScreen from '../screens/FamilyManagementScreen';
 
+import PetSummaryScreen from '../screens/PetSummaryScreen';
+
 /* =========================================================
    AUTH
 ========================================================= */
@@ -117,6 +119,10 @@ export type RootStackParamList = {
   };
 
   PetInvite: {
+    pet: Pet;
+  };
+
+  PetSummary: {
     pet: Pet;
   };
 
@@ -880,6 +886,14 @@ function MainAppNavigator() {
       <Stack.Screen
         name="FamilyManagement"
         component={FamilyManagementScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="PetSummary"
+        component={PetSummaryScreen}
         options={{
           headerShown: false,
         }}

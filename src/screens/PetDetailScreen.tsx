@@ -832,30 +832,36 @@ export default function PetDetailScreen({
               PET SUMMARY
           ===================================================== */}
 
+          {/* =====================================================
+              PET SUMMARY
+          ===================================================== */}
+
           <Pressable
             style={({pressed}) => [
               styles.petSummaryCard,
               pressed && styles.pressedCard,
-            ]}>
-
+            ]}
+            onPress={() => {
+              navigation.navigate('PetSummary', {
+                pet: currentPet,
+              });
+            }}
+          >
             <View style={styles.petSummaryTop}>
-
               <View
                 style={[
                   styles.cardIconCircle,
                   styles.generalIconCircle,
-                ]}>
-
+                ]}
+              >
                 <FileText
                   size={24}
                   color="#7655F5"
                   strokeWidth={2}
                 />
-
               </View>
 
               <View style={styles.petSummaryTextWrap}>
-
                 <Text style={styles.petSummaryTitle}>
                   Pet Özeti
                 </Text>
@@ -863,13 +869,10 @@ export default function PetDetailScreen({
                 <Text style={styles.petSummaryDescription}>
                   {currentPet.name}’ın önemli bilgilerini tek yerde görüntüle ve paylaş.
                 </Text>
-
               </View>
-
             </View>
 
             <View style={styles.petSummaryAction}>
-
               <Text style={styles.petSummaryActionText}>
                 Özeti Gör
               </Text>
@@ -879,9 +882,7 @@ export default function PetDetailScreen({
                 color="#7655F5"
                 strokeWidth={2.2}
               />
-
             </View>
-
           </Pressable>
 
           {/* =====================================================
