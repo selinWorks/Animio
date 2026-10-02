@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Sparkles,
   X,
+  Users,
 } from 'lucide-react-native';
 
 import {useAuth} from '../data/AuthContext';
@@ -599,6 +600,24 @@ export default function ProfileScreen() {
             'Görüşlerini bizimle paylaş',
             () =>
               openModal('feedback'),
+          )}
+        </View>
+
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionTitle}>
+            Aile Yönetimi
+          </Text>
+
+          {renderMenuItem(
+            <Users
+              size={18}
+              color="#6D5CE7"
+              strokeWidth={2.2}
+            />,
+            '#F1ECFF',
+            'Aile ve Üye Yönetimi',
+            'Dostlarının aile üyelerini görüntüle ve yönet',
+            () => navigation.navigate('FamilyManagement'),
           )}
         </View>
 

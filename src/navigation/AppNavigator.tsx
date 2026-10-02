@@ -45,6 +45,7 @@ import UpcomingFeaturesScreen from '../screens/UpcomingFeaturesScreen';
 import PetInviteScreen from '../screens/PetInviteScreen';
 import PetJoinScreen from '../screens/PetJoinScreen';
 
+import FamilyManagementScreen from '../screens/FamilyManagementScreen';
 
 /* =========================================================
    AUTH
@@ -130,6 +131,8 @@ export type RootStackParamList = {
   UpcomingFeatures: undefined;
 
   FirestoreTest: undefined;
+
+  FamilyManagement: undefined;
 };
 
 
@@ -871,6 +874,14 @@ function MainAppNavigator() {
         options={{
           title:
             'Yakında',
+        }}
+      />
+
+      <Stack.Screen
+        name="FamilyManagement"
+        component={FamilyManagementScreen}
+        options={{
+          headerShown: false,
         }}
       />
 

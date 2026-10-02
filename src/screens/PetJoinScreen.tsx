@@ -190,6 +190,11 @@ const PetJoinScreen = () => {
     } catch (error: any) {
       const errorMessage =
         error?.message || '';
+        console.error('[PET JOIN ERROR]', {
+          code: error?.code,
+          message: error?.message,
+          error,
+        });
 
       const isPermissionError =
         errorMessage.includes('PERMISSION_DENIED') ||

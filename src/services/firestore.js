@@ -2491,18 +2491,15 @@ export const createPetInvitation = async (
     };
   };
 
+
 /* =========================================================
    ACCEPT PET INVITATION
 ========================================================= */
 
-export const acceptPetInvitation = async (
-  code,
-  uid,
-) => {
-  const normalizedCode =
-    (code || '')
-      .trim()
-      .toUpperCase();
+export const acceptPetInvitation = async (code, uid) => {
+  const normalizedCode = (code || '')
+    .trim()
+    .toUpperCase();
 
   if (!normalizedCode || !uid) {
     throw new Error(
@@ -2510,16 +2507,14 @@ export const acceptPetInvitation = async (
     );
   }
 
-  const invitationRef =
-    firestore()
-      .collection('petInvitations')
-      .doc(normalizedCode);
+  const db = firestore();
 
-  /*
-   * Önce daveti okuyoruz.
-   */
-  const invitationSnapshot =
-    await invitationRef.get();
+  // Davet koduyla tek bir davet belgesini oku.
+  const invitationRef = db
+    .collection('petInvitations')
+    .doc(normalizedCode);
+
+  const invitationSnapshot = await invitationRef.get();
 
   if (!invitationSnapshot.exists) {
     throw new Error(
@@ -2527,26 +2522,12 @@ export const acceptPetInvitation = async (
     );
   }
 
-  const invitation =
-    invitationSnapshot.data() || {};
+  const invitation = invitationSnapshot.data() || {};
 
-  if (
-    invitation.status !== 'pending'
-  ) {
+  // Davet hâlâ kullanılabilir mi?
+  if (invitation.status !== 'pending') {
     throw new Error(
       'Bu davet artık geçerli değil.',
-    );
-  }
-
-  if (
-    invitation.expiresAt &&
-    invitation.expiresAt.toDate &&
-    invitation.expiresAt
-      .toDate()
-      .getTime() < Date.now()
-  ) {
-    throw new Error(
-      'Bu davetin süresi dolmuş.',
     );
   }
 
@@ -2556,85 +2537,210 @@ export const acceptPetInvitation = async (
     );
   }
 
-  /*
-   * Giriş yapılan hesabın e-posta adresiyle
-   * davetin gönderildiği adres eşleşmeli.
-   */
-  const currentUserEmail =
-    (auth().currentUser?.email || '')
-      .trim()
-      .toLowerCase();
-
-  const invitedEmail =
-    (invitation.inviteeEmail || '')
-      .trim()
-      .toLowerCase();
-
+  // Davet süresi dolmuş mu?
   if (
-    invitedEmail &&
-    currentUserEmail &&
-    invitedEmail !== currentUserEmail
+    invitation.expiresAt &&
+    typeof invitation.expiresAt.toDate === 'function' &&
+    invitation.expiresAt.toDate().getTime() < Date.now()
   ) {
     throw new Error(
-      'Bu davet farklı bir e-posta adresine gönderilmiş.',
+      'Bu davetin süresi dolmuş.',
     );
   }
 
-  if (
-    invitedEmail &&
-    !currentUserEmail
-  ) {
+  // Davet, giriş yapan kullanıcının e-postasına mı gönderilmiş?
+  const currentUserEmail = (
+    auth().currentUser?.email || ''
+  ).trim().toLowerCase();
+
+  const invitedEmail = (
+    invitation.inviteeEmail || ''
+  ).trim().toLowerCase();
+
+  if (!currentUserEmail) {
     throw new Error(
       'Kullanıcı e-posta bilgisi alınamadı.',
     );
   }
 
-  const petRef =
-    firestore()
-      .collection('pets')
-      .doc(invitation.petId);
+  if (
+    !invitedEmail ||
+    invitedEmail !== currentUserEmail
+  ) {
+    throw new Error(
+      'Bu davet, giriş yaptığın e-posta adresine gönderilmemiş.',
+    );
+  }
 
-  /*
-   * Pet üyeliğini ve davet durumunu
-   * tek batch içerisinde güncelliyoruz.
-   */
-  const batch =
-    firestore().batch();
+  const petRef = db
+    .collection('pets')
+    .doc(invitation.petId);
+
+  // Pet ve davet belgelerini atomik olarak güncelle.
+  const batch = db.batch();
 
   batch.update(petRef, {
-    petMembers:
-      firestore.FieldValue.arrayUnion(
-        uid,
-      ),
-
-    lastAcceptedInvitationCode:
-      normalizedCode,
-
-    updatedAt:
-      firestore.FieldValue.serverTimestamp(),
+    petMembers: firestore.FieldValue.arrayUnion(uid),
+    lastAcceptedInvitationCode: normalizedCode,
+    updatedAt: firestore.FieldValue.serverTimestamp(),
   });
 
   batch.update(invitationRef, {
-    status:
-      'accepted',
-
-    inviteeUid:
-      uid,
-
-    acceptedAt:
-      firestore.FieldValue.serverTimestamp(),
+    status: 'accepted',
+    inviteeUid: uid,
+    acceptedAt: firestore.FieldValue.serverTimestamp(),
   });
 
   await batch.commit();
 
   return {
-    success:
-      true,
-
-    code:
-      normalizedCode,
-
-    petId:
-      invitation.petId,
+    success: true,
+    code: normalizedCode,
+    petId: invitation.petId,
   };
+};
+
+
+
+/* =========================================================
+   AİLE ÜYELERİNİ GETİR
+========================================================= */
+
+export const getPetMembersForManagement = async (
+  petId,
+  managerUid,
+) => {
+  if (!petId || !managerUid) {
+    throw new Error('Dost ve yönetici bilgisi gerekli.');
+  }
+
+  const petRef = firestore()
+    .collection('pets')
+    .doc(petId);
+
+  const petSnapshot = await petRef.get();
+
+  if (!petSnapshot.exists) {
+    throw new Error('Dost profili bulunamadı.');
+  }
+
+  const petData = petSnapshot.data() || {};
+
+  if (petData.ownerId !== managerUid) {
+    throw new Error(
+      'Aile üyelerini yalnızca dostun yöneticisi yönetebilir.',
+    );
+  }
+
+  const memberIds = new Set(
+    Array.isArray(petData.petMembers)
+      ? petData.petMembers
+      : [],
+  );
+
+  // Eski kayıtlarda yönetici petMembers içinde olmayabilir.
+  if (petData.ownerId) {
+    memberIds.add(petData.ownerId);
+  }
+
+  // Yalnızca mevcut yöneticinin oluşturduğu davetleri sorgula.
+  const invitationSnapshot = await firestore()
+    .collection('petInvitations')
+    .where('petId', '==', petId)
+    .where('inviterId', '==', managerUid)
+    .get();
+
+  const emailByUid = new Map();
+
+  invitationSnapshot.docs.forEach(doc => {
+    const invitation = doc.data() || {};
+
+    if (
+      invitation.status === 'accepted' &&
+      invitation.inviteeUid &&
+      invitation.inviteeEmail
+    ) {
+      emailByUid.set(
+        invitation.inviteeUid,
+        invitation.inviteeEmail,
+      );
+    }
+  });
+
+  return Array.from(memberIds).map(uid => ({
+    uid,
+    email: emailByUid.get(uid) || '',
+    isOwner: uid === petData.ownerId,
+  }));
+};
+
+
+/* =========================================================
+   AİLE ÜYESİNİ DOST PROFİLİNDEN KALDIR
+========================================================= */
+
+export const removePetMemberFromFirestore = async (
+  petId,
+  managerUid,
+  memberUid,
+) => {
+  if (!petId || !managerUid || !memberUid) {
+    throw new Error(
+      'Dost ve kullanıcı bilgileri gerekli.',
+    );
+  }
+
+  if (managerUid === memberUid) {
+    throw new Error(
+      'Yönetici kendi üyeliğini bu ekrandan kaldıramaz.',
+    );
+  }
+
+  const petRef = firestore()
+    .collection('pets')
+    .doc(petId);
+
+  await firestore().runTransaction(
+    async transaction => {
+      const snapshot = await transaction.get(petRef);
+
+      if (!snapshot.exists) {
+        throw new Error('Dost profili bulunamadı.');
+      }
+
+      const petData = snapshot.data() || {};
+
+      if (petData.ownerId !== managerUid) {
+        throw new Error(
+          'Bu işlem için yönetici yetkisi gerekli.',
+        );
+      }
+
+      if (memberUid === petData.ownerId) {
+        throw new Error(
+          'Dostun yöneticisi üyelikten kaldırılamaz.',
+        );
+      }
+
+      const members = Array.isArray(petData.petMembers)
+        ? petData.petMembers
+        : petData.ownerId
+          ? [petData.ownerId]
+          : [];
+
+      if (!members.includes(memberUid)) {
+        throw new Error(
+          'Bu kullanıcı dostun aile üyesi değil.',
+        );
+      }
+
+      transaction.update(petRef, {
+        petMembers: members.filter(
+          uid => uid !== memberUid,
+        ),
+        updatedAt:
+          firestore.FieldValue.serverTimestamp(),
+      });
+    },
+  );
 };
