@@ -26,6 +26,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Scissors,
 } from 'lucide-react-native';
 import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -50,7 +51,14 @@ type Props = {
   route: HealthHistoryRouteProp;
 };
 
-type HealthCategory = 'checkup' | 'vaccine' | 'medicine' | 'other';
+
+type HealthCategory =
+  | 'checkup'
+  | 'vaccine'
+  | 'medicine'
+  | 'operation'
+  | 'other';
+
 type FilterCategory = 'all' | HealthCategory;
 type PeriodFilter = '3months' | '6months' | 'year' | 'all';
 
@@ -71,11 +79,54 @@ type HealthRecord = {
   medicineFrequency?: string;
 };
 
+const normalizeHealthCategory = (value: unknown) =>
+  String(value ?? '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .trim();
+
+const TITLE_PLACEHOLDERS: Record<HealthCategory, string> = {
+  checkup: 'Örn. Genel veteriner kontrolü',
+  vaccine: 'Örn. Karma aşı, kuduz aşısı',
+  medicine: 'Örn. İç parazit ilacı, antibiyotik',
+  operation: 'Örn. Kısırlaştırma ameliyatı, diş çekimi',
+  other: 'Örn. Alerji takibi, cilt problemi',
+};
+
+const isOperationRecord = (record: any) => {
+  const values = [
+    record.category,
+    record.categoryLabel,
+    record.type,
+    record.title,
+    record.name,
+  ];
+
+  return values.some(value => {
+    const normalized = normalizeHealthCategory(value);
+
+    return [
+      'ameliyat',
+      'operasyon',
+      'kisirlastirma',
+      'surgery',
+      'operation',
+      'sterilization',
+      'neuter',
+      'spay',
+    ].some(keyword => normalized.includes(keyword));
+  });
+};
+
+
 const CATEGORY_FILTERS: {key: FilterCategory; label: string}[] = [
   {key: 'all', label: 'Tümü'},
   {key: 'checkup', label: 'Kontroller'},
   {key: 'vaccine', label: 'Aşılar'},
   {key: 'medicine', label: 'İlaç / Parazit'},
+  {key: 'operation', label: 'Ameliyat / Kısırlaştırma'},
   {key: 'other', label: 'Diğer'},
 ];
 
@@ -101,6 +152,11 @@ const CATEGORY_COLORS = {
     primary: '#54A98B',
     light: '#EBF8F3',
     border: '#D2EFE4',
+  },
+  operation: {
+    primary: '#8B6BD6',
+    light: '#F2ECFF',
+    border: '#DCCEFF',
   },
   other: {
     primary: '#D49B3F',
@@ -249,6 +305,21 @@ export default function HealthHistoryScreen({route}: Props) {
               parseFirestoreDate(
                 record.date,
               );
+            const resolvedCategory: HealthCategory =
+              isOperationRecord(record)
+                ? 'operation'
+                : (
+                    [
+                      'checkup',
+                      'vaccine',
+                      'medicine',
+                      'operation',
+                      'other',
+                    ].includes(String(record.category))
+                      ? record.category
+                      : 'other'
+                  ) as HealthCategory;
+
 
             if (!dateValue) {
               return null;
@@ -265,8 +336,12 @@ export default function HealthHistoryScreen({route}: Props) {
                 record.id,
               title:
                 record.title || '',
-              category:
-                record.category as HealthCategory,
+              category: resolvedCategory,
+              categoryLabel:
+                resolvedCategory === 'operation'
+                  ? 'Ameliyat / Kısırlaştırma'
+                  : record.categoryLabel ||
+                    categoryLabel(resolvedCategory),
               categoryLabel:
                 record.categoryLabel ||
                 categoryLabel(
@@ -458,6 +533,10 @@ export default function HealthHistoryScreen({route}: Props) {
 
     if (category === 'medicine') {
       return 'İlaç / Parazit';
+    }
+
+    if (category === 'operation') {
+      return 'Ameliyat / Kısırlaştırma';
     }
 
     return 'Diğer';
@@ -663,15 +742,44 @@ export default function HealthHistoryScreen({route}: Props) {
     }
 
     if (category === 'vaccine') {
-      return <Syringe size={size} color={color} strokeWidth={2} />;
+      return (
+        <Syringe
+          size={size}
+          color={color}
+          strokeWidth={2}
+        />
+      );
     }
 
     if (category === 'medicine') {
-      return <Pill size={size} color={color} strokeWidth={2} />;
+      return (
+        <Pill
+          size={size}
+          color={color}
+          strokeWidth={2}
+        />
+      );
     }
 
-    return <HeartPulse size={size} color={color} strokeWidth={2} />;
+    if (category === 'operation') {
+      return (
+        <Scissors
+          size={size}
+          color={color}
+          strokeWidth={2}
+        />
+      );
+    }
+
+    return (
+      <HeartPulse
+        size={size}
+        color={color}
+        strokeWidth={2}
+      />
+    );
   };
+
 
   return (
     <View style={styles.container}>
@@ -746,7 +854,10 @@ export default function HealthHistoryScreen({route}: Props) {
           <View style={styles.headerActions}>
             <Pressable
               style={styles.addRecordButton}
-              onPress={() => setAddRecordVisible(true)}>
+              onPress={() => {
+                resetNewRecordForm();
+                setAddRecordVisible(true);
+              }}>
               <Plus
                 size={16}
                 color="#FFFFFF"
@@ -1090,7 +1201,7 @@ export default function HealthHistoryScreen({route}: Props) {
                 style={styles.textInput}
                 value={newTitle}
                 onChangeText={setNewTitle}
-                placeholder="Örn. Genel veteriner kontrolü"
+                placeholder={TITLE_PLACEHOLDERS[newCategory]}
                 placeholderTextColor="#AAA7B5"
               />
 

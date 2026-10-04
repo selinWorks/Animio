@@ -262,6 +262,33 @@ export default function PetSummaryScreen({route, navigation}: Props) {
     [sortedHealthRecords],
   );
 
+  const operations = useMemo(() => {
+    const normalize = (value: unknown) =>
+      String(value ?? '')
+        .toLocaleLowerCase('tr-TR')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    return sortedHealthRecords.filter(record => {
+      const category = normalize(
+        `${record.category ?? ''} ${record.type ?? ''} ${
+          record.title ?? ''
+        } ${record.name ?? ''}`,
+      );
+
+      return (
+        category.includes('ameliyat') ||
+        category.includes('operasyon') ||
+        category.includes('kisirlastirma') ||
+        category.includes('surgery') ||
+        category.includes('operation') ||
+        category.includes('sterilization') ||
+        category.includes('neuter') ||
+        category.includes('spay')
+      );
+    });
+  }, [sortedHealthRecords]);
+
   const weightHistory = useMemo(() => {
     const history = (pet as any).weightHistory;
 
