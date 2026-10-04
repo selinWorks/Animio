@@ -1712,6 +1712,98 @@ export const addHealthRecordToFirestore = async (
   return healthRef.id;
 };
 
+const getHealthCategoryFromCareEventType = type => {
+  switch (type) {
+    case 'Vaccination':
+      return {
+        category: 'vaccine',
+        categoryLabel: 'Aşı',
+      };
+
+    case 'Vet Visit':
+      return {
+        category: 'checkup',
+        categoryLabel: 'Veteriner Kontrolü',
+      };
+
+    case 'Medication':
+      return {
+        category: 'medicine',
+        categoryLabel: 'İlaç / Parazit',
+      };
+
+    case 'Operation':
+      return {
+        category: 'operation',
+        categoryLabel: 'Ameliyat / Kısırlaştırma',
+      };
+
+    case 'Grooming':
+      return {
+        category: 'other',
+        categoryLabel: 'Bakım',
+      };
+
+    default:
+      return {
+        category: 'other',
+        categoryLabel: 'Diğer',
+      };
+  }
+};
+
+export const syncCompletedCareEventToHealthHistory = async (
+  eventId,
+  eventData,
+  uid,
+) => {
+  if (!eventId || !eventData?.petId || !uid) {
+    throw new Error(
+      'Etkinlik, dost ve kullanıcı bilgisi gerekli.',
+    );
+  }
+
+  await getPetAccessData(eventData.petId, uid);
+
+  const { category, categoryLabel } =
+    getHealthCategoryFromCareEventType(eventData.type);
+
+  const historyRef = firestore()
+    .collection('pets')
+    .doc(eventData.petId)
+    .collection('healthHistory')
+    .doc(`careEvent_${eventId}`);
+
+  const existingSnapshot = await historyRef.get();
+
+  const now = firestore.FieldValue.serverTimestamp();
+
+  const recordData = {
+    petId: eventData.petId,
+    title: eventData.title || eventData.name || 'Bakım etkinliği',
+    name: eventData.title || eventData.name || 'Bakım etkinliği',
+    type: eventData.type || 'Custom',
+    category,
+    categoryLabel,
+    date: eventData.date || '',
+    description: eventData.description || '',
+    notes: eventData.notes || '',
+    source: 'careEvent',
+    sourceId: eventId,
+    sourceEventId: eventId,
+    createdBy: uid,
+    completedBy: uid,
+    completedAt: now,
+    updatedAt: now,
+  };
+
+  if (!existingSnapshot.exists) {
+    recordData.createdAt = now;
+  }
+
+  await historyRef.set(recordData, { merge: true });
+};
+
 export const getHealthHistoryFromFirestore = async (
   petId,
   uid = null,
@@ -1816,6 +1908,15 @@ export const updateHealthRecordInFirestore = async (
 
     updatedAt:
       firestore.FieldValue.serverTimestamp(),
+
+    category: record.category || 'other',
+    categoryLabel: record.categoryLabel || '',
+
+    clinic: record.clinic || '',
+    doctor: record.doctor || '',
+
+    medicineName: record.medicineName || '',
+    medicineFrequency: record.medicineFrequency || '',
   });
 };
 
@@ -1845,83 +1946,6 @@ export const deleteHealthRecordFromFirestore = async (
   }
 
   await healthRef.delete();
-};
-
-const syncCompletedCareEventToHealthHistory = async (
-  eventId,
-  eventData,
-  uid,
-) => {
-  if (!eventData?.petId) {
-    return null;
-  }
-
-  const {petRef} = await getPetAccessData(
-    eventData.petId,
-    uid,
-  );
-
-  const healthRef = petRef
-    .collection('healthHistory')
-    .doc(`careEvent_${eventId}`);
-
-  const now =
-    firestore.FieldValue.serverTimestamp();
-
-  await healthRef.set(
-    {
-      title:
-        eventData.title || eventData.name || '',
-
-      name:
-        eventData.name || eventData.title || '',
-
-      type:
-        eventData.type || '',
-
-      date:
-        eventData.date || '',
-
-      description:
-        eventData.description || eventData.notes || '',
-
-      notes:
-        eventData.notes || eventData.description || '',
-
-      source:
-        'careEvent',
-
-      sourceEventId:
-        eventId,
-
-      createdBy:
-        eventData.ownerId || uid,
-
-      completedBy:
-        uid,
-
-      completedAt:
-        now,
-
-      updatedAt:
-        now,
-    },
-    {
-      merge: true,
-    },
-  );
-
-  const savedSnapshot = await healthRef.get();
-  const savedData = savedSnapshot.data() || {};
-
-  if (!savedData.createdAt) {
-    await healthRef.update({
-      createdAt:
-        firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  return healthRef.id;
 };
 
 const removeCareEventFromHealthHistory = async (

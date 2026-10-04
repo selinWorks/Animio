@@ -44,6 +44,7 @@ type CareEventType =
   | 'Vet Visit'
   | 'Medication'
   | 'Grooming'
+  | 'Operation'
   | 'Custom';
 
 type CareEvent = {
@@ -57,6 +58,15 @@ type CareEvent = {
   color?: string;
   completed?: boolean;
   completedAt?: any;
+};
+
+const TITLE_PLACEHOLDERS: Record<CareEventType, string> = {
+  Vaccination: 'Örn. Karma aşı, kuduz aşısı',
+  'Vet Visit': 'Örn. Genel veteriner kontrolü',
+  Medication: 'Örn. İç parazit ilacı, antibiyotik',
+  Grooming: 'Örn. Tırnak kesimi, tüy bakımı',
+  Operation: 'Örn. Kısırlaştırma ameliyatı, diş çekimi',
+  Custom: 'Örn. Özel bakım, alerji takibi',
 };
 
 const PASTEL_COLORS = [
@@ -99,10 +109,21 @@ function getDefaultPetImage(type?: string) {
 }
 
 export default function CalendarScreen() {
-  const today = new Date().toISOString().split('T')[0];
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getLocalDateString();
 
   const {user} = useAuth();
   const {pets} = usePets();
+  const selectedPet = pets.find(
+    pet => pet.name === petName,
+  );
 
   /* =========================================================
      STATE
@@ -118,7 +139,9 @@ export default function CalendarScreen() {
 
   const [title, setTitle] = useState('');
   const [petName, setPetName] = useState('');
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [petDropdownOpen, setPetDropdownOpen] = useState(false);
+
   const [note, setNote] = useState('');
   const [selectedColor, setSelectedColor] = useState(PASTEL_COLORS[2]);
   const [selectedType, setSelectedType] = useState<CareEventType>('Custom');
@@ -311,13 +334,52 @@ export default function CalendarScreen() {
     dateString: string,
     timeString: string,
   ) => {
-    const [year, month, day] =
-      dateString.split('-').map(Number);
+    if (!dateString || !timeString) {
+      return null;
+    }
 
-    const [hour, minute] =
-      timeString.split(':').map(Number);
+    const dateParts = dateString.split('-');
+    const timeParts = timeString.split(':');
 
-    return new Date(
+    if (
+      dateParts.length !== 3 ||
+      timeParts.length !== 2
+    ) {
+      return null;
+    }
+
+    const year = Number(dateParts[0]);
+    const month = Number(dateParts[1]);
+    const day = Number(dateParts[2]);
+
+    const hour = Number(timeParts[0]);
+    const minute = Number(timeParts[1]);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(day) ||
+      !Number.isInteger(hour) ||
+      !Number.isInteger(minute)
+    ) {
+      return null;
+    }
+
+    if (
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31 ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      return null;
+    }
+
+    // Yerel saat ile oluşturuyoruz.
+    const date = new Date(
       year,
       month - 1,
       day,
@@ -326,6 +388,20 @@ export default function CalendarScreen() {
       0,
       0,
     );
+
+    // JavaScript'in örneğin 31 Şubat'ı Mart'a
+    // otomatik çevirmesini engelle.
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day ||
+      date.getHours() !== hour ||
+      date.getMinutes() !== minute
+    ) {
+      return null;
+    }
+
+    return date;
   };
 
   const scheduleCareNotification = async ({
@@ -447,6 +523,7 @@ export default function CalendarScreen() {
   const resetForm = () => {
     setTitle('');
     setPetName('');
+    setSelectedPetId(null);
     setPetDropdownOpen(false);
     setNote('');
     setSelectedColor(PASTEL_COLORS[2]);
@@ -471,10 +548,10 @@ export default function CalendarScreen() {
       return;
     }
 
-    if (!petName.trim()) {
+    if (!selectedPetId) {
       showErrorModal(
-        'Pet adı eksik',
-        'Bu bakım görevinin hangi pet için olduğunu belirtmek için pet adını gir.',
+        'Dost seçilmedi',
+        'Bakım görevi eklemek için önce bir dost seçmelisin.',
         'pet',
       );
 
@@ -524,6 +601,16 @@ export default function CalendarScreen() {
         selectedTime,
       );
 
+    if (!selectedDateTime) {
+      showErrorModal(
+        'Geçersiz tarih veya saat',
+        'Seçtiğin tarih veya saat geçerli değil. Lütfen tekrar kontrol et.',
+        'date',
+      );
+
+      return;
+    }
+
     if (selectedDateTime.getTime() <= Date.now()) {
       showErrorModal(
         'Geçersiz tarih veya saat',
@@ -537,9 +624,67 @@ export default function CalendarScreen() {
     try {
       setSaving(true);
 
-      const eventTitle = title.trim();
-      const eventPetName = petName.trim();
+      // Önce dost seçilmiş mi kontrol et
+      if (!selectedPetId) {
+        showErrorModal(
+          'Dost seçilmedi',
+          'Bakım görevi eklemek için önce bir dost seçmelisin.',
+          'pet',
+        );
 
+        setSaving(false);
+        return;
+      }
+
+      // Seçilen dostu ID üzerinden bul
+      const selectedPet = pets.find(
+        pet =>
+          String(pet.id) ===
+          String(selectedPetId),
+      );
+
+      // Dost bulunamadıysa
+      if (!selectedPet) {
+        showErrorModal(
+          'Dost seçilemedi',
+          'Seçilen dost bulunamadı. Lütfen dostu tekrar seç.',
+          'pet',
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      // Dostun ID'si doğrulanamadıysa
+      if (!selectedPet.id) {
+        showErrorModal(
+          'Dost seçilemedi',
+          'Seçilen dostun kimliği doğrulanamadı. Lütfen dostu tekrar seç.',
+          'pet',
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      // İsim sadece seçilen ID'ye ait dosttan alınır
+      const eventPetName = selectedPet.name;
+
+      const eventTitle = title.trim();
+
+      // Görev başlığı kontrolü
+      if (!eventTitle) {
+        showErrorModal(
+          'Eksik bilgi',
+          'Lütfen bakım görevi için bir başlık gir.',
+          'save',
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      // Firestore'a bakım görevini kaydet
       const eventId =
         await addCareEventToFirestore(
           {
@@ -548,12 +693,14 @@ export default function CalendarScreen() {
             time: selectedTime,
             type: selectedType,
             petName: eventPetName,
+            petId: selectedPet.id,
             note: note.trim(),
             color: selectedColor,
           },
           user.uid,
         );
 
+      // Telefon bildirimini planla
       try {
         await scheduleCareNotification({
           eventId,
@@ -569,15 +716,19 @@ export default function CalendarScreen() {
         );
       }
 
+      // Formu temizle
       resetForm();
 
+      // Modalı kapat
       setModalVisible(false);
 
+      // Etkinlikleri yeniden yükle
       await loadEvents();
 
+      // Başarılı mesajı
       showToast(
         'Başarılı',
-        `Bakım görevi ${selectedTime} için planlandı ✨`,
+        `${eventPetName} için bakım görevi ${selectedTime} için planlandı ✨`,
       );
     } catch (error: any) {
       console.log(
@@ -1081,7 +1232,9 @@ export default function CalendarScreen() {
                           ? 'İlaç / Parazit'
                           : event.type === 'Grooming'
                             ? 'Bakım'
-                            : 'Diğer'}
+                            : event.type === 'Operation'
+                              ? 'Ameliyat / Kısırlaştırma'
+                              : 'Diğer'}
                   </Text>
 
                   {event.completed ? (
@@ -1173,10 +1326,8 @@ export default function CalendarScreen() {
               <TextInput
                 value={title}
                 onChangeText={setTitle}
-
-                placeholder="Görev başlığı"
+                placeholder={TITLE_PLACEHOLDERS[selectedType]}
                 placeholderTextColor="#9CA3AF"
-
                 style={styles.input}
               />
 
@@ -1198,45 +1349,61 @@ export default function CalendarScreen() {
                       styles.petSelectButtonOpen,
                   ]}>
 
-                  {petName ? (
-                    <>
-                      {(() => {
-                        const selectedPet = pets.find(
-                          pet => pet.name === petName,
-                        );
+                  {selectedPetId ? (
+                    (() => {
+                      const selectedPet = pets.find(
+                        pet =>
+                          String(pet.id) ===
+                          String(selectedPetId),
+                      );
 
-                        if (!selectedPet) {
-                          return null;
-                        }
-
+                      if (!selectedPet) {
                         return (
                           <>
-                            {selectedPet.photoUrl ||
-                            selectedPet.photoUri ? (
-                              <Image
-                                source={{
-                                  uri:
-                                    selectedPet.photoUrl ||
-                                    selectedPet.photoUri,
-                                }}
-                                style={styles.petSelectImage}
-                                resizeMode="cover"
+                            <View style={styles.petSelectIcon}>
+                              <PawPrint
+                                size={20}
+                                color="#7C3AED"
+                                strokeWidth={2}
                               />
+                            </View>
 
-                            ) : (
-                              <Image
-                                source={getDefaultPetImage(selectedPet.type)}
-                                style={styles.petSelectImage}
-                              />
-                            )}
-
-                            <Text style={styles.petSelectText}>
-                              {selectedPet.name}
+                            <Text style={styles.petPlaceholderText}>
+                              Bir dost seç
                             </Text>
                           </>
                         );
-                      })()}
-                    </>
+                      }
+
+                      return (
+                        <>
+                          {selectedPet.photoUrl ||
+                          selectedPet.photoUri ? (
+                            <Image
+                              source={{
+                                uri:
+                                  selectedPet.photoUrl ||
+                                  selectedPet.photoUri,
+                              }}
+                              style={styles.petSelectImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <Image
+                              source={getDefaultPetImage(
+                                selectedPet.type,
+                              )}
+                              style={styles.petSelectImage}
+                              resizeMode="contain"
+                            />
+                          )}
+
+                          <Text style={styles.petSelectText}>
+                            {selectedPet.name}
+                          </Text>
+                        </>
+                      );
+                    })()
                   ) : (
                     <>
                       <View style={styles.petSelectIcon}>
@@ -1264,17 +1431,25 @@ export default function CalendarScreen() {
 
                     {pets.length > 0 ? (
                       pets.map(pet => {
+
                         const isSelected =
-                          petName === pet.name;
+                          String(selectedPetId) ===
+                          String(pet.id);
 
                         const petPhoto =
-                          pet.photoUrl || pet.photoUri;
+                          pet.photoUrl ||
+                          pet.photoUri;
 
                         return (
                           <Pressable
-                            key={pet.name}
+                            key={String(pet.id)}
                             onPress={() => {
+                              setSelectedPetId(
+                                String(pet.id),
+                              );
+
                               setPetName(pet.name);
+
                               setPetDropdownOpen(false);
                             }}
                             style={[
@@ -1293,7 +1468,9 @@ export default function CalendarScreen() {
                               />
                             ) : (
                               <Image
-                                source={getDefaultPetImage(pet.type)}
+                                source={getDefaultPetImage(
+                                  pet.type,
+                                )}
                                 style={styles.petDropdownImage}
                                 resizeMode="contain"
                               />
@@ -1338,6 +1515,7 @@ export default function CalendarScreen() {
                   ['Vet Visit', 'Veteriner'],
                   ['Medication', 'İlaç / Parazit'],
                   ['Grooming', 'Bakım'],
+                  ['Operation', 'Ameliyat / Kısırlaştırma'],
                   ['Custom', 'Diğer'],
                 ] as [CareEventType, string][]).map(([value, label]) => {
                   const active = selectedType === value;
