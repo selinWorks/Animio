@@ -1661,6 +1661,8 @@ export const addHealthRecordToFirestore = async (
     .doc();
 
   await healthRef.set({
+    petId: petId,
+
     title:
       record.title || record.name || '',
 
@@ -1670,8 +1672,20 @@ export const addHealthRecordToFirestore = async (
     type:
       record.type || '',
 
+    category:
+      record.category || 'other',
+
+    categoryLabel:
+      record.categoryLabel || '',
+
     date:
       record.date || '',
+
+    clinic:
+      record.clinic || '',
+
+    doctor:
+      record.doctor || '',
 
     description:
       record.description || record.notes || '',
@@ -1679,20 +1693,20 @@ export const addHealthRecordToFirestore = async (
     notes:
       record.notes || record.description || '',
 
-    source:
-      'manual',
+    source: 'manual',
+    sourceId: healthRef.id,
+    sourceEventId: '',
 
-    sourceEventId:
-      '',
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
 
-    createdBy:
-      uid,
-
-    createdAt:
-      now,
-
-    updatedAt:
-      now,
+    category: record.category || '',
+    categoryLabel: record.categoryLabel || '',
+    medicineName: record.medicineName || '',
+    medicineFrequency: record.medicineFrequency || '',
+    clinic: record.clinic || '',
+    doctor: record.doctor || '',
   });
 
   return healthRef.id;

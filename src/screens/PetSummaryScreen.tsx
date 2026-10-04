@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import {
   ArrowLeft,
   Download,
@@ -17,16 +19,23 @@ import {
   Syringe,
   FileText,
   CalendarDays,
+  Pill,
+  Stethoscope,
+  FlaskConical,
+  Scissors,
 } from 'lucide-react-native';
+
 import {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {useAuth} from '../data/AuthContext';
+
 import {
   getHealthHistoryFromFirestore,
 } from '../services/firestore';
+
 import {
   createPetSummaryPdf,
   sharePetSummaryPdf,
@@ -39,17 +48,24 @@ type Props = NativeStackScreenProps<
   'PetSummary'
 >;
 
+
 type HealthRecord = {
   id: string;
   title?: string;
   name?: string;
   type?: string;
+  category?: string;
   date?: string;
   description?: string;
   notes?: string;
   clinic?: string;
   doctor?: string;
+  medicineName?: string;
+  medicineFrequency?: string;
+  vaccineName?: string;
+  [key: string]: unknown;
 };
+
 
 const formatDate = (value?: string) => {
   if (!value) {
@@ -58,21 +74,131 @@ const formatDate = (value?: string) => {
 
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-  return match
-    ? `${match[3]}.${match[2]}.${match[1]}`
-    : value;
+  if (match) {
+    return `${match[3]}.${match[2]}.${match[1]}`;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 };
 
 const isVaccine = (record: HealthRecord) => {
-  const type = String(record.type ?? '').toLocaleLowerCase('tr-TR');
+  const category = String(
+    record.category ?? record.type ?? '',
+  )
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
   return (
-    type.includes('aşı') ||
-    type.includes('asi') ||
-    type.includes('vaccine') ||
-    type.includes('vaccination')
+    category.includes('asi') ||
+    category.includes('vaccine') ||
+    category.includes('vaccination')
   );
 };
+
+
+const getHealthCategoryLabel = (record: HealthRecord) => {
+  const raw = String(record.category ?? record.type ?? '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (raw.includes('vaccine') || raw.includes('vaccination') || raw.includes('asi')) {
+    return 'Aşı';
+  }
+
+  if (raw.includes('medicine') || raw.includes('medication') || raw.includes('ilac')) {
+    return 'İlaç';
+  }
+
+  if (raw.includes('veteriner') || raw.includes('muayene') || raw.includes('doctor') || raw.includes('visit')) {
+    return 'Veteriner Muayenesi';
+  }
+
+  if (raw.includes('tahlil') || raw.includes('test') || raw.includes('analiz') || raw.includes('laboratuvar') || raw.includes('laboratory')) {
+    return 'Tahlil / Laboratuvar';
+  }
+
+  if (raw.includes('ameliyat') || raw.includes('operasyon') || raw.includes('kisirlastirma') || raw.includes('surgery') || raw.includes('operation')) {
+    return 'Ameliyat / Operasyon';
+  }
+
+  return raw ? 'Diğer Sağlık Kaydı' : 'Sağlık Kaydı';
+};
+
+const getHealthCategoryIcon = (record: HealthRecord) => {
+  const normalize = (value: unknown) =>
+    String(value ?? '')
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  // Öncelik: kaydın gerçek kategori alanı
+  const category = normalize(record.category || record.type);
+
+  // Yalnızca kategori bilgisi yoksa başlıktan tahmin et
+  const text = category || normalize(
+    `${record.title ?? ''} ${record.name ?? ''} ${record.description ?? ''}`,
+  );
+
+  if (
+    text.includes('asi') ||
+    text.includes('vaccine') ||
+    text.includes('vaccination')
+  ) {
+    return {Icon: Syringe, color: '#E9689B', background: '#FFF0F6'};
+  }
+
+  if (
+    text.includes('ilac') ||
+    text.includes('medicine') ||
+    text.includes('medication')
+  ) {
+    return {Icon: Pill, color: '#7457E8', background: '#F0ECFF'};
+  }
+
+  if (
+    text.includes('veteriner') ||
+    text.includes('muayene') ||
+    text.includes('doctor') ||
+    text.includes('visit')
+  ) {
+    return {Icon: Stethoscope, color: '#359B83', background: '#E8F8F2'};
+  }
+
+  if (
+    text.includes('tahlil') ||
+    text.includes('test') ||
+    text.includes('analiz') ||
+    text.includes('laboratuvar') ||
+    text.includes('laboratory')
+  ) {
+    return {Icon: FlaskConical, color: '#D99036', background: '#FFF5E5'};
+  }
+
+  if (
+    text.includes('ameliyat') ||
+    text.includes('operasyon') ||
+    text.includes('kisirlastirma') ||
+    text.includes('surgery') ||
+    text.includes('operation')
+  ) {
+    return {Icon: Scissors, color: '#E9689B', background: '#FFF0F6'};
+  }
+
+  return {Icon: HeartPulse, color: '#54A98B', background: '#E8F8F2'};
+};
+
 
 const displayValue = (value: unknown) => {
   if (value === undefined || value === null || value === '') {
@@ -280,30 +406,40 @@ export default function PetSummaryScreen({route, navigation}: Props) {
               Henüz sağlık kaydı bulunmuyor.
             </Text>
           ) : (
-            sortedHealthRecords.map((record, index) => (
-              <View
-                key={record.id ?? `${record.date}-${index}`}
-                style={styles.recordRow}>
-                <View style={styles.rowIcon}>
-                  <HeartPulse size={16} color="#54A98B" />
-                </View>
+            sortedHealthRecords.map((record, index) => {
+              const {Icon, color, background} =
+                getHealthCategoryIcon(record);
 
-                <View style={styles.rowText}>
-                  <Text style={styles.rowTitle}>
-                    {displayValue(record.title || record.name)}
-                  </Text>
-                  <Text style={styles.rowSubtitle}>
-                    {formatDate(record.date)} · {displayValue(record.type)}
-                  </Text>
+              return (
+                <View
+                  key={record.id ?? `${record.date}-${index}`}
+                  style={styles.recordRow}>
+                  <View
+                    style={[
+                      styles.rowIcon,
+                      {backgroundColor: background},
+                    ]}>
+                    <Icon size={16} color={color} />
+                  </View>
 
-                  {!!(record.description || record.notes) && (
-                    <Text style={styles.description}>
-                      {record.description || record.notes}
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle}>
+                      {displayValue(record.title || record.name)}
                     </Text>
-                  )}
+
+                    <Text style={styles.rowSubtitle}>
+                      {formatDate(record.date)} · {getHealthCategoryLabel(record)}
+                    </Text>
+
+                    {!!(record.description || record.notes) && (
+                      <Text style={styles.description}>
+                        {record.description || record.notes}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 

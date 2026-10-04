@@ -22,7 +22,6 @@ import {
   FileText,
   Check,
   CalendarDays,
-  PawPrint,
   X,
   Plus,
   Pencil,
@@ -68,6 +67,8 @@ type HealthRecord = {
   doctor?: string;
   description?: string;
   attachment?: string;
+  medicineName?: string;
+  medicineFrequency?: string;
 };
 
 const CATEGORY_FILTERS: {key: FilterCategory; label: string}[] = [
@@ -222,6 +223,9 @@ export default function HealthHistoryScreen({route}: Props) {
   const [newDoctor, setNewDoctor] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
+  const [newMedicineName, setNewMedicineName] = useState('');
+  const [newMedicineFrequency, setNewMedicineFrequency] = useState('');
+
   const loadHealthRecords = useCallback(async () => {
     if (!user?.uid || !pet?.id) {
       setRecords([]);
@@ -285,6 +289,8 @@ export default function HealthHistoryScreen({route}: Props) {
               attachment:
                 record.attachment ||
                 undefined,
+              medicineName: record.medicineName || '',
+              medicineFrequency: record.medicineFrequency || '',
             };
           })
           .filter(
@@ -385,6 +391,8 @@ export default function HealthHistoryScreen({route}: Props) {
     setNewClinic('');
     setNewDoctor('');
     setNewDescription('');
+    setNewMedicineName('');
+    setNewMedicineFrequency('');
   };
 
   const closeAddRecord = () => {
@@ -416,6 +424,13 @@ export default function HealthHistoryScreen({route}: Props) {
     }
 
     const date = new Date(year, month - 1, day);
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (date > today) {
+      return null;
+    }
 
     if (
       date.getFullYear() !== year ||
@@ -461,6 +476,10 @@ export default function HealthHistoryScreen({route}: Props) {
     setNewDoctor(record.doctor ?? '');
     setNewDescription(record.description ?? '');
     setAddRecordVisible(true);
+    setNewMedicineName((record as any).medicineName ?? '');
+    setNewMedicineFrequency(
+      (record as any).medicineFrequency ?? '',
+    );
   };
 
   const saveNewRecord = async () => {
@@ -470,24 +489,39 @@ export default function HealthHistoryScreen({route}: Props) {
     if (
       !newTitle.trim() ||
       !parsedDate ||
-      !user?.uid
+      !user?.uid ||
+      (
+        newCategory === 'medicine' &&
+        (
+          !newMedicineName.trim() ||
+          !newMedicineFrequency.trim()
+        )
+      )
     ) {
+      Alert.alert(
+        'Eksik bilgi',
+        'Lütfen zorunlu alanları doldur.',
+      );
       return;
     }
 
     const payload = {
       title: newTitle.trim(),
       category: newCategory,
-      date:
-        toFirestoreDate(
-          parsedDate,
-        ),
-      clinic:
-        newClinic.trim(),
-      doctor:
-        newDoctor.trim(),
-      description:
-        newDescription.trim(),
+      date: toFirestoreDate(parsedDate),
+      clinic: newClinic.trim(),
+      doctor: newDoctor.trim(),
+      description: newDescription.trim(),
+
+      medicineName:
+        newCategory === 'medicine'
+          ? newMedicineName.trim()
+          : '',
+
+      medicineFrequency:
+        newCategory === 'medicine'
+          ? newMedicineFrequency.trim()
+          : '',
     };
 
     try {
@@ -930,6 +964,20 @@ export default function HealthHistoryScreen({route}: Props) {
                         </Text>
                       )}
 
+                      {record.category === 'medicine' &&
+                        record.medicineName && (
+                          <Text style={styles.descriptionText}>
+                            İlaç: {record.medicineName}
+                          </Text>
+                        )}
+
+                      {record.category === 'medicine' &&
+                        record.medicineFrequency && (
+                          <Text style={styles.descriptionText}>
+                            Kullanım sıklığı: {record.medicineFrequency}
+                          </Text>
+                        )}
+
                       {record.attachment && (
                         <View style={styles.attachmentRow}>
                           <View style={styles.attachmentIcon}>
@@ -998,6 +1046,7 @@ export default function HealthHistoryScreen({route}: Props) {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.addForm}>
+
               <Text style={styles.inputLabel}>Kayıt Türü</Text>
 
               <ScrollView
@@ -1023,6 +1072,7 @@ export default function HealthHistoryScreen({route}: Props) {
                       ]}
                       onPress={() => setNewCategory(category)}>
                       {getCategoryIcon(category, 16)}
+
                       <Text
                         style={[
                           styles.formCategoryText,
@@ -1043,6 +1093,30 @@ export default function HealthHistoryScreen({route}: Props) {
                 placeholder="Örn. Genel veteriner kontrolü"
                 placeholderTextColor="#AAA7B5"
               />
+
+              {newCategory === 'medicine' && (
+                <>
+                  <Text style={styles.inputLabel}>İlaç Adı *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={newMedicineName}
+                    onChangeText={setNewMedicineName}
+                    placeholder="Örn. Veterinerin önerdiği ilaç"
+                    placeholderTextColor="#AAA7B5"
+                  />
+
+                  <Text style={styles.inputLabel}>
+                    Günde Kaç Kez Kullanılacak? *
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={newMedicineFrequency}
+                    onChangeText={setNewMedicineFrequency}
+                    placeholder="Örn. Günde 2 kez"
+                    placeholderTextColor="#AAA7B5"
+                  />
+                </>
+              )}
 
               <Text style={styles.inputLabel}>Tarih *</Text>
               <View style={styles.dateInputWrapper}>
@@ -1106,7 +1180,14 @@ export default function HealthHistoryScreen({route}: Props) {
                 disabled={
                   savingRecord ||
                   !newTitle.trim() ||
-                  !parseDate(newDate)
+                  !parseDate(newDate) ||
+                  (
+                    newCategory === 'medicine' &&
+                    (
+                      !newMedicineName.trim() ||
+                      !newMedicineFrequency.trim()
+                    )
+                  )
                 }
                 onPress={saveNewRecord}>
                 {savingRecord ? (

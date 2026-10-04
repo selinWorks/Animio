@@ -1,9 +1,8 @@
-
 import React, {useCallback, useState} from 'react';
 
 import {
   ActivityIndicator,
-  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,11 @@ import {
   Trash2,
   ChevronRight,
   RefreshCw,
+  ShieldAlert,
+  UserMinus,
+  CheckCircle2,
+  CircleX,
+  X,
 } from 'lucide-react-native';
 
 import {
@@ -52,6 +56,17 @@ type Member = {
 
 const PURPLE = '#8067E8';
 const DARK_PURPLE = '#4C3B69';
+
+type FamilyModalType = 'warning' | 'confirm' | 'success' | 'error';
+
+type FamilyModalConfig = {
+    visible: boolean;
+    type: FamilyModalType;
+    title: string;
+    message: string;
+    confirmText?: string;
+    onConfirm?: () => void | Promise<void>;
+  };
 
 export default function FamilyManagementScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -115,59 +130,75 @@ export default function FamilyManagementScreen() {
     }, [loadMembers]),
   );
 
+
+
+  const [familyModal, setFamilyModal] = useState<FamilyModalConfig>({
+    visible: false,
+    type: 'warning',
+    title: '',
+    message: '',
+  });
+
+  const closeFamilyModal = () => {
+    setFamilyModal(prev => ({...prev, visible: false}));
+  };
+
   const handleRemoveMember = (member: Member) => {
     if (!selectedPet || !user?.uid) {
       return;
     }
 
     if (member.isOwner || member.uid === user.uid) {
-      Alert.alert(
-        'İşlem yapılamıyor',
-        'Yönetici bu ekrandan kaldırılamaz.',
-      );
+      setFamilyModal({
+        visible: true,
+        type: 'warning',
+        title: 'İşlem yapılamıyor',
+        message: 'Yönetici bu ekrandan kaldırılamaz.',
+      });
       return;
     }
 
-    Alert.alert(
-      'Aile üyesini kaldır',
-      `${member.email || 'Bu kullanıcı'} yalnızca ${selectedPet.name} profilinden kaldırılacak. Devam etmek istiyor musun?`,
-      [
-        {
-          text: 'Vazgeç',
-          style: 'cancel',
-        },
-        {
-          text: 'Üyeyi Kaldır',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRemovingUid(member.uid);
+    setFamilyModal({
+      visible: true,
+      type: 'confirm',
+      title: 'Aile üyesini kaldır',
+      message: `${member.email || 'Bu kullanıcı'} yalnızca ${selectedPet.name} profilinden kaldırılacak. Devam etmek istiyor musun?`,
+      confirmText: 'Üyeyi Kaldır',
+      onConfirm: async () => {
+        closeFamilyModal();
 
-              await removePetMemberFromFirestore(
-                selectedPet.id,
-                user.uid,
-                member.uid,
-              );
+        try {
+          setRemovingUid(member.uid);
 
-              await loadMembers();
+          await removePetMemberFromFirestore(
+            selectedPet.id,
+            user.uid,
+            member.uid,
+          );
 
-              Alert.alert(
-                'İşlem tamamlandı',
-                'Aile üyesinin bu dost profiline erişimi kaldırıldı.',
-              );
-            } catch (e: any) {
-              Alert.alert(
-                'İşlem başarısız',
-                e?.message ||
-                  'Üye kaldırılırken bir sorun oluştu.',
-              );
-            } finally {
-              setRemovingUid(null);
-            }
-          },
-        },
-      ],
-    );
+          await loadMembers();
+
+          setFamilyModal({
+            visible: true,
+            type: 'success',
+            title: 'İşlem tamamlandı',
+            message:
+              'Aile üyesinin bu dost profiline erişimi kaldırıldı.',
+          });
+        } catch (e: any) {
+          setFamilyModal({
+            visible: true,
+            type: 'error',
+            title: 'İşlem başarısız',
+            message:
+              e?.message ||
+              'Üye kaldırılırken bir sorun oluştu.',
+          });
+        } finally {
+          setRemovingUid(null);
+        }
+      },
+    });
   };
 
   return (
@@ -353,19 +384,19 @@ export default function FamilyManagementScreen() {
                   </View>
 
                   <View style={styles.memberText}>
-                    <Text style={styles.memberName}>
-                      {member.isOwner
-                        ? 'Yönetici'
-                        : member.email || 'Aile üyesi'}
-                    </Text>
+                    <View style={styles.memberNameRow}>
+                      <Text style={styles.memberName}>
+                        {member.isOwner
+                          ? 'Yönetici'
+                          : member.email || 'Aile üyesi'}
+                      </Text>
 
-                    <Text
-                      style={styles.memberUid}
-                      numberOfLines={1}>
-                      {member.email
-                        ? member.uid
-                        : `Kullanıcı ID: ${member.uid}`}
-                    </Text>
+                      {member.uid === user?.uid && (
+                        <View style={styles.selfBadge}>
+                          <Text style={styles.selfBadgeText}>Sen</Text>
+                        </View>
+                      )}
+                    </View>
 
                     {member.isOwner && (
                       <Text style={styles.ownerBadge}>
@@ -411,8 +442,84 @@ export default function FamilyManagementScreen() {
           </>
         )}
       </ScrollView>
+
+    <Modal
+      visible={familyModal.visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={closeFamilyModal}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Pressable
+            style={styles.modalCloseButton}
+            onPress={closeFamilyModal}>
+            <X size={19} color="#958AA8" />
+          </Pressable>
+
+          <View
+            style={[
+              styles.modalIconCircle,
+              familyModal.type === 'warning' && styles.warningIconCircle,
+              familyModal.type === 'confirm' && styles.confirmIconCircle,
+              familyModal.type === 'success' && styles.successIconCircle,
+              familyModal.type === 'error' && styles.errorIconCircle,
+            ]}>
+            {familyModal.type === 'warning' && (
+              <ShieldAlert size={34} color="#D97757" />
+            )}
+
+            {familyModal.type === 'confirm' && (
+              <UserMinus size={34} color="#8067E8" />
+            )}
+
+            {familyModal.type === 'success' && (
+              <CheckCircle2 size={34} color="#24966A" />
+            )}
+
+            {familyModal.type === 'error' && (
+              <CircleX size={34} color="#D9485F" />
+            )}
+          </View>
+
+          <Text style={styles.modalTitle}>
+            {familyModal.title}
+          </Text>
+
+          <Text style={styles.modalMessage}>
+            {familyModal.message}
+          </Text>
+
+          {familyModal.type === 'confirm' ? (
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelButton}
+                onPress={closeFamilyModal}>
+                <Text style={styles.modalCancelText}>Vazgeç</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalConfirmButton}
+                onPress={() => {
+                  void familyModal.onConfirm?.();
+                }}>
+                <Text style={styles.modalConfirmText}>
+                  {familyModal.confirmText || 'Onayla'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.modalOkButton}
+              onPress={closeFamilyModal}>
+              <Text style={styles.modalOkText}>Tamam</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </Modal>
     </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -583,12 +690,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: DARK_PURPLE,
   },
-  memberUid: {
-    fontFamily: 'Quicksand-Medium',
-    fontSize: 10,
-    color: '#958AA8',
-    marginTop: 4,
-  },
   ownerBadge: {
     fontFamily: 'Quicksand-Bold',
     fontSize: 11,
@@ -666,5 +767,142 @@ const styles = StyleSheet.create({
   retryText: {
     color: PURPLE,
     fontFamily: 'Quicksand-Bold',
+  },
+
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(42, 30, 64, 0.48)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 25,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 30,
+    paddingBottom: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0EAFB',
+    elevation: 12,
+    shadowColor: '#453366',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 13,
+    right: 13,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: '#F6F3FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  modalIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  warningIconCircle: {
+    backgroundColor: '#FFF0E8',
+  },
+  confirmIconCircle: {
+    backgroundColor: '#F0EBFF',
+  },
+  successIconCircle: {
+    backgroundColor: '#E5F8EE',
+  },
+  errorIconCircle: {
+    backgroundColor: '#FFF0F2',
+  },
+  modalTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 19,
+    color: '#4C3B69',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#766B91',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalCancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: '#F3EFFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
+    color: '#766B91',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: '#C2415D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalConfirmText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  modalOkButton: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 15,
+    backgroundColor: '#8067E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalOkText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+
+  selfBadge: {
+    backgroundColor: '#F0EBFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+
+  selfBadgeText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 10,
+    color: '#8067E8',
   },
 });

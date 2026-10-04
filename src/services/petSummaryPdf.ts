@@ -21,6 +21,9 @@ type PdfHealthRecord = {
   doctor?: string;
   description?: string;
   notes?: string;
+  vaccineName?: string;
+  medicineName?: string;
+  medicineFrequency?: string;
 };
 
 type PetSummaryPdfData = {
@@ -48,21 +51,132 @@ const displayValue = (value: unknown): string => {
   return text || 'Belirtilmemiş';
 };
 
+
+const getRecordTitle = (record: PdfHealthRecord): string => {
+  const value =
+    record.title ||
+    record.name ||
+    record.vaccineName ||
+    record.medicineName;
+
+  return displayValue(value);
+};
+
+const getRecordDescription = (record: PdfHealthRecord): string => {
+  const value =
+    record.description ||
+    record.notes ||
+    record.medicineFrequency;
+
+  return displayValue(value);
+};
+
+
+const getPdfHealthCategory = (type?: string) => {
+  const category = String(type ?? '').toLocaleLowerCase('tr-TR');
+
+  if (
+    category.includes('aşı') ||
+    category.includes('asi') ||
+    category.includes('vaccine') ||
+    category.includes('vaccination')
+  ) {
+    return {
+      label: 'Aşı',
+      icon: '💉',
+      color: '#E9689B',
+      background: '#FFF0F6',
+    };
+  }
+
+  if (
+    category.includes('ilaç') ||
+    category.includes('ilac') ||
+    category.includes('medicine') ||
+    category.includes('medication')
+  ) {
+    return {
+      label: 'İlaç',
+      icon: '💊',
+      color: '#7457E8',
+      background: '#F0ECFF',
+    };
+  }
+
+  if (
+    category.includes('veteriner') ||
+    category.includes('muayene') ||
+    category.includes('doctor') ||
+    category.includes('visit')
+  ) {
+    return {
+      label: 'Muayene',
+      icon: '🩺',
+      color: '#359B83',
+      background: '#E8F8F2',
+    };
+  }
+
+  if (
+    category.includes('tahlil') ||
+    category.includes('test') ||
+    category.includes('analiz') ||
+    category.includes('laboratuvar')
+  ) {
+    return {
+      label: 'Tahlil',
+      icon: '🧪',
+      color: '#D99036',
+      background: '#FFF5E5',
+    };
+  }
+
+  if (
+    category.includes('ameliyat') ||
+    category.includes('operasyon') ||
+    category.includes('kısırlaştırma') ||
+    category.includes('kisirlastirma')
+  ) {
+    return {
+      label: 'Ameliyat',
+      icon: '✂️',
+      color: '#E9689B',
+      background: '#FFF0F6',
+    };
+  }
+
+  return {
+    label: category ? type! : 'Diğer',
+    icon: '♡',
+    color: '#54A98B',
+    background: '#E8F8F2',
+  };
+};
+
+
 const formatDate = (value?: string): string => {
   if (!value) {
     return 'Tarih belirtilmemiş';
   }
 
-  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  // YYYY-MM-DD veya ISO tarihlerini destekle.
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/,
+  );
 
-  if (iso) {
-    const day = iso[3];
-    const month = iso[2];
-    const year = iso[1];
-
-    return `${day}.${month}.${year}`;
+  if (match) {
+    return `${match[3]}.${match[2]}.${match[1]}`;
   }
 
+  const parsed = new Date(value);
+
+  if (!Number.isNaN(parsed.getTime())) {
+    return [
+      String(parsed.getDate()).padStart(2, '0'),
+      String(parsed.getMonth() + 1).padStart(2, '0'),
+      parsed.getFullYear(),
+    ].join('.');
+  }
 
   return value;
 };
@@ -75,29 +189,72 @@ const formatWeight = (value?: string | number): string => {
   return `${value} kg`;
 };
 
+
+
 const createRows = (
   records: PdfHealthRecord[],
 ): string => {
   if (records.length === 0) {
-    return '<tr><td colspan="3">Henüz kayıt bulunmuyor.</td></tr>';
+    return `
+      <tr>
+        <td colspan="4">Henüz kayıt bulunmuyor.</td>
+      </tr>
+    `;
   }
 
   return records
-    .map(
-      record => `
+    .map(record => {
+      // Kategori bilgisi
+      const category = getPdfHealthCategory(
+        record.type || (record as any).category,
+      );
+
+      // Kayıt adı için olası alanlar
+      const title =
+        record.title ||
+        record.name ||
+        (record as any).vaccineName ||
+        (record as any).medicineName ||
+        'İsimsiz kayıt';
+
+      // Açıklama için olası alanlar
+      const description =
+        record.description ||
+        record.notes ||
+        (record as any).medicineFrequency ||
+        '';
+
+      const details = [
+        record.clinic ? `Klinik: ${escapeHtml(record.clinic)}` : '',
+        record.doctor ? `Veteriner: ${escapeHtml(record.doctor)}` : '',
+      ]
+        .filter(Boolean)
+        .join('<br />');
+
+      return `
         <tr>
           <td>${escapeHtml(formatDate(record.date))}</td>
-          <td>${escapeHtml(
-            displayValue(record.title || record.name),
-          )}</td>
-          <td>${escapeHtml(
-            displayValue(
-              record.description || record.notes,
-            ),
-          )}</td>
+          <td>
+            <span style="
+              display:inline-block;
+              padding:5px 8px;
+              border-radius:8px;
+              color:${category.color};
+              background:${category.background};
+              font-weight:bold;
+              white-space:nowrap;
+            ">
+              ${category.icon} ${escapeHtml(category.label)}
+            </span>
+          </td>
+          <td>${escapeHtml(title)}</td>
+          <td>
+            ${escapeHtml(description)}
+            ${details ? `<br />${details}` : ''}
+          </td>
         </tr>
-      `,
-    )
+      `;
+    })
     .join('');
 };
 
@@ -239,7 +396,12 @@ export const createPetSummaryPdf = async (
         <h2>Sağlık Kayıtları</h2>
         <table>
           <thead>
-            <tr><th>Tarih</th><th>Kayıt</th><th>Açıklama</th></tr>
+            <tr>
+              <th>Tarih</th>
+              <th>Kategori</th>
+              <th>Kayıt</th>
+              <th>Açıklama</th>
+            </tr>
           </thead>
           <tbody>
             ${createRows(allHealthRecords)}
@@ -249,7 +411,12 @@ export const createPetSummaryPdf = async (
         <h2>Aşı Kayıtları</h2>
         <table>
           <thead>
-            <tr><th>Tarih</th><th>Aşı</th><th>Açıklama</th></tr>
+            <tr>
+              <th>Tarih</th>
+              <th>Kategori</th>
+              <th>Aşı</th>
+              <th>Açıklama</th>
+            </tr>
           </thead>
           <tbody>
             ${createRows(vaccines)}
