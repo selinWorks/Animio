@@ -1316,7 +1316,14 @@ export default function AddPetScreen({navigation}: any) {
 
               <TextInput
                 value={name}
-                onChangeText={setName}
+                onChangeText={text => {
+                  const onlyLetters = text.replace(
+                    /[^a-zA-ZçÇğĞıİöÖşŞüÜ\s]/g,
+                    '',
+                  );
+
+                  setName(onlyLetters);
+                }}
                 placeholder="Örn. Luna"
                 placeholderTextColor="#A0A5B5"
                 style={styles.input}

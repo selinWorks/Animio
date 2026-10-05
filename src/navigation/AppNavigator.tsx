@@ -163,263 +163,380 @@ const Stack =
 
 function PetCareLoading() {
   const rotateAnimation =
-    useRef(
-      new Animated.Value(0),
-    ).current;
+    useRef(new Animated.Value(0)).current;
 
   const pulseAnimation =
-    useRef(
-      new Animated.Value(0),
-    ).current;
+    useRef(new Animated.Value(0)).current;
 
+  const dot1Animation =
+    useRef(new Animated.Value(0)).current;
+
+  const dot2Animation =
+    useRef(new Animated.Value(0)).current;
+
+  const dot3Animation =
+    useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const rotateLoop =
-      Animated.loop(
-        Animated.timing(
-          rotateAnimation,
-          {
-            toValue: 1,
+    // -----------------------------
+    // RING ANIMATION
+    // -----------------------------
 
-            duration: 1500,
+    const rotateLoop = Animated.loop(
+      Animated.timing(rotateAnimation, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
 
-            easing:
-              Easing.linear,
+    // -----------------------------
+    // PAW PULSE ANIMATION
+    // -----------------------------
 
-            useNativeDriver:
-              true,
-          },
-        ),
-      );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
 
+        Animated.timing(pulseAnimation, {
+          toValue: 0,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
 
-    const pulseLoop =
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(
-            pulseAnimation,
-            {
-              toValue: 1,
+    // -----------------------------
+    // DOT ANIMATION
+    // 1 → 2 → 3 → 1 → 2 → 3
+    // Aynı anda sadece bir nokta hareket eder
+    // -----------------------------
 
-              duration: 750,
+    const dotAnimation = Animated.loop(
+      Animated.sequence([
 
-              easing:
-                Easing.inOut(
-                  Easing.ease,
-                ),
+        // 1. NOKTA
+        Animated.timing(dot1Animation, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
 
-              useNativeDriver:
-                true,
-            },
-          ),
+        Animated.timing(dot1Animation, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
 
-          Animated.timing(
-            pulseAnimation,
-            {
-              toValue: 0,
+        Animated.delay(80),
 
-              duration: 750,
+        // 2. NOKTA
+        Animated.timing(dot2Animation, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
 
-              easing:
-                Easing.inOut(
-                  Easing.ease,
-                ),
+        Animated.timing(dot2Animation, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
 
-              useNativeDriver:
-                true,
-            },
-          ),
-        ]),
-      );
+        Animated.delay(80),
 
+        // 3. NOKTA
+        Animated.timing(dot3Animation, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+
+        Animated.timing(dot3Animation, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+
+        Animated.delay(180),
+      ]),
+    );
 
     rotateLoop.start();
-
     pulseLoop.start();
-
+    dotAnimation.start();
 
     return () => {
       rotateLoop.stop();
-
       pulseLoop.stop();
+      dotAnimation.stop();
     };
   }, [
     rotateAnimation,
     pulseAnimation,
+    dot1Animation,
+    dot2Animation,
+    dot3Animation,
   ]);
 
-
+  // -----------------------------
+  // RING ROTATION
+  // -----------------------------
   const rotation =
     rotateAnimation.interpolate({
-      inputRange: [
-        0,
-        1,
-      ],
-
-      outputRange: [
-        '0deg',
-        '360deg',
-      ],
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
     });
 
-
+  // -----------------------------
+  // PAW SCALE
+  // -----------------------------
   const pawScale =
     pulseAnimation.interpolate({
-      inputRange: [
-        0,
-        1,
-      ],
-
-      outputRange: [
-        1,
-        1.1,
-      ],
+      inputRange: [0, 1],
+      outputRange: [1, 1.1],
     });
 
-
+  // -----------------------------
+  // PAW OPACITY
+  // -----------------------------
   const pawOpacity =
     pulseAnimation.interpolate({
-      inputRange: [
-        0,
-        1,
-      ],
-
-      outputRange: [
-        0.78,
-        1,
-      ],
+      inputRange: [0, 1],
+      outputRange: [0.78, 1],
     });
 
+  // -----------------------------
+  // DOT POSITION
+  // -----------------------------
+  const dot1TranslateY =
+    dot1Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -6],
+    });
+
+  const dot2TranslateY =
+    dot2Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -6],
+    });
+
+  const dot3TranslateY =
+    dot3Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -6],
+    });
+
+  // -----------------------------
+  // DOT SIZE
+  // Hareket eden nokta büyür
+  // -----------------------------
+  const dot1Scale =
+    dot1Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 1.5],
+    });
+
+  const dot2Scale =
+    dot2Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 1.5],
+    });
+
+  const dot3Scale =
+    dot3Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 1.5],
+    });
+
+  // -----------------------------
+  // DOT COLOR
+  // Hareket eden nokta koyulaşır
+  // -----------------------------
+  const dot1Opacity =
+    dot1Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+
+  const dot2Opacity =
+    dot2Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+
+  const dot3Opacity =
+    dot3Animation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
 
   return (
-    <View
-      style={
-        loadingStyles.container
-      }>
+    <View style={loadingStyles.container}>
 
       {/* BACKGROUND */}
 
       <View
-        style={
-          loadingStyles.glowTop
-        }
+        style={loadingStyles.glowTop}
       />
 
       <View
-        style={
-          loadingStyles.glowBottom
-        }
+        style={loadingStyles.glowBottom}
       />
 
-
-      <View
-        style={
-          loadingStyles.content
-        }>
+      <View style={loadingStyles.content}>
 
         {/* LOADER */}
 
-        <View
-          style={
-            loadingStyles.loaderWrapper
-          }>
+        <View style={loadingStyles.loaderWrapper}>
 
           <Animated.View
             style={[
               loadingStyles.rotatingRing,
-
               {
                 transform: [
                   {
-                    rotate:
-                      rotation,
+                    rotate: rotation,
                   },
                 ],
               },
-            ]}>
-
+            ]}
+          >
             <View
-              style={
-                loadingStyles.ringAccent
-              }
+              style={loadingStyles.ringAccent}
             />
-
           </Animated.View>
 
-
-          <View
-            style={
-              loadingStyles.pawCircle
-            }>
+          <View style={loadingStyles.pawCircle}>
 
             <Animated.View
               style={{
-                opacity:
-                  pawOpacity,
-
+                opacity: pawOpacity,
                 transform: [
                   {
-                    scale:
-                      pawScale,
+                    scale: pawScale,
                   },
                 ],
-              }}>
-
+              }}
+            >
               <PawPrint
                 size={42}
                 color="#7457E8"
                 strokeWidth={2.2}
               />
-
             </Animated.View>
 
           </View>
 
         </View>
 
-
         {/* BRAND */}
 
-        <Text
-          style={
-            loadingStyles.brand
-          }>
+        <Text style={loadingStyles.brand}>
           PetCare
         </Text>
 
-
-        <Text
-          style={
-            loadingStyles.loadingText
-          }>
+        <Text style={loadingStyles.loadingText}>
           PetCare hazırlanıyor...
         </Text>
 
+        <View style={loadingStyles.dots}>
 
-        {/* DOTS */}
+          {/* 1. NOKTA */}
 
-        <View
-          style={
-            loadingStyles.dots
-          }>
+          <Animated.View
+            style={[
+              loadingStyles.dot,
+              {
+                transform: [
+                  {
+                    translateY: dot1TranslateY,
+                  },
+                  {
+                    scale: dot1Scale,
+                  },
+                ],
+              },
+            ]}
+          >
+            <Animated.View
+              style={[
+                loadingStyles.activeDot,
+                {
+                  opacity: dot1Opacity,
+                },
+              ]}
+            />
+          </Animated.View>
 
-          <View
-            style={
-              loadingStyles.dot
-            }
-          />
 
-          <View
-            style={
-              loadingStyles.dotMiddle
-            }
-          />
+          {/* 2. NOKTA */}
 
-          <View
-            style={
-              loadingStyles.dot
-            }
-          />
+          <Animated.View
+            style={[
+              loadingStyles.dot,
+              {
+                transform: [
+                  {
+                    translateY: dot2TranslateY,
+                  },
+                  {
+                    scale: dot2Scale,
+                  },
+                ],
+              },
+            ]}
+          >
+            <Animated.View
+              style={[
+                loadingStyles.activeDot,
+                {
+                  opacity: dot2Opacity,
+                },
+              ]}
+            />
+          </Animated.View>
+
+
+          {/* 3. NOKTA */}
+
+          <Animated.View
+            style={[
+              loadingStyles.dot,
+              {
+                transform: [
+                  {
+                    translateY: dot3TranslateY,
+                  },
+                  {
+                    scale: dot3Scale,
+                  },
+                ],
+              },
+            ]}
+          >
+            <Animated.View
+              style={[
+                loadingStyles.activeDot,
+                {
+                  opacity: dot3Opacity,
+                },
+              ]}
+            />
+          </Animated.View>
 
         </View>
 
@@ -921,7 +1038,6 @@ export default function AppNavigator() {
     );
   }
 
-
   return user
     ? (
       <MainAppNavigator />
@@ -1156,26 +1272,17 @@ const loadingStyles =
 
     dot: {
       width: 5,
-
       height: 5,
-
-      borderRadius:
-        3,
-
-      backgroundColor:
-        '#C8BDF7',
+      borderRadius: 3,
+      backgroundColor: '#C8BDF7',
     },
 
-
-    dotMiddle: {
-      width: 7,
-
-      height: 7,
-
-      borderRadius:
-        4,
-
-      backgroundColor:
-        '#8068E9',
+    activeDot: {
+      position: 'absolute',
+      width: 5,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: '#8068E9',
     },
+
   });
