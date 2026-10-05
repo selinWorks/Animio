@@ -9,7 +9,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -27,6 +26,8 @@ import {
   Pencil,
   Trash2,
   Scissors,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react-native';
 import {RouteProp, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -282,6 +283,43 @@ export default function HealthHistoryScreen({route}: Props) {
   const [newMedicineName, setNewMedicineName] = useState('');
   const [newMedicineFrequency, setNewMedicineFrequency] = useState('');
 
+  // =======================================================
+  // ÖZEL POPUP
+  // =======================================================
+
+  type PopupType =
+    | 'error'
+    | 'warning'
+    | 'info'
+    | 'success'
+    | 'delete';
+
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupType, setPopupType] =
+    useState<PopupType>('info');
+  const [popupConfirmAction, setPopupConfirmAction] =
+    useState<(() => void | Promise<void>) | null>(null);
+
+  const showPopup = (
+    title: string,
+    message: string,
+    type: PopupType = 'info',
+    confirmAction: (() => void | Promise<void>) | null = null,
+  ) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setPopupConfirmAction(() => confirmAction);
+    setPopupVisible(true);
+  };
+
+  const closePopup = () => {
+    setPopupVisible(false);
+    setPopupConfirmAction(null);
+  };
+
   const loadHealthRecords = useCallback(async () => {
     if (!user?.uid || !pet?.id) {
       setRecords([]);
@@ -382,9 +420,10 @@ export default function HealthHistoryScreen({route}: Props) {
         error,
       );
 
-      Alert.alert(
+      showPopup(
         'Sağlık geçmişi yüklenemedi',
         'Kayıtlar alınırken bir sorun oluştu. Lütfen tekrar dene.',
+        'error',
       );
     } finally {
       setLoading(false);
@@ -577,9 +616,10 @@ export default function HealthHistoryScreen({route}: Props) {
         )
       )
     ) {
-      Alert.alert(
+      showPopup(
         'Eksik bilgi',
         'Lütfen zorunlu alanları doldur.',
+        'warning',
       );
       return;
     }
@@ -618,9 +658,10 @@ export default function HealthHistoryScreen({route}: Props) {
           recordToEdit?.source ===
           'careEvent'
         ) {
-          Alert.alert(
+          showPopup(
             'Takvim kaydı',
             'Bu kayıt takvimde tamamlanan bir işlemden geliyor. Düzenleme işlemi takvim kaydı üzerinden yapılmalı.',
+            'info',
           );
           return;
         }
@@ -648,9 +689,10 @@ export default function HealthHistoryScreen({route}: Props) {
         error,
       );
 
-      Alert.alert(
+      showPopup(
         'Kayıt kaydedilemedi',
         'Sağlık kaydı kaydedilirken bir sorun oluştu. Lütfen tekrar dene.',
+        'error',
       );
     } finally {
       setSavingRecord(false);
@@ -676,55 +718,48 @@ export default function HealthHistoryScreen({route}: Props) {
       recordToDelete?.source ===
       'careEvent'
     ) {
-      Alert.alert(
+      showPopup(
         'Takvim kaydı',
         'Bu kayıt takvimde tamamlanan bir işlemden geliyor. Sağlık geçmişinden doğrudan silinemez.',
+        'info',
       );
       return;
     }
 
-    Alert.alert(
+    showPopup(
       'Sağlık kaydı silinsin mi?',
       recordToDelete
         ? `“${recordToDelete.title}” kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`
         : 'Bu sağlık kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.',
-      [
-        {
-          text: 'Vazgeç',
-          style: 'cancel',
-        },
-        {
-          text: 'Kaydı Sil',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setSavingRecord(true);
+      'delete',
+      async () => {
+        try {
+          setSavingRecord(true);
 
-              await deleteHealthRecordFromFirestore(
-                pet.id,
-                recordToDelete?.sourceId ||
-                  editingRecordId,
-                user.uid,
-              );
+          await deleteHealthRecordFromFirestore(
+            pet.id,
+            recordToDelete?.sourceId ||
+              editingRecordId,
+            user.uid,
+          );
 
-              await loadHealthRecords();
-              closeAddRecord();
-            } catch (error) {
-              console.error(
-                'Sağlık kaydı silinemedi:',
-                error,
-              );
+          await loadHealthRecords();
+          closeAddRecord();
+        } catch (error) {
+          console.error(
+            'Sağlık kaydı silinemedi:',
+            error,
+          );
 
-              Alert.alert(
-                'Kayıt silinemedi',
-                'Sağlık kaydı silinirken bir sorun oluştu. Lütfen tekrar dene.',
-              );
-            } finally {
-              setSavingRecord(false);
-            }
-          },
-        },
-      ],
+          showPopup(
+            'Kayıt silinemedi',
+            'Sağlık kaydı silinirken bir sorun oluştu. Lütfen tekrar dene.',
+            'error',
+          );
+        } finally {
+          setSavingRecord(false);
+        }
+      },
     );
   };
 
@@ -1038,9 +1073,10 @@ export default function HealthHistoryScreen({route}: Props) {
                             ]}
                             onPress={() => {
                               if (record.source === 'careEvent') {
-                                Alert.alert(
+                                showPopup(
                                   'Takvim kaydı',
                                   'Bu kayıt takvimde tamamlanan bir işlemden geliyor. Düzenlemek için ilgili takvim kaydını kullanmalısın.',
+                                  'info',
                                 );
                                 return;
                               }
@@ -1433,6 +1469,156 @@ export default function HealthHistoryScreen({route}: Props) {
                 Uygula
               </Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* =======================================================
+          ÖZEL BİLGİ / HATA / SİLME POPUP
+      ======================================================= */}
+
+      <Modal
+        visible={popupVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closePopup}>
+        <View style={styles.popupOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closePopup}
+          />
+
+          <View style={styles.popupCard}>
+
+            <View
+              style={[
+                styles.popupIconContainer,
+                popupType === 'error' &&
+                  styles.popupIconError,
+                popupType === 'warning' &&
+                  styles.popupIconWarning,
+                popupType === 'success' &&
+                  styles.popupIconSuccess,
+                popupType === 'info' &&
+                  styles.popupIconInfo,
+                popupType === 'delete' &&
+                  styles.popupIconDelete,
+              ]}>
+              {popupType === 'error' && (
+                <AlertCircle
+                  size={28}
+                  color="#D85F73"
+                  strokeWidth={2}
+                />
+              )}
+
+              {popupType === 'warning' && (
+                <AlertCircle
+                  size={28}
+                  color="#D49B3F"
+                  strokeWidth={2}
+                />
+              )}
+
+              {popupType === 'info' && (
+                <CalendarDays
+                  size={28}
+                  color="#7457E8"
+                  strokeWidth={2}
+                />
+              )}
+
+              {popupType === 'success' && (
+                <CheckCircle2
+                  size={28}
+                  color="#54A98B"
+                  strokeWidth={2}
+                />
+              )}
+
+              {popupType === 'delete' && (
+                <Trash2
+                  size={28}
+                  color="#D65D70"
+                  strokeWidth={2}
+                />
+              )}
+            </View>
+
+            <Text style={styles.popupTitle}>
+              {popupTitle}
+            </Text>
+
+            <Text style={styles.popupMessage}>
+              {popupMessage}
+            </Text>
+
+            {popupConfirmAction ? (
+              <View style={styles.popupButtons}>
+
+                <Pressable
+                  style={({pressed}) => [
+                    styles.popupCancelButton,
+                    pressed &&
+                      styles.popupButtonPressed,
+                  ]}
+                  onPress={closePopup}>
+                  <Text style={styles.popupCancelText}>
+                    Vazgeç
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={({pressed}) => [
+                    styles.popupConfirmButton,
+                    popupType === 'delete' &&
+                      styles.popupDeleteButton,
+                    pressed &&
+                      styles.popupButtonPressed,
+                  ]}
+                  onPress={async () => {
+                    const action =
+                      popupConfirmAction;
+
+                    closePopup();
+
+                    if (action) {
+                      await action();
+                    }
+                  }}>
+                  {popupType === 'delete' && (
+                    <Trash2
+                      size={16}
+                      color="#FFFFFF"
+                      strokeWidth={2.2}
+                    />
+                  )}
+
+                  <Text
+                    style={
+                      styles.popupConfirmText
+                    }>
+                    {popupType === 'delete'
+                      ? 'Kaydı Sil'
+                      : 'Devam Et'}
+                  </Text>
+                </Pressable>
+
+              </View>
+            ) : (
+              <Pressable
+                style={({pressed}) => [
+                  styles.popupOkButton,
+                  pressed &&
+                    styles.popupButtonPressed,
+                ]}
+                onPress={closePopup}>
+                <Text style={styles.popupOkText}>
+                  Tamam
+                </Text>
+              </Pressable>
+            )}
+
           </View>
         </View>
       </Modal>
@@ -2115,6 +2301,184 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(31, 27, 49, 0.35)',
+  },
+
+  /* =======================================================
+     ÖZEL POPUP STİLLERİ
+  ======================================================= */
+
+  popupOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(35, 30, 58, 0.42)',
+    paddingHorizontal: 26,
+  },
+
+  popupCard: {
+    width: '100%',
+    maxWidth: 370,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 23,
+    paddingTop: 24,
+    paddingBottom: 20,
+    alignItems: 'center',
+
+    shadowColor: '#44376D',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 10,
+  },
+
+  popupIconContainer: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+
+  popupIconError: {
+    backgroundColor: '#FFF0F3',
+    borderWidth: 1,
+    borderColor: '#FFD8E0',
+  },
+
+  popupIconWarning: {
+    backgroundColor: '#FFF7E8',
+    borderWidth: 1,
+    borderColor: '#F5E4BF',
+  },
+
+  popupIconInfo: {
+    backgroundColor: '#F0ECFF',
+    borderWidth: 1,
+    borderColor: '#DDD4FF',
+  },
+
+  popupIconSuccess: {
+    backgroundColor: '#EBF8F3',
+    borderWidth: 1,
+    borderColor: '#D2EFE4',
+  },
+
+  popupIconDelete: {
+    backgroundColor: '#FFF1F3',
+    borderWidth: 1,
+    borderColor: '#F4CDD5',
+  },
+
+  popupTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 17,
+    color: '#2D2940',
+    textAlign: 'center',
+  },
+
+  popupMessage: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 11.5,
+    lineHeight: 18,
+    color: '#7D7F91',
+    textAlign: 'center',
+  },
+
+  popupButtons: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 9,
+    marginTop: 21,
+  },
+
+  popupCancelButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#F6F4FA',
+    borderWidth: 1,
+    borderColor: '#E8E4F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  popupCancelText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 11.5,
+    color: '#77798A',
+  },
+
+  popupConfirmButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#7457E8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+
+    shadowColor: '#7457E8',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  popupDeleteButton: {
+    backgroundColor: '#D65D70',
+
+    shadowColor: '#D65D70',
+  },
+
+  popupConfirmText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 11.5,
+    color: '#FFFFFF',
+  },
+
+  popupOkButton: {
+    width: '100%',
+    height: 47,
+    borderRadius: 15,
+    backgroundColor: '#7457E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 21,
+
+    shadowColor: '#7457E8',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.16,
+    shadowRadius: 9,
+    elevation: 3,
+  },
+
+  popupOkText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+
+  popupButtonPressed: {
+    opacity: 0.78,
+    transform: [
+      {
+        scale: 0.98,
+      },
+    ],
   },
 
   bottomSheet: {

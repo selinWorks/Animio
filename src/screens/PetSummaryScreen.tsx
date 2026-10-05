@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {
   ActivityIndicator,
-  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +23,10 @@ import {
   Stethoscope,
   FlaskConical,
   Scissors,
+  AlertCircle,
+  CheckCircle2,
+  FileWarning,
+  Info,
 } from 'lucide-react-native';
 
 import {
@@ -216,6 +220,32 @@ export default function PetSummaryScreen({route, navigation}: Props) {
   const [loading, setLoading] = useState(true);
   const [creatingPdf, setCreatingPdf] = useState(false);
 
+  type PopupType =
+    | 'error'
+    | 'success'
+    | 'warning'
+    | 'info';
+
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupType, setPopupType] = useState<PopupType>('info');
+
+  const showPopup = (
+    title: string,
+    message: string,
+    type: PopupType = 'info',
+  ) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setPopupVisible(true);
+  };
+
+  const closePopup = () => {
+    setPopupVisible(false);
+  };
+
   const loadHealthRecords = useCallback(async () => {
     if (!user?.uid || !pet?.id) {
       setHealthRecords([]);
@@ -236,9 +266,10 @@ export default function PetSummaryScreen({route, navigation}: Props) {
       );
     } catch (error) {
       console.error('Pet özeti sağlık kayıtları yüklenemedi:', error);
-      Alert.alert(
+      showPopup(
         'Kayıtlar yüklenemedi',
         'Sağlık geçmişi alınırken bir sorun oluştu.',
+        'error',
       );
     } finally {
       setLoading(false);
@@ -320,7 +351,11 @@ export default function PetSummaryScreen({route, navigation}: Props) {
       const saved = await savePetSummaryPdf(filePath, pet.name);
 
       if (saved) {
-        Alert.alert('Başarılı', 'PDF seçtiğin klasöre kaydedildi.');
+        showPopup(
+          'PDF hazırlandı',
+          'PDF seçtiğin klasöre başarıyla kaydedildi.',
+          'success',
+        );
       }
     } catch (error: any) {
       const message =
@@ -328,10 +363,10 @@ export default function PetSummaryScreen({route, navigation}: Props) {
         error?.localizedDescription ??
         String(error);
 
-      Alert.alert(
-        'Hata ayrıntısı',
+      showPopup(
+        'PDF oluşturulamadı',
         message,
-        [{text: 'Tamam'}],
+        'warning',
       );
     } finally {
       setCreatingPdf(false);
@@ -540,10 +575,78 @@ export default function PetSummaryScreen({route, navigation}: Props) {
 
 
 
-      </ScrollView>
-    </View>
-  );
-}
+            </ScrollView>
+
+            <Modal
+              visible={popupVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={closePopup}>
+              <View style={styles.popupOverlay}>
+                <View style={styles.popupCard}>
+
+                  <View
+                    style={[
+                      styles.popupIconContainer,
+                      popupType === 'error' && styles.popupIconError,
+                      popupType === 'success' && styles.popupIconSuccess,
+                      popupType === 'warning' && styles.popupIconWarning,
+                      popupType === 'info' && styles.popupIconInfo,
+                    ]}>
+                    {popupType === 'error' && (
+                      <AlertCircle
+                        size={28}
+                        color="#D9536F"
+                      />
+                    )}
+
+                    {popupType === 'success' && (
+                      <CheckCircle2
+                        size={29}
+                        color="#48A982"
+                      />
+                    )}
+
+                    {popupType === 'warning' && (
+                      <FileWarning
+                        size={28}
+                        color="#D99036"
+                      />
+                    )}
+
+                    {popupType === 'info' && (
+                      <Info
+                        size={28}
+                        color="#7457E8"
+                      />
+                    )}
+                  </View>
+
+                  <Text style={styles.popupTitle}>
+                    {popupTitle}
+                  </Text>
+
+                  <Text style={styles.popupMessage}>
+                    {popupMessage}
+                  </Text>
+
+                  <Pressable
+                    style={({pressed}) => [
+                      styles.popupButton,
+                      pressed && styles.popupButtonPressed,
+                    ]}
+                    onPress={closePopup}>
+                    <Text style={styles.popupButtonText}>
+                      Tamam
+                    </Text>
+                  </Pressable>
+
+                </View>
+              </View>
+            </Modal>
+          </View>
+        );
+      }
 
 function ProfileItem({
   label,
@@ -762,6 +865,98 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     transform: [{scale: 0.99}],
   },
+
+    popupOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(31, 27, 49, 0.48)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+
+    popupCard: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 26,
+      paddingHorizontal: 22,
+      paddingTop: 24,
+      paddingBottom: 20,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#EAE4FF',
+      elevation: 10,
+      shadowColor: '#28243F',
+      shadowOffset: {
+        width: 0,
+        height: 7,
+      },
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+    },
+
+    popupIconContainer: {
+      width: 62,
+      height: 62,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+
+    popupIconError: {
+      backgroundColor: '#FFF0F3',
+    },
+
+    popupIconSuccess: {
+      backgroundColor: '#EAF8F1',
+    },
+
+    popupIconWarning: {
+      backgroundColor: '#FFF5E6',
+    },
+
+    popupIconInfo: {
+      backgroundColor: '#F0ECFF',
+    },
+
+    popupTitle: {
+      fontFamily: 'Quicksand-Bold',
+      fontSize: 17,
+      color: '#29243F',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+
+    popupMessage: {
+      fontFamily: 'Quicksand-Medium',
+      fontSize: 12,
+      lineHeight: 19,
+      color: '#777389',
+      textAlign: 'center',
+      paddingHorizontal: 5,
+      marginBottom: 20,
+    },
+
+    popupButton: {
+      width: '100%',
+      minHeight: 46,
+      borderRadius: 15,
+      backgroundColor: '#7457E8',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    popupButtonPressed: {
+      opacity: 0.82,
+      transform: [{scale: 0.98}],
+    },
+
+    popupButtonText: {
+      fontFamily: 'Quicksand-Bold',
+      fontSize: 12,
+      color: '#FFFFFF',
+    },
 
   savePdfButton: {
     backgroundColor: '#FFFFFF',
