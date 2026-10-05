@@ -491,7 +491,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.tipCatArea}>
             <Image
-              source={require('../assets/images/home/tip-cat.png')}
+              source={require('../assets/images/home/tip-turtle.png')}
               style={styles.tipCatImage}
               resizeMode="contain"
             />
@@ -902,8 +902,8 @@ const styles = StyleSheet.create({
   },
   tipContent: {
     flex: 1,
-    zIndex: 3,
-    paddingRight: 63,
+    zIndex: 5,
+    paddingRight: 78,
   },
   tipTitle: {
     fontSize: 15.5,
@@ -921,17 +921,17 @@ const styles = StyleSheet.create({
   },
   tipCatArea: {
     position: 'absolute',
-    right: 0,
-    bottom: -25,
-    width: 125,
-    height: 120,
+    right: -2,
+    bottom: -20,
+    width: 105,
+    height: 105,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     zIndex: 4,
   },
   tipCatImage: {
-    width: 200,
-    height: 150,
+    width: 145,
+    height: 115,
   },
   /* ANLIK KAYARAK GELEN BİLDİRİM BALONU (TOAST) */
   topBanner: {
