@@ -72,6 +72,7 @@ type HealthRecord = {
   categoryLabel: string;
   date: string;
   dateValue: Date;
+  createdAtValue: Date;
   clinic?: string;
   doctor?: string;
   description?: string;
@@ -222,6 +223,46 @@ const parseFirestoreDate = (value: string) => {
   return null;
 };
 
+const parseCreatedAt = (value: any, fallback: Date) => {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value?.toDate === 'function') {
+    const date = value.toDate();
+    return Number.isNaN(date.getTime()) ? fallback : date;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? fallback : value;
+  }
+
+  const seconds =
+    typeof value?.seconds === 'number'
+      ? value.seconds
+      : typeof value?._seconds === 'number'
+        ? value._seconds
+        : null;
+
+  if (seconds !== null) {
+    const nanoseconds =
+      typeof value?.nanoseconds === 'number'
+        ? value.nanoseconds
+        : typeof value?._nanoseconds === 'number'
+          ? value._nanoseconds
+          : 0;
+
+    return new Date(seconds * 1000 + nanoseconds / 1000000);
+  }
+
+  if (typeof value === 'number' || typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? fallback : date;
+  }
+
+  return fallback;
+};
+
 const formatHealthDate = (date: Date) => {
   const months = [
     'Ocak',
@@ -268,6 +309,7 @@ export default function HealthHistoryScreen({route}: Props) {
   const [filterVisible, setFilterVisible] = useState(false);
   const [addRecordVisible, setAddRecordVisible] = useState(false);
   const [records, setRecords] = useState<HealthRecord[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [savingRecord, setSavingRecord] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
@@ -390,6 +432,10 @@ export default function HealthHistoryScreen({route}: Props) {
                   dateValue,
                 ),
               dateValue,
+              createdAtValue: parseCreatedAt(
+                record.createdAt ?? record.updatedAt,
+                dateValue,
+              ),
               clinic:
                 record.clinic ||
                 undefined,
@@ -467,10 +513,49 @@ export default function HealthHistoryScreen({route}: Props) {
       );
     }
 
-    return filtered.sort(
-      (a, b) => b.dateValue.getTime() - a.dateValue.getTime(),
-    );
+    return filtered.sort((a, b) => {
+      const dateDifference =
+        b.dateValue.getTime() - a.dateValue.getTime();
+
+      if (dateDifference !== 0) {
+        return dateDifference;
+      }
+
+      const createdAtDifference =
+        b.createdAtValue.getTime() - a.createdAtValue.getTime();
+
+      if (createdAtDifference !== 0) {
+        return createdAtDifference;
+      }
+
+      return b.id.localeCompare(a.id);
+    });
   }, [records, selectedCategory, selectedPeriod]);
+
+  const RECORDS_PER_PAGE = 5;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedPeriod]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRecords.length / RECORDS_PER_PAGE),
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const visibleRecords = useMemo(() => {
+    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+    return filteredRecords.slice(
+      startIndex,
+      startIndex + RECORDS_PER_PAGE,
+    );
+  }, [filteredRecords, currentPage]);
 
   const sortedRecords = useMemo(
     () =>
@@ -480,9 +565,6 @@ export default function HealthHistoryScreen({route}: Props) {
     [records],
   );
 
-  const lastCheckup = sortedRecords.find(
-    item => item.category === 'checkup',
-  );
   const lastVaccine = sortedRecords.find(
     item => item.category === 'vaccine',
   );
@@ -862,17 +944,6 @@ export default function HealthHistoryScreen({route}: Props) {
 
           <View style={styles.summarySmallItem}>
             <Text style={styles.summarySmallLabel}>
-              Son Kontrol
-            </Text>
-            <Text style={styles.summarySmallValue}>
-              {lastCheckup ? lastCheckup.date : '—'}
-            </Text>
-          </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summarySmallItem}>
-            <Text style={styles.summarySmallLabel}>
               Son Aşı
             </Text>
             <Text style={styles.summarySmallValue}>
@@ -990,11 +1061,11 @@ export default function HealthHistoryScreen({route}: Props) {
               </Text>
             </View>
           ) : (
-            filteredRecords.map((record, index) => {
+            visibleRecords.map((record, index) => {
               const colors =
                 CATEGORY_COLORS[record.category];
               const isLast =
-                index === filteredRecords.length - 1;
+                index === visibleRecords.length - 1;
 
               return (
                 <View
@@ -1144,6 +1215,67 @@ export default function HealthHistoryScreen({route}: Props) {
                 </View>
               );
             })
+          )}
+
+          {!loading && filteredRecords.length > RECORDS_PER_PAGE && (
+            <View style={styles.pagination}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.paginationButton,
+                  currentPage === 1 && styles.paginationButtonDisabled,
+                  pressed &&
+                    currentPage > 1 &&
+                    styles.paginationButtonPressed,
+                ]}
+                disabled={currentPage === 1}
+                onPress={() =>
+                  setCurrentPage(page => Math.max(1, page - 1))
+                }>
+                <Text
+                  style={[
+                    styles.paginationButtonText,
+                    currentPage === 1 &&
+                      styles.paginationButtonTextDisabled,
+                  ]}>
+                  ‹ Önceki
+                </Text>
+              </Pressable>
+
+              <View style={styles.paginationInfo}>
+                <Text style={styles.paginationCurrent}>
+                  {currentPage}
+                </Text>
+                <Text style={styles.paginationDivider}>/</Text>
+                <Text style={styles.paginationTotal}>
+                  {totalPages}
+                </Text>
+              </View>
+
+              <Pressable
+                style={({pressed}) => [
+                  styles.paginationButton,
+                  currentPage === totalPages &&
+                    styles.paginationButtonDisabled,
+                  pressed &&
+                    currentPage < totalPages &&
+                    styles.paginationButtonPressed,
+                ]}
+                disabled={currentPage === totalPages}
+                onPress={() =>
+                  setCurrentPage(page =>
+                    Math.min(totalPages, page + 1),
+                  )
+                }>
+                <Text
+                  style={[
+                    styles.paginationButtonText,
+                    currentPage === totalPages &&
+                      styles.paginationButtonTextDisabled,
+                  ]}>
+                  Sonraki ›
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -1740,14 +1872,14 @@ const styles = StyleSheet.create({
   },
 
   summaryMain: {
-    flex: 0.95,
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   summaryTextArea: {
     alignItems: 'center',
-    marginLeft: 15,
+    justifyContent: 'center',
   },
 
   summaryNumber: {
@@ -1767,14 +1899,13 @@ const styles = StyleSheet.create({
     width: 1,
     height: 46,
     backgroundColor: '#ECEAF3',
-    marginHorizontal: 6,
   },
 
   summarySmallItem: {
-    flex: 1.05,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 8,
   },
 
   summarySmallLabel: {
@@ -2061,6 +2192,80 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-SemiBold',
     fontSize: 10,
     color: '#7457E8',
+  },
+
+  pagination: {
+    marginTop: 6,
+    marginLeft: 35,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+
+  paginationButton: {
+    minWidth: 92,
+    height: 42,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#DED6FF',
+    backgroundColor: '#F8F6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  paginationButtonDisabled: {
+    backgroundColor: '#F5F4F8',
+    borderColor: '#E8E6ED',
+  },
+
+  paginationButtonPressed: {
+    opacity: 0.76,
+    transform: [{scale: 0.98}],
+  },
+
+  paginationButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 10.5,
+    color: '#7457E8',
+  },
+
+  paginationButtonTextDisabled: {
+    color: '#B8B5C2',
+  },
+
+  paginationInfo: {
+    height: 38,
+    minWidth: 58,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE8F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+
+  paginationCurrent: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 11.5,
+    color: '#7457E8',
+  },
+
+  paginationDivider: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 10.5,
+    color: '#AAA6B6',
+  },
+
+  paginationTotal: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 10.5,
+    color: '#77738A',
   },
 
   loadingCard: {
@@ -2600,3 +2805,4 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+

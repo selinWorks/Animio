@@ -61,7 +61,7 @@ type CareEvent = {
 };
 
 const TITLE_PLACEHOLDERS: Record<CareEventType, string> = {
-  Vaccination: 'Örn. Karma aşı, kuduz aşısı',
+  Vaccination: 'Örn. Karma Aşı, Kuduz Aşısı',
   'Vet Visit': 'Örn. Genel veteriner kontrolü',
   Medication: 'Örn. İç parazit ilacı, antibiyotik',
   Grooming: 'Örn. Tırnak kesimi, tüy bakımı',
@@ -1157,7 +1157,9 @@ export default function CalendarScreen() {
                           color: eventColor,
                         },
                       ]}>
-                      {event.title}
+                      {event.type === 'Vaccination'
+                        ? 'Aşı'
+                        : event.title}
                     </Text>
 
                   </View>
@@ -1189,7 +1191,7 @@ export default function CalendarScreen() {
                           ? '...'
                           : event.completed
                             ? 'Geri Al'
-                            : 'Tamamlandı'}
+                            : 'Tamamla'}
                       </Text>
                     </Pressable>
 

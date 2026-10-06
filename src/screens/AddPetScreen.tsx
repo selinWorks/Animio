@@ -1832,10 +1832,6 @@ export default function AddPetScreen({navigation}: any) {
 
                 </View>
 
-                <Text style={styles.weightSlash}>
-                  /
-                </Text>
-
                 <View style={styles.weightInputBox}>
 
                   <TextInput
@@ -4137,12 +4133,6 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
-  weightSlash: {
-    fontSize: 18,
-    fontFamily: 'Quicksand-Bold',
-    color: '#94A3B8',
-  },
-
   iconInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4550,3 +4540,4 @@ const styles = StyleSheet.create({
   },
 
 });
+
