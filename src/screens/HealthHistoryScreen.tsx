@@ -926,29 +926,24 @@ export default function HealthHistoryScreen({route}: Props) {
         </View>
 
         <View style={styles.summaryCard}>
-          <View style={styles.summaryDecorationOne} />
-          <View style={styles.summaryDecorationTwo} />
-
-          <View style={styles.summaryMain}>
-            <View style={styles.summaryTextArea}>
-              <Text style={styles.summaryNumber}>
-                {records.length}
-              </Text>
-              <Text style={styles.summaryLabel}>
-                Sağlık Kaydı
-              </Text>
-            </View>
+          <View style={styles.summaryRecordArea}>
+            <Text style={styles.summaryNumber}>{records.length}</Text>
+            <Text style={styles.summaryRecordLabel}>Kayıt</Text>
           </View>
 
-          <View style={styles.summaryDivider} />
+          <View style={styles.summaryVaccineArea}>
+            <View style={styles.summaryVaccineTextArea}>
+              <Text style={styles.summarySmallLabel}>Son Aşı:</Text>
+              <Text style={styles.summarySmallValue}>
+                {lastVaccine ? lastVaccine.date : '—'}
+              </Text>
+            </View>
 
-          <View style={styles.summarySmallItem}>
-            <Text style={styles.summarySmallLabel}>
-              Son Aşı
-            </Text>
-            <Text style={styles.summarySmallValue}>
-              {lastVaccine ? lastVaccine.date : '—'}
-            </Text>
+            <Syringe
+              size={25}
+              color="#332D67"
+              strokeWidth={2.1}
+            />
           </View>
         </View>
 
@@ -1834,92 +1829,70 @@ const styles = StyleSheet.create({
 
 
   summaryCard: {
-    minHeight: 105,
-    borderRadius: 24,
+    minHeight: 72,
+    borderRadius: 36,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#ECE7FC',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingLeft: 20,
+    paddingRight: 6,
     overflow: 'hidden',
-    shadowColor: '#5B4C94',
+    shadowColor: '#514779',
     shadowOffset: {width: 0, height: 7},
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.11,
     shadowRadius: 15,
-    elevation: 4,
+    elevation: 5,
     marginBottom: 26,
   },
 
-  summaryDecorationOne: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F3EFFF',
-    right: -52,
-    top: -55,
-  },
-
-  summaryDecorationTwo: {
-    position: 'absolute',
-    width: 65,
-    height: 65,
-    borderRadius: 33,
-    backgroundColor: '#FFF1F6',
-    left: -28,
-    bottom: -35,
-  },
-
-  summaryMain: {
+  summaryRecordArea: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  summaryTextArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   summaryNumber: {
     fontFamily: 'Quicksand-Bold',
-    fontSize: 22,
-    color: '#29243F',
+    fontSize: 27,
+    color: '#272344',
+    lineHeight: 32,
   },
 
-  summaryLabel: {
-    marginTop: 0,
-    fontFamily: 'Quicksand-SemiBold',
-    fontSize: 10.5,
-    color: '#8D90A2',
+  summaryRecordLabel: {
+    marginLeft: 9,
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 15,
+    color: '#302C48',
   },
 
-  summaryDivider: {
-    width: 1,
-    height: 46,
-    backgroundColor: '#ECEAF3',
-  },
-
-  summarySmallItem: {
-    flex: 1,
+  summaryVaccineArea: {
+    width: '54%',
+    minHeight: 60,
+    borderRadius: 30,
+    backgroundColor: '#E9E4FA',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    paddingLeft: 16,
+    paddingRight: 14,
+  },
+
+  summaryVaccineTextArea: {
+    flex: 1,
+    paddingRight: 10,
   },
 
   summarySmallLabel: {
     fontFamily: 'Quicksand-Medium',
-    fontSize: 9.5,
-    color: '#999CAD',
-    marginBottom: 5,
+    fontSize: 10.5,
+    color: '#8B84A7',
+    marginBottom: 1,
   },
 
   summarySmallValue: {
     fontFamily: 'Quicksand-Bold',
-    fontSize: 9.5,
-    color: '#39354C',
-    textAlign: 'center',
+    fontSize: 11.5,
+    color: '#302B58',
   },
 
   filterHeader: {

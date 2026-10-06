@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   Image,
 } from 'react-native';
 
-import {Calendar} from 'react-native-calendars';
 
 import {
   addCareEventToFirestore,
@@ -25,6 +24,7 @@ import notifee, {
   TriggerType,
 } from '@notifee/react-native';
 
+import {useNavigation} from '@react-navigation/native';
 import {useAuth} from '../data/AuthContext';
 import {usePets} from '../data/PetContext';
 
@@ -109,6 +109,12 @@ function getDefaultPetImage(type?: string) {
 }
 
 export default function CalendarScreen() {
+  const navigation = useNavigation<any>();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({headerShown: false});
+  }, [navigation]);
+
   const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -121,10 +127,6 @@ export default function CalendarScreen() {
 
   const {user} = useAuth();
   const {pets} = usePets();
-  const selectedPet = pets.find(
-    pet => pet.name === petName,
-  );
-
   /* =========================================================
      STATE
   ========================================================= */
@@ -132,6 +134,7 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [events, setEvents] = useState<CareEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [monthExpanded, setMonthExpanded] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -865,32 +868,6 @@ export default function CalendarScreen() {
     );
 
   /* =========================================================
-     MARKED DATES
-  ========================================================= */
-
-  const markedDates = useMemo(() => {
-    const marked: Record<string, any> = {};
-
-    events.forEach(event => {
-      marked[event.date] = {
-        marked: true,
-        dotColor:
-          event.color || '#A78BFA',
-      };
-    });
-
-    marked[selectedDate] = {
-      ...(marked[selectedDate] || {}),
-
-      selected: true,
-      selectedColor: '#A78BFA',
-      selectedTextColor: '#FFFFFF',
-    };
-
-    return marked;
-  }, [events, selectedDate]);
-
-  /* =========================================================
      ERROR ICON
   ========================================================= */
 
@@ -979,6 +956,89 @@ export default function CalendarScreen() {
     }
   };
 
+
+  const formatTurkishDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('tr-TR', {day: 'numeric', month: 'long', weekday: 'long'});
+  };
+
+  const weekDays = useMemo(() => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const selected = new Date(year, month - 1, day);
+    const mondayOffset = selected.getDay() === 0 ? -6 : 1 - selected.getDay();
+    const monday = new Date(selected);
+    monday.setDate(selected.getDate() + mondayOffset);
+
+    return Array.from({length: 7}, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const dateString = getLocalDateString(date);
+      return {
+        date,
+        dateString,
+        dayName: ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][date.getDay()],
+        dayNumber: date.getDate(),
+        eventColors: events.filter(event => event.date === dateString).slice(0, 3).map(event => event.color || '#A78BFA'),
+      };
+    });
+  }, [selectedDate, events]);
+
+  const selectedMonthTitle = useMemo(() => {
+    const [year, month] = selectedDate.split('-').map(Number);
+    return new Date(year, month - 1, 1).toLocaleDateString('tr-TR', {month: 'long', year: 'numeric'});
+  }, [selectedDate]);
+
+  const monthDays = useMemo(() => {
+    const [year, month] = selectedDate.split('-').map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const mondayOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    const totalCells = Math.ceil((mondayOffset + lastDay.getDate()) / 7) * 7;
+
+    return Array.from({length: totalCells}, (_, index) => {
+      const dayNumber = index - mondayOffset + 1;
+      const date = new Date(year, month - 1, dayNumber);
+      const dateString = getLocalDateString(date);
+      const inCurrentMonth = date.getMonth() === month - 1;
+
+      return {
+        dateString,
+        dayNumber: date.getDate(),
+        inCurrentMonth,
+        eventColors: events
+          .filter(event => event.date === dateString)
+          .slice(0, 3)
+          .map(event => event.color || '#A78BFA'),
+      };
+    });
+  }, [selectedDate, events]);
+
+  const moveMonth = (amount: number) => {
+    const [year, month] = selectedDate.split('-').map(Number);
+    const next = new Date(year, month - 1 + amount, 1);
+    setSelectedDate(getLocalDateString(next));
+  };
+
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(event => event.date > selectedDate && !event.completed)
+      .sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`))
+      .slice(0, 3);
+  }, [events, selectedDate]);
+
+  const getPetForEvent = (event: CareEvent) =>
+    pets.find(pet => pet.name === event.petName);
+
+  const getTypeLabel = (type: CareEventType) => {
+    if (type === 'Vaccination') return 'Aşı';
+    if (type === 'Vet Visit') return 'Veteriner Kontrolü';
+    if (type === 'Medication') return 'İlaç / Parazit';
+    if (type === 'Grooming') return 'Bakım';
+    if (type === 'Operation') return 'Ameliyat / Kısırlaştırma';
+    return 'Diğer';
+  };
+
   /* =========================================================
      UI
   ========================================================= */
@@ -987,305 +1047,399 @@ export default function CalendarScreen() {
     <>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.plannerContent}
         showsVerticalScrollIndicator={false}>
 
-        {/* HERO */}
-
-        <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-
-            <View style={styles.heroTextContainer}>
-              <Text style={styles.heroTitle}>
-                Care Calendar
-              </Text>
-
-              <Text style={styles.heroSubtitle}>
-                Aşıları, veteriner randevularını ve bakım
-                görevlerini tek yerden takip et.
-              </Text>
-            </View>
+        <View style={styles.calendarArea}>
+          <View style={styles.calendarBackRow}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={({pressed}) => [
+                styles.calendarBackButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={styles.calendarBackText}>‹</Text>
+            </Pressable>
 
             <Pressable
-              onPress={() =>
-                setModalVisible(true)
-              }
+              onPress={() => setModalVisible(true)}
               style={({pressed}) => [
-                styles.heroActionButton,
-                pressed &&
-                  styles.heroActionButtonPressed,
+                styles.compactNewButton,
+                pressed && styles.buttonPressed,
               ]}>
+              <Text style={styles.compactNewPlus}>＋</Text>
+              <Text style={styles.compactNewText}>Yeni Kayıt</Text>
+            </Pressable>
+          </View>
 
-              <Text
-                style={styles.heroActionIcon}>
-                ＋
+          <View style={styles.monthRow}>
+            <View style={styles.monthNavigation}>
+              <Pressable
+                onPress={() => moveMonth(-1)}
+                style={styles.monthArrowButton}>
+                <Text style={styles.monthArrow}>‹</Text>
+              </Pressable>
+
+              <Text style={styles.monthTitle}>{selectedMonthTitle}</Text>
+
+              <Pressable
+                onPress={() => moveMonth(1)}
+                style={styles.monthArrowButton}>
+                <Text style={styles.monthArrow}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.monthActions}>
+
+            </View>
+          </View>
+
+          <View style={styles.weekStrip}>
+            {weekDays.map(item => {
+              const active = item.dateString === selectedDate;
+
+              return (
+                <Pressable
+                  key={item.dateString}
+                  onPress={() => setSelectedDate(item.dateString)}
+                  style={[
+                    styles.weekDay,
+                    active && styles.weekDayActive,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.weekDayName,
+                      active && styles.weekDayNameActive,
+                    ]}>
+                    {item.dayName}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.weekDayNumber,
+                      active && styles.weekDayNumberActive,
+                    ]}>
+                    {item.dayNumber}
+                  </Text>
+
+                  <View style={styles.dayDots}>
+                    {item.eventColors.length > 0 ? (
+                      item.eventColors.map((color, index) => (
+                        <View
+                          key={`${item.dateString}-${index}`}
+                          style={[
+                            styles.dayDot,
+                            {
+                              backgroundColor: active
+                                ? '#FFFFFF'
+                                : color,
+                            },
+                          ]}
+                        />
+                      ))
+                    ) : (
+                      <View style={styles.dayDotPlaceholder} />
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {monthExpanded ? (
+            <View style={styles.monthCalendar}>
+              <View style={styles.monthWeekHeader}>
+                {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(day => (
+                  <Text key={day} style={styles.monthWeekHeaderText}>
+                    {day}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.monthGrid}>
+                {monthDays.map((item, index) => {
+                  const active = item.dateString === selectedDate;
+                  const isToday = item.dateString === today;
+
+                  return (
+                    <Pressable
+                      key={`${item.dateString}-${index}`}
+                      onPress={() => setSelectedDate(item.dateString)}
+                      style={({pressed}) => [
+                        styles.monthDayCell,
+                        active && styles.monthDayCellActive,
+                        isToday && !active && styles.monthDayCellToday,
+                        pressed && styles.buttonPressed,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.monthDayNumber,
+                          !item.inCurrentMonth && styles.monthDayNumberMuted,
+                          active && styles.monthDayNumberActive,
+                        ]}>
+                        {item.dayNumber}
+                      </Text>
+
+                      <View style={styles.monthDayDots}>
+                        {item.eventColors.map((color, dotIndex) => (
+                          <View
+                            key={`${item.dateString}-dot-${dotIndex}`}
+                            style={[
+                              styles.monthDayDot,
+                              {backgroundColor: active ? '#FFFFFF' : color},
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.monthExpandWrap}>
+            <Pressable
+              onPress={() => setMonthExpanded(prev => !prev)}
+              style={({pressed}) => [
+                styles.monthExpandButton,
+                pressed && styles.buttonPressed,
+              ]}>
+              <Text style={[styles.monthExpandIcon, monthExpanded && styles.monthExpandIconOpen]}>
+                ⌄
               </Text>
-
+              <Text style={styles.monthExpandText}>
+                {monthExpanded ? 'Ayı gizle' : 'Ayı göster'}
+              </Text>
             </Pressable>
           </View>
         </View>
 
-        {/* CALENDAR */}
-
-        <View style={styles.calendarCard}>
-          <Calendar
-            current={today}
-
-            onDayPress={day =>
-              setSelectedDate(
-                day.dateString,
-              )
-            }
-
-            markedDates={markedDates}
-
-            hideExtraDays={true}
-            enableSwipeMonths={true}
-            hideArrows={false}
-
-            renderArrow={direction => (
-              <Text
-                style={styles.calendarArrow}>
-                {direction === 'left'
-                  ? '‹'
-                  : '›'}
+        <View style={styles.agendaPanel}>
+          <View style={styles.agendaHeadingRow}>
+            <View style={styles.agendaHeadingText}>
+              <Text style={styles.selectedDateText}>
+                {formatTurkishDate(selectedDate)}
               </Text>
-            )}
+              <Text style={styles.agendaTitle}>Bugünün Bakımları</Text>
+            </View>
 
-            theme={{
-              backgroundColor: '#FFFFFF',
-              calendarBackground: '#FFFFFF',
-              textSectionTitleColor: '#94A3B8',
-
-              selectedDayBackgroundColor:
-                '#A78BFA',
-
-              selectedDayTextColor:
-                '#FFFFFF',
-
-              todayTextColor: '#8B5CF6',
-              dayTextColor: '#111827',
-              textDisabledColor: '#CBD5E1',
-              arrowColor: '#8B5CF6',
-              monthTextColor: '#111827',
-              indicatorColor: '#8B5CF6',
-
-              textDayFontWeight: '500',
-              textMonthFontWeight: '700',
-              textDayHeaderFontWeight: '600',
-
-              textDayFontSize: 15,
-              textMonthFontSize: 18,
-              textDayHeaderFontSize: 13,
-            }}
-
-            style={styles.calendar}
-          />
-        </View>
-
-        {/* SELECTED DAY */}
-
-        <View style={styles.selectedDayCard}>
-
-          <View>
-            <Text
-              style={styles.dayHeaderTitle}>
-              Selected Day
-            </Text>
-
-            <Text
-              style={styles.dayHeaderDate}>
-              {selectedDate}
-            </Text>
+            <View style={styles.recordCountBadge}>
+              <Text style={styles.recordCountText}>
+                {eventsForSelectedDay.length} kayıt
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.dayChip}>
-            <Text
-              style={styles.dayChipText}>
-              {eventsForSelectedDay.length}{' '}
-              task
-            </Text>
-          </View>
+          {loading ? (
+            <View style={styles.plannerEmpty}>
+              <Text style={styles.plannerEmptyTitle}>
+                Takvim yükleniyor
+              </Text>
+              <Text style={styles.plannerEmptyText}>
+                Bakım kayıtların hazırlanıyor.
+              </Text>
+            </View>
+          ) : eventsForSelectedDay.length > 0 ? (
+            eventsForSelectedDay.map(event => {
+              const eventColor = event.color || '#A78BFA';
+              const pet = getPetForEvent(event);
+              const petPhoto = pet?.photoUrl || pet?.photoUri;
 
-        </View>
-
-        {/* EVENTS */}
-
-        {loading ? (
-          <View style={styles.emptyCard}>
-
-            <Text style={styles.emptyEmoji}>
-              ✨
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              Takvim yükleniyor
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Bakım görevleri Firestore’dan
-              getiriliyor.
-            </Text>
-
-          </View>
-        ) : eventsForSelectedDay.length > 0 ? (
-          eventsForSelectedDay.map(event => {
-            const eventColor =
-              event.color || '#A78BFA';
-
-            return (
-              <View
-                key={event.id}
-                style={styles.eventCard}>
-
-                <View
-                  style={styles.eventHeaderRow}>
-
+              return (
+                <View key={event.id} style={styles.careCard}>
                   <View
                     style={[
-                      styles.titleChip,
-                      {
-                        backgroundColor:
-                          `${eventColor}20`,
-                      },
-                    ]}>
+                      styles.careAccent,
+                      {backgroundColor: eventColor},
+                    ]}
+                  />
 
-                    <Text
-                      style={[
-                        styles.titleChipText,
-                        {
-                          color: eventColor,
-                        },
-                      ]}>
-                      {event.type === 'Vaccination'
-                        ? 'Aşı'
-                        : event.title}
-                    </Text>
+                  <View style={styles.careCardContent}>
+                    <View style={styles.careMainRow}>
+                      <Image
+                        source={
+                          petPhoto
+                            ? {uri: petPhoto}
+                            : getDefaultPetImage(pet?.type)
+                        }
+                        style={styles.carePetImage}
+                        resizeMode={petPhoto ? 'cover' : 'contain'}
+                      />
 
+                      <View style={styles.careTextBlock}>
+                        <Text style={styles.carePetName}>
+                          {event.petName}
+                        </Text>
+
+                        <View style={styles.eventNameRow}>
+                          <View
+                            style={[
+                              styles.eventTypeIcon,
+                              {backgroundColor: `${eventColor}20`},
+                            ]}>
+                            <PawPrint
+                              size={14}
+                              color={eventColor}
+                              strokeWidth={2.2}
+                            />
+                          </View>
+                          <Text
+                            style={styles.careEventTitle}
+                            numberOfLines={1}>
+                            {event.title}
+                          </Text>
+                        </View>
+
+                        <View style={styles.careMetaRow}>
+                          <Clock3
+                            size={14}
+                            color="#8D88A8"
+                            strokeWidth={1.8}
+                          />
+                          <Text style={styles.careTime}>
+                            {event.time || '09:00'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.cardRight}>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            event.completed
+                              ? styles.statusDone
+                              : styles.statusPending,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.statusText,
+                              event.completed
+                                ? styles.statusDoneText
+                                : styles.statusPendingText,
+                            ]}>
+                            {event.completed
+                              ? '✓  Tamamlandı'
+                              : '◷  Bekliyor'}
+                          </Text>
+                        </View>
+
+                        <View style={styles.careActions}>
+                          <Pressable
+                            onPress={() => handleToggleCompleted(event)}
+                            disabled={completingEventId === event.id}
+                            style={({pressed}) => [
+                              styles.moreCircle,
+                              pressed && styles.buttonPressed,
+                            ]}>
+                            <Text style={styles.moreCircleText}>
+                              {completingEventId === event.id
+                                ? '…'
+                                : event.completed
+                                  ? '↶'
+                                  : '✓'}
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => handleDeleteEvent(event.id)}
+                            style={({pressed}) => [
+                              styles.moreCircle,
+                              pressed && styles.buttonPressed,
+                            ]}>
+                            <Text style={styles.moreDots}>•••</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+
+                    {event.note ? (
+                      <Text style={styles.careNote}>{event.note}</Text>
+                    ) : null}
                   </View>
-
-                  <View style={styles.eventActions}>
-                    <Pressable
-                      onPress={() =>
-                        handleToggleCompleted(event)
-                      }
-                      disabled={
-                        completingEventId === event.id
-                      }
-                      style={({pressed}) => [
-                        styles.completeButton,
-                        event.completed &&
-                          styles.completeButtonDone,
-                        pressed &&
-                          styles.completeButtonPressed,
-                        completingEventId === event.id &&
-                          styles.disabledButton,
-                      ]}>
-                      <Text
-                        style={[
-                          styles.completeButtonText,
-                          event.completed &&
-                            styles.completeButtonTextDone,
-                        ]}>
-                        {completingEventId === event.id
-                          ? '...'
-                          : event.completed
-                            ? 'Geri Al'
-                            : 'Tamamla'}
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() =>
-                        handleDeleteEvent(
-                          event.id,
-                        )
-                      }
-                      style={({pressed}) => [
-                        styles.deleteButton,
-                        pressed &&
-                          styles.deleteButtonPressed,
-                      ]}>
-
-                      <Text
-                        style={
-                          styles.deleteButtonText
-                        }>
-                        Sil
-                      </Text>
-
-                    </Pressable>
-                  </View>
-
                 </View>
-
-                <Text
-                  style={styles.eventPetName}>
-                  🐾 {event.petName}
-                </Text>
-
-                <View style={styles.eventMetaRow}>
-                  <Text style={styles.eventTypeText}>
-                    {event.type === 'Vaccination'
-                      ? 'Aşı'
-                      : event.type === 'Vet Visit'
-                        ? 'Veteriner'
-                        : event.type === 'Medication'
-                          ? 'İlaç / Parazit'
-                          : event.type === 'Grooming'
-                            ? 'Bakım'
-                            : event.type === 'Operation'
-                              ? 'Ameliyat / Kısırlaştırma'
-                              : 'Diğer'}
-                  </Text>
-
-                  {event.completed ? (
-                    <Text style={styles.completedText}>
-                      ✓ Tamamlandı
-                    </Text>
-                  ) : null}
-                </View>
-
-                {/* SAAT */}
-
-                <View style={styles.eventTimeRow}>
-
-                  <Text style={styles.eventTimeIcon}>
-                    ⏰
-                  </Text>
-
-                  <Text style={styles.eventTime}>
-                    {event.time || '09:00'}
-                  </Text>
-
-                </View>
-
-                {event.note ? (
-                  <Text style={styles.eventNote}>
-                    {event.note}
-                  </Text>
-                ) : null}
-
+              );
+            })
+          ) : (
+            <View style={styles.plannerEmpty}>
+              <View style={styles.emptyIconCircle}>
+                <Text style={styles.emptyIcon}>♡</Text>
               </View>
-            );
-          })
-        ) : (
-          <View style={styles.emptyCard}>
+              <Text style={styles.plannerEmptyTitle}>
+                Bugün bakım kaydı yok
+              </Text>
+              <Text style={styles.plannerEmptyText}>
+                Dostlarının programı bugün sakin görünüyor.
+              </Text>
+            </View>
+          )}
 
-            <Text style={styles.emptyEmoji}>
-              🌷
-            </Text>
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            style={({pressed}) => [
+              styles.addCareButton,
+              pressed && styles.buttonPressed,
+            ]}>
+            <Text style={styles.addCarePlus}>＋</Text>
+            <Text style={styles.addCareButtonText}>Kayıt Ekle</Text>
+          </Pressable>
+        </View>
 
-            <Text style={styles.emptyTitle}>
-              Bugün için görev yok
-            </Text>
+        {upcomingEvents.length > 0 ? (
+          <View style={styles.upcomingSection}>
+            <View style={styles.upcomingHeader}>
+              <Text style={styles.upcomingTitle}>Yaklaşan Bakımlar</Text>
 
-            <Text style={styles.emptyText}>
-              Seçilen tarihte görev görünmüyor.
-            </Text>
+              <View style={styles.seeAllButton}>
+                <Text style={styles.seeAllText}>Tümünü Gör</Text>
+                <Text style={styles.seeAllArrow}>›</Text>
+              </View>
+            </View>
 
+            <View style={styles.upcomingList}>
+              {upcomingEvents.map((event, index) => {
+                const eventColor = event.color || '#A78BFA';
+
+                return (
+                  <Pressable
+                    key={event.id}
+                    onPress={() => setSelectedDate(event.date)}
+                    style={[
+                      styles.upcomingCard,
+                      index === upcomingEvents.length - 1 &&
+                        styles.upcomingCardLast,
+                    ]}>
+                    <View
+                      style={[
+                        styles.upcomingIconCircle,
+                        {backgroundColor: `${eventColor}22`},
+                      ]}>
+                      <PawPrint
+                        size={22}
+                        color={eventColor}
+                        strokeWidth={2}
+                      />
+                    </View>
+
+                    <View style={styles.upcomingText}>
+                      <Text style={styles.upcomingDate}>
+                        {formatTurkishDate(event.date)}
+                      </Text>
+                      <Text style={styles.upcomingEventTitle}>
+                        {event.title}
+                      </Text>
+                      <Text style={styles.upcomingPet}>
+                        {event.petName}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.upcomingArrow}>›</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        )}
+        ) : null}
 
       </ScrollView>
 
@@ -2114,13 +2268,14 @@ const styles = StyleSheet.create({
   },
 
   heroTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 26,
-    fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
   },
 
   heroSubtitle: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 21,
@@ -2144,9 +2299,9 @@ const styles = StyleSheet.create({
   },
 
   heroActionIcon: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 24,
     color: '#8B5CF6',
-    fontWeight: '700',
     marginTop: -2,
   },
 
@@ -2163,9 +2318,9 @@ const styles = StyleSheet.create({
   },
 
   calendarArrow: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 24,
     color: '#8B5CF6',
-    fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 2,
   },
@@ -2182,14 +2337,15 @@ const styles = StyleSheet.create({
   },
 
   dayHeaderTitle: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 4,
   },
 
   dayHeaderDate: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 20,
-    fontWeight: '700',
     color: '#111827',
   },
 
@@ -2201,8 +2357,8 @@ const styles = StyleSheet.create({
   },
 
   dayChipText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#6366F1',
-    fontWeight: '700',
     fontSize: 13,
   },
 
@@ -2230,8 +2386,8 @@ const styles = StyleSheet.create({
   },
 
   titleChipText: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 13,
-    fontWeight: '700',
   },
 
   eventActions: {
@@ -2260,12 +2416,13 @@ const styles = StyleSheet.create({
   },
 
   completeButtonText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#7C3AED',
     fontSize: 12,
-    fontWeight: '700',
   },
 
   completeButtonTextDone: {
+    fontFamily: 'Quicksand-Regular',
     color: '#059669',
   },
 
@@ -2284,15 +2441,15 @@ const styles = StyleSheet.create({
   },
 
   deleteButtonText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#DC2626',
     fontSize: 12,
-    fontWeight: '700',
   },
 
   eventPetName: {
+    fontFamily: 'Quicksand-SemiBold',
     fontSize: 14,
     color: '#6366F1',
-    fontWeight: '600',
     marginBottom: 6,
   },
 
@@ -2304,9 +2461,9 @@ const styles = StyleSheet.create({
   },
 
   eventTypeText: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 12,
     color: '#64748B',
-    fontWeight: '700',
     backgroundColor: '#F8FAFC',
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -2314,9 +2471,9 @@ const styles = StyleSheet.create({
   },
 
   completedText: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 12,
     color: '#059669',
-    fontWeight: '800',
   },
 
   eventTimeRow: {
@@ -2326,17 +2483,19 @@ const styles = StyleSheet.create({
   },
 
   eventTimeIcon: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 13,
     marginRight: 5,
   },
 
   eventTime: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 13,
-    fontWeight: '700',
     color: '#8B5CF6',
   },
 
   eventNote: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
@@ -2352,18 +2511,20 @@ const styles = StyleSheet.create({
   },
 
   emptyEmoji: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 30,
     marginBottom: 10,
   },
 
   emptyTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 17,
-    fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
   },
 
   emptyText: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
@@ -2387,20 +2548,22 @@ const styles = StyleSheet.create({
   },
 
   modalEmoji: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 28,
     marginBottom: 8,
     textAlign: 'center',
   },
 
   modalTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 22,
-    fontWeight: '700',
     color: '#111827',
     textAlign: 'center',
     marginBottom: 6,
   },
 
   modalSubtitle: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
@@ -2408,6 +2571,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
+    fontFamily: 'Quicksand-Regular',
     backgroundColor: '#F8FAFC',
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -2423,8 +2587,8 @@ const styles = StyleSheet.create({
   },
 
   typePickerLabel: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#374151',
     marginBottom: 10,
     marginTop: 2,
@@ -2457,20 +2621,21 @@ const styles = StyleSheet.create({
   },
 
   typeOptionText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#64748B',
     fontSize: 12,
-    fontWeight: '700',
   },
 
   typeOptionTextActive: {
+    fontFamily: 'Quicksand-Regular',
     color: '#7C3AED',
   },
 
   /* TIME PICKER */
 
   timePickerLabel: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#374151',
     marginBottom: 10,
     marginTop: 2,
@@ -2508,13 +2673,14 @@ const styles = StyleSheet.create({
   },
 
   timeControlText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#7C3AED',
     fontSize: 20,
-    fontWeight: '700',
     lineHeight: 22,
   },
 
   timeInput: {
+    fontFamily: 'Quicksand-Bold',
     minWidth: 64,
     height: 48,
     borderRadius: 14,
@@ -2527,30 +2693,29 @@ const styles = StyleSheet.create({
 
     fontSize: 22,
     color: '#111827',
-    fontWeight: '800',
     textAlign: 'center',
     paddingVertical: 0,
   },
 
   timeValue: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 22,
     color: '#111827',
-    fontWeight: '800',
   },
 
   timeColon: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 27,
     color: '#8B5CF6',
-    fontWeight: '800',
     marginHorizontal: 8,
     marginBottom: 18,
   },
 
   timeUnit: {
+    fontFamily: 'Quicksand-SemiBold',
     marginTop: 5,
     fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '600',
   },
 
   selectedTimePreview: {
@@ -2568,20 +2733,20 @@ const styles = StyleSheet.create({
   },
 
   selectedTimePreviewLabel: {
+    fontFamily: 'Quicksand-SemiBold',
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '600',
   },
 
   selectedTimePreviewValue: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 15,
     color: '#7C3AED',
-    fontWeight: '800',
   },
 
   colorPickerLabel: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#374151',
     marginBottom: 10,
     marginTop: 2,
@@ -2610,9 +2775,9 @@ const styles = StyleSheet.create({
   },
 
   colorCheck: {
+    fontFamily: 'Quicksand-Bold',
     color: '#111827',
     fontSize: 16,
-    fontWeight: '800',
   },
 
   modalButtons: {
@@ -2634,9 +2799,9 @@ const styles = StyleSheet.create({
   },
 
   cancelButtonText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#4B5563',
     fontSize: 15,
-    fontWeight: '700',
   },
 
   saveButton: {
@@ -2653,9 +2818,9 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
   },
 
   disabledButton: {
@@ -2670,20 +2835,22 @@ const styles = StyleSheet.create({
   },
 
   deleteEmoji: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 28,
     textAlign: 'center',
     marginBottom: 10,
   },
 
   deleteTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 22,
-    fontWeight: '700',
     color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
 
   deleteText: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
@@ -2709,9 +2876,9 @@ const styles = StyleSheet.create({
   },
 
   cancelDeleteText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#4B5563',
     fontSize: 15,
-    fontWeight: '700',
   },
 
   confirmDeleteBtn: {
@@ -2728,9 +2895,9 @@ const styles = StyleSheet.create({
   },
 
   confirmDeleteText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
   },
 
   /* =========================================================
@@ -2775,14 +2942,15 @@ const styles = StyleSheet.create({
   },
 
   errorModalTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 21,
-    fontWeight: '800',
     color: '#11163A',
     textAlign: 'center',
     marginBottom: 8,
   },
 
   errorModalText: {
+    fontFamily: 'Quicksand-Regular',
     fontSize: 14,
     lineHeight: 21,
     color: '#687492',
@@ -2821,9 +2989,9 @@ const styles = StyleSheet.create({
   },
 
   errorModalButtonText: {
+    fontFamily: 'Quicksand-Bold',
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
   },
 
   /* =========================================================
@@ -2855,22 +3023,22 @@ const styles = StyleSheet.create({
   },
 
   successToastTitle: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 13,
-    fontWeight: '800',
     color: '#8B5CF6',
     marginBottom: 2,
   },
 
   successToastText: {
+    fontFamily: 'Quicksand-SemiBold',
     color: '#374151',
     fontSize: 13,
-    fontWeight: '600',
     lineHeight: 18,
   },
 
   petPickerLabel: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 14,
-    fontWeight: '700',
     color: '#374151',
     marginBottom: 10,
   },
@@ -2915,23 +3083,23 @@ const styles = StyleSheet.create({
   },
 
   petSelectText: {
+    fontFamily: 'Quicksand-Bold',
     flex: 1,
     fontSize: 14,
-    fontWeight: '700',
     color: '#374151',
   },
 
   petPlaceholderText: {
+    fontFamily: 'Quicksand-SemiBold',
     flex: 1,
     fontSize: 14,
     color: '#9CA3AF',
-    fontWeight: '600',
   },
 
   petArrow: {
+    fontFamily: 'Quicksand-SemiBold',
     fontSize: 22,
     color: '#7C3AED',
-    fontWeight: '600',
     marginLeft: 8,
   },
 
@@ -2973,29 +3141,806 @@ const styles = StyleSheet.create({
   },
 
   petDropdownText: {
+    fontFamily: 'Quicksand-SemiBold',
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
     color: '#475569',
   },
 
   petDropdownTextSelected: {
+    fontFamily: 'Quicksand-Bold',
     color: '#7C3AED',
-    fontWeight: '700',
   },
 
   petCheck: {
+    fontFamily: 'Quicksand-Bold',
     fontSize: 18,
     color: '#7C3AED',
-    fontWeight: '700',
     marginLeft: 8,
   },
 
   noPetsText: {
+    fontFamily: 'Quicksand-Regular',
     padding: 16,
     fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
+  },
+
+
+  plannerContent: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 34,
+    backgroundColor: '#FAF9FF',
+  },
+
+  referenceHeader: {
+    minHeight: 76,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FCFBFF',
+  },
+
+  referenceBack: {
+    width: 32,
+    height: 34,
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+
+  referenceBackText: {
+    fontFamily: 'Quicksand-Light',
+    fontSize: 34,
+    lineHeight: 34,
+    color: '#17143F',
+    marginTop: -5,
+  },
+
+  referenceHeaderCopy: {
+    flex: 1,
+    paddingTop: 1,
+  },
+
+  referenceHeaderTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 23,
+    lineHeight: 27,
+    color: '#17143F',
+  },
+
+  referenceSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+
+  referenceHeaderSubtitle: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#817B9E',
+  },
+
+  referenceNewButton: {
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    backgroundColor: '#F0ECFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+
+  referenceNewPlus: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 21,
+    lineHeight: 22,
+    color: '#7256E8',
+    marginRight: 6,
+  },
+
+  referenceNewText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 12,
+    color: '#7256E8',
+  },
+
+  headerDivider: {
+    height: 1,
+    backgroundColor: '#F0EDF8',
+  },
+
+  buttonPressed: {
+    opacity: 0.76,
+    transform: [{scale: 0.98}],
+  },
+
+  calendarArea: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 14,
+    backgroundColor: '#FAF9FF',
+  },
+
+  calendarBackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+
+  monthRow: {
+    position: 'relative',
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  calendarBackButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0ECFF',
+    marginRight: 6,
+  },
+
+  calendarBackText: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 29,
+    lineHeight: 31,
+    color: '#7256E8',
+    marginTop: -5,
+  },
+
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+
+  monthActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 6,
+  },
+
+  monthArrowButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  monthArrow: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 29,
+    lineHeight: 31,
+    color: '#7256E8',
+    marginTop: -5,
+  },
+
+  monthTitle: {
+    fontFamily: 'Quicksand-Bold',
+    minWidth: 108,
+    textAlign: 'center',
+    fontSize: 17,
+    lineHeight: 22,
+    color: '#17143F',
+    textTransform: 'capitalize',
+    marginHorizontal: 4,
+  },
+
+  todayButton: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#EFEBFF',
+  },
+
+  todayButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 11,
+    color: '#7256E8',
+  },
+
+  compactNewButton: {
+    height: 34,
+    paddingHorizontal: 11,
+    borderRadius: 17,
+    backgroundColor: '#7256E8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  compactNewPlus: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 18,
+    lineHeight: 19,
+    color: '#FFFFFF',
+    marginRight: 4,
+  },
+
+  compactNewText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 10,
+    color: '#FFFFFF',
+  },
+
+  weekStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+
+  weekDay: {
+    flex: 1,
+    height: 82,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F3F0F8',
+  },
+
+  weekDayActive: {
+    backgroundColor: '#DDD2FF',
+    borderColor: '#D8CBFF',
+  },
+
+  weekDayName: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 10,
+    lineHeight: 13,
+    color: '#777294',
+    marginBottom: 5,
+  },
+
+  weekDayNameActive: {
+    fontFamily: 'Quicksand-Regular',
+    color: '#514A72',
+  },
+
+  weekDayNumber: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 18,
+    lineHeight: 22,
+    color: '#17143F',
+  },
+
+  weekDayNumberActive: {
+    fontFamily: 'Quicksand-Regular',
+    color: '#17143F',
+  },
+
+  dayDots: {
+    height: 8,
+    marginTop: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+
+  dayDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  dayDotPlaceholder: {
+    width: 6,
+    height: 6,
+  },
+
+  monthCalendar: {
+    marginTop: 14,
+    paddingTop: 12,
+    paddingHorizontal: 2,
+    borderTopWidth: 1,
+    borderTopColor: '#F0EDF8',
+  },
+
+  monthWeekHeader: {
+    flexDirection: 'row',
+    marginBottom: 7,
+  },
+
+  monthWeekHeaderText: {
+    fontFamily: 'Quicksand-Bold',
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#817B9E',
+  },
+
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  monthDayCell: {
+    width: '14.2857%',
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    marginVertical: 2,
+  },
+
+  monthDayCellActive: {
+    backgroundColor: '#7256E8',
+  },
+
+  monthDayCellToday: {
+    backgroundColor: '#F0ECFF',
+  },
+
+  monthDayNumber: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#302A59',
+  },
+
+  monthDayNumberMuted: {
+    fontFamily: 'Quicksand-SemiBold',
+    color: '#C3BED2',
+  },
+
+  monthDayNumberActive: {
+    fontFamily: 'Quicksand-Bold',
+    color: '#FFFFFF',
+  },
+
+  monthDayDots: {
+    height: 6,
+    marginTop: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+
+  monthDayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+
+  monthExpandWrap: {
+    alignItems: 'center',
+    marginTop: 14,
+  },
+
+  monthExpandButton: {
+    minWidth: 122,
+    height: 34,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: '#F0ECFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+
+  monthExpandIcon: {
+    fontFamily: 'Quicksand-Bold',
+    color: '#7256E8',
+    fontSize: 18,
+    marginTop: -4,
+  },
+
+  monthExpandIconOpen: {
+    transform: [{rotate: '180deg'}],
+    marginTop: 4,
+  },
+
+  monthExpandText: {
+    fontFamily: 'Quicksand-Bold',
+    color: '#7256E8',
+    fontSize: 12,
+  },
+
+  agendaPanel: {
+    marginHorizontal: 14,
+    marginTop: 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    paddingHorizontal: 14,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F2EFF8',
+    marginBottom: 14,
+  },
+
+  agendaHeadingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 14,
+    paddingHorizontal: 1,
+  },
+
+  agendaHeadingText: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  selectedDateText: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: '#817B9E',
+    textTransform: 'capitalize',
+    marginBottom: 3,
+  },
+
+  agendaTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 23,
+    lineHeight: 28,
+    color: '#17143F',
+  },
+
+  recordCountBadge: {
+    backgroundColor: '#F0ECFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginBottom: 2,
+  },
+
+  recordCountText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 10,
+    color: '#7256E8',
+  },
+
+  careCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ECE9F2',
+    marginBottom: 10,
+    overflow: 'hidden',
+    minHeight: 94,
+  },
+
+  careAccent: {
+    width: 5,
+  },
+
+  careCardContent: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingLeft: 10,
+    paddingRight: 10,
+  },
+
+  careMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 70,
+  },
+
+  carePetImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    backgroundColor: '#F3EFFF',
+    marginRight: 10,
+  },
+
+  careTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  carePetName: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#17143F',
+    marginBottom: 4,
+  },
+
+  eventNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  eventTypeIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+
+  careEventTitle: {
+    fontFamily: 'Quicksand-Bold',
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#302A59',
+  },
+
+  careMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  careTime: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 11,
+    color: '#817B9E',
+  },
+
+  cardRight: {
+    alignSelf: 'stretch',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginLeft: 8,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+
+  statusDone: {
+    backgroundColor: '#DDF7EE',
+  },
+
+  statusPending: {
+    backgroundColor: '#EEE8FF',
+  },
+
+  statusText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 9,
+  },
+
+  statusDoneText: {
+    fontFamily: 'Quicksand-Regular',
+    color: '#229474',
+  },
+
+  statusPendingText: {
+    fontFamily: 'Quicksand-Regular',
+    color: '#7256E8',
+  },
+
+  careActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+
+  moreCircle: {
+    minWidth: 25,
+    height: 25,
+    paddingHorizontal: 5,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  moreCircleText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 16,
+    color: '#77718F',
+  },
+
+  moreDots: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 15,
+    letterSpacing: 1,
+    color: '#292347',
+    marginTop: -5,
+  },
+
+  careNote: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 11,
+    color: '#918B9F',
+    lineHeight: 16,
+    marginTop: 8,
+    marginLeft: 71,
+  },
+
+  addCareButton: {
+    height: 46,
+    borderRadius: 17,
+    backgroundColor: '#F0ECFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 3,
+    flexDirection: 'row',
+    gap: 7,
+  },
+
+  addCarePlus: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 21,
+    color: '#7256E8',
+  },
+
+  addCareButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 13,
+    color: '#7256E8',
+  },
+
+  plannerEmpty: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+
+  emptyIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3EFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 11,
+  },
+
+  emptyIcon: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 21,
+    color: '#9275DF',
+  },
+
+  plannerEmptyTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 13,
+    color: '#302B42',
+    marginBottom: 5,
+  },
+
+  plannerEmptyText: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#9690A2',
+    textAlign: 'center',
+  },
+
+  upcomingSection: {
+    marginHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    paddingHorizontal: 12,
+    paddingTop: 15,
+    paddingBottom: 11,
+    borderWidth: 1,
+    borderColor: '#F2EFF8',
+    marginBottom: 10,
+  },
+
+  upcomingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+
+  upcomingTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 20,
+    lineHeight: 24,
+    color: '#17143F',
+  },
+
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0ECFF',
+    paddingLeft: 13,
+    paddingRight: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+
+  seeAllText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 10,
+    color: '#7256E8',
+  },
+
+  seeAllArrow: {
+    fontFamily: 'Quicksand-Bold',
+    marginLeft: 5,
+    fontSize: 20,
+    lineHeight: 19,
+    color: '#7256E8',
+  },
+
+  upcomingList: {
+    borderWidth: 1,
+    borderColor: '#F0EDF5',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  upcomingCard: {
+    minHeight: 72,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0EDF5',
+  },
+
+  upcomingCardLast: {
+    borderBottomWidth: 0,
+  },
+
+  upcomingIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+
+  upcomingText: {
+    flex: 1,
+    paddingVertical: 12,
+  },
+
+  upcomingDate: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 12,
+    color: '#8A84A2',
+    textTransform: 'capitalize',
+    marginBottom: 2,
+  },
+
+  upcomingEventTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 16,
+    lineHeight: 20,
+    color: '#17143F',
+    marginBottom: 2,
+  },
+
+  upcomingPet: {
+    fontFamily: 'Quicksand-SemiBold',
+    fontSize: 13,
+    color: '#817B9E',
+  },
+
+  upcomingArrow: {
+    fontFamily: 'Quicksand-Regular',
+    fontSize: 30,
+    color: '#817B9E',
+    marginLeft: 8,
   },
 
 });
