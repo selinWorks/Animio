@@ -9,11 +9,18 @@ import {
   Modal,
   Animated,
   Image,
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Switch,
+  AppState,
 } from 'react-native';
 
 
 import {
   addCareEventToFirestore,
+  updateCareEventInFirestore,
   getCareEventsFromFirestore,
   deleteCareEventFromFirestore,
   setCareEventCompletedInFirestore,
@@ -34,9 +41,24 @@ import {
   LockKeyhole,
   Clock3,
   CalendarX2,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   TriangleAlert,
   Save,
   Trash2,
+  Pencil,
+  X,
+  Syringe,
+  Stethoscope,
+  Pill,
+  Scissors,
+  MoreHorizontal,
+  Bell,
+  Plus,
+  Check,
+  Palette,
+  ChevronDown,
 } from 'lucide-react-native';
 
 type CareEventType =
@@ -54,9 +76,13 @@ type CareEvent = {
   time?: string;
   type: CareEventType;
   petName: string;
+  petId?: string;
+  notes?: string;
+  description?: string;
   note?: string;
   color?: string;
   completed?: boolean;
+  reminderEnabled?: boolean;
   completedAt?: any;
 };
 
@@ -136,6 +162,33 @@ export default function CalendarScreen() {
   const [loading, setLoading] = useState(true);
   const [monthExpanded, setMonthExpanded] = useState(false);
 
+  const [editingEvent, setEditingEvent] = useState<CareEvent | null>(null);
+  const [noteExpanded, setNoteExpanded] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [pendingHour, setPendingHour] = useState('09');
+  const [pendingMinute, setPendingMinute] = useState('00');
+  const [editDate, setEditDate] = useState('');
+  const [newEventDate, setNewEventDate] = useState(selectedDate);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerMonth, setDatePickerMonth] = useState(() => new Date());
+  const [pendingDate, setPendingDate] = useState('');
+  const actionMenuRootRef = useRef<View>(null);
+  const [actionMenu, setActionMenu] = useState<{
+    event: CareEvent;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [upcomingModalVisible, setUpcomingModalVisible] = useState(false);
+  const [upcomingNow, setUpcomingNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setUpcomingNow(Date.now());
+    const timer = setInterval(refresh, 60000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refresh();
+    });
+    return () => { clearInterval(timer); subscription.remove(); };
+  }, []);
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -427,6 +480,8 @@ export default function CalendarScreen() {
           timeString,
         );
 
+      if (!notificationDate) throw new Error('Geçersiz bildirim tarihi.');
+
       console.log(
         'PLANLANAN BİLDİRİM:',
         notificationDate.toString(),
@@ -508,6 +563,7 @@ export default function CalendarScreen() {
         'Bildirim planlama hatası:',
         error,
       );
+      throw error;
     }
   };
 
@@ -524,6 +580,13 @@ export default function CalendarScreen() {
   ========================================================= */
 
   const resetForm = () => {
+    setEditingEvent(null);
+    setEditDate('');
+    setNewEventDate(selectedDate);
+    setDatePickerVisible(false);
+    setTimePickerVisible(false);
+    setNoteExpanded(false);
+    setReminderEnabled(true);
     setTitle('');
     setPetName('');
     setSelectedPetId(null);
@@ -540,7 +603,44 @@ export default function CalendarScreen() {
      ADD EVENT
   ========================================================= */
 
+  const handleEditEvent = (event: CareEvent) => {
+    resetForm();
+    setEditingEvent(event);
+    setReminderEnabled(event.reminderEnabled !== false);
+    setNoteExpanded(Boolean(event.note || event.notes || event.description));
+    setEditDate(event.date);
+    setTitle(event.title);
+    const matchingPets = pets.filter(pet => pet.name === event.petName);
+    const pet = event.petId
+      ? pets.find(item => String(item.id) === String(event.petId))
+      : matchingPets.length === 1 ? matchingPets[0] : undefined;
+    setSelectedPetId(pet ? String(pet.id) : null);
+    setPetName(pet?.name || event.petName);
+    setNote(event.note ?? event.notes ?? event.description ?? '');
+    setSelectedColor(event.color || PASTEL_COLORS[2]);
+    setSelectedType(event.type || 'Custom');
+    const [hour, minute] = (event.time || '09:00').split(':');
+    setSelectedHour(hour);
+    setSelectedMinute(minute);
+    setModalVisible(true);
+  };
+
+  const handleEventActions = (event: CareEvent, pageX: number, pageY: number) => {
+    actionMenuRootRef.current?.measureInWindow((rootX, rootY, width, height) => {
+      const screen = Dimensions.get('window');
+      const availableWidth = width || screen.width;
+      const availableHeight = height || screen.height;
+      setActionMenu({
+        event,
+        x: Math.max(12, Math.min(pageX - rootX - 148, availableWidth - 172)),
+        y: Math.max(12, Math.min(pageY - rootY + 12, availableHeight - 112)),
+      });
+    });
+  };
+
   const handleAddEvent = async () => {
+    if (saving) return;
+    const eventDate = editingEvent ? editDate.trim() : newEventDate.trim();
     if (!title.trim()) {
       showErrorModal(
         'Görev başlığı eksik',
@@ -600,7 +700,7 @@ export default function CalendarScreen() {
 
     const selectedDateTime =
       getNotificationDate(
-        selectedDate,
+        eventDate,
         selectedTime,
       );
 
@@ -614,7 +714,10 @@ export default function CalendarScreen() {
       return;
     }
 
-    if (selectedDateTime.getTime() <= Date.now()) {
+    const unchangedSchedule = editingEvent &&
+      eventDate === editingEvent.date && selectedTime === (editingEvent.time || '09:00');
+    if (selectedDateTime.getTime() <= Date.now() &&
+        !editingEvent?.completed && !unchangedSchedule) {
       showErrorModal(
         'Geçersiz tarih veya saat',
         'Hatırlatma için gelecekte bir tarih ve saat seçmelisin.',
@@ -687,37 +790,43 @@ export default function CalendarScreen() {
         return;
       }
 
-      // Firestore'a bakım görevini kaydet
-      const eventId =
-        await addCareEventToFirestore(
-          {
-            title: eventTitle,
-            date: selectedDate,
-            time: selectedTime,
-            type: selectedType,
-            petName: eventPetName,
-            petId: selectedPet.id,
-            note: note.trim(),
-            color: selectedColor,
-          },
-          user.uid,
-        );
-
-      // Telefon bildirimini planla
-      try {
-        await scheduleCareNotification({
-          eventId,
-          eventTitle,
-          petNameText: eventPetName,
-          dateString: selectedDate,
-          timeString: selectedTime,
-        });
-      } catch (notificationError) {
-        console.log(
-          'Bildirim planlanamadı:',
-          notificationError,
-        );
+      const payload = {
+        title: eventTitle,
+        date: eventDate,
+        time: selectedTime,
+        type: selectedType,
+        petName: eventPetName,
+        petId: selectedPet.id,
+        note: note.trim(),
+        notes: note.trim(),
+        color: selectedColor,
+        reminderEnabled,
+      };
+      const eventId = editingEvent
+        ? editingEvent.id
+        : await addCareEventToFirestore(payload, user.uid);
+      if (editingEvent) {
+        await updateCareEventInFirestore({...payload, id: eventId}, user.uid);
       }
+
+      let reminderFailed = false;
+      try {
+        await cancelCareNotification(eventId);
+        if (reminderEnabled && !editingEvent?.completed && selectedDateTime.getTime() > Date.now()) {
+          await scheduleCareNotification({
+            eventId,
+            eventTitle,
+            petNameText: eventPetName,
+            dateString: eventDate,
+            timeString: selectedTime,
+          });
+        }
+      } catch (notificationError) {
+        reminderFailed = true;
+        console.log('Bildirim güncellenemedi:', notificationError);
+      }
+      const wasEditing = Boolean(editingEvent);
+      setSelectedDate(eventDate);
 
       // Formu temizle
       resetForm();
@@ -730,8 +839,11 @@ export default function CalendarScreen() {
 
       // Başarılı mesajı
       showToast(
-        'Başarılı',
-        `${eventPetName} için bakım görevi ${selectedTime} için planlandı ✨`,
+        wasEditing ? 'Güncellendi' : 'Başarılı',
+        reminderFailed
+          ? 'Görev kaydedildi, ancak telefon hatırlatıcısı güncellenemedi.'
+          : wasEditing ? 'Bakım görevi güncellendi ✨'
+          : `${eventPetName} için bakım görevi ${selectedTime} için planlandı ✨`,
       );
     } catch (error: any) {
       console.log(
@@ -1020,12 +1132,24 @@ export default function CalendarScreen() {
     setSelectedDate(getLocalDateString(next));
   };
 
-  const upcomingEvents = useMemo(() => {
+  const upcomingMonthEvents = useMemo(() => {
+    const now = new Date(upcomingNow);
+    // One calendar month; clamp month-end dates (31 January -> 28/29 February).
+    const limit = new Date(now);
+    const day = limit.getDate();
+    limit.setDate(1);
+    limit.setMonth(limit.getMonth() + 1);
+    const lastDay = new Date(limit.getFullYear(), limit.getMonth() + 1, 0).getDate();
+    limit.setDate(Math.min(day, lastDay));
     return events
-      .filter(event => event.date > selectedDate && !event.completed)
-      .sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`))
-      .slice(0, 3);
-  }, [events, selectedDate]);
+      .filter(event => {
+        if (event.completed) return false;
+        const date = getNotificationDate(event.date, event.time || '09:00');
+        return date !== null && date.getTime() >= upcomingNow && date.getTime() <= limit.getTime();
+      })
+      .sort((a, b) => `${a.date} ${a.time || '09:00'}`.localeCompare(`${b.date} ${b.time || '09:00'}`));
+  }, [events, upcomingNow]);
+  const upcomingEvents = upcomingMonthEvents.slice(0, 3);
 
   const getPetForEvent = (event: CareEvent) =>
     pets.find(pet => pet.name === event.petName);
@@ -1039,12 +1163,37 @@ export default function CalendarScreen() {
     return 'Diğer';
   };
 
+  const openDatePicker = () => {
+    Keyboard.dismiss();
+    const value = editingEvent ? editDate : newEventDate;
+    const parsed = getNotificationDate(value, '12:00') || new Date();
+    setPendingDate(getLocalDateString(parsed));
+    setDatePickerMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+    setDatePickerVisible(true);
+  };
+
+  const datePickerCells = useMemo(() => {
+    const year = datePickerMonth.getFullYear();
+    const month = datePickerMonth.getMonth();
+    const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+    const count = new Date(year, month + 1, 0).getDate();
+    const cellCount = Math.ceil((offset + count) / 7) * 7;
+    return Array.from({length: cellCount}, (_, index) => {
+      const day = index - offset + 1;
+      return day > 0 && day <= count ? day : null;
+    });
+  }, [datePickerMonth]);
+
+  const shiftPickerMonth = (amount: number) => {
+    setDatePickerMonth(value => new Date(value.getFullYear(), value.getMonth() + amount, 1));
+  };
+
   /* =========================================================
      UI
   ========================================================= */
 
   return (
-    <>
+    <View ref={actionMenuRootRef} style={{flex: 1}} collapsable={false}>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.plannerContent}
@@ -1062,7 +1211,7 @@ export default function CalendarScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => setModalVisible(true)}
+              onPress={() => { resetForm(); setModalVisible(true); }}
               style={({pressed}) => [
                 styles.compactNewButton,
                 pressed && styles.buttonPressed,
@@ -1304,45 +1453,34 @@ export default function CalendarScreen() {
                       </View>
 
                       <View style={styles.cardRight}>
-                        <View
-                          style={[
+                        <Pressable
+                          onPress={() => handleToggleCompleted(event)}
+                          disabled={completingEventId !== null}
+                          accessibilityRole="button"
+                          accessibilityLabel={event.completed ? 'Tamamlanmayı geri al' : 'Bakımı tamamla'}
+                          accessibilityState={{disabled: completingEventId !== null}}
+                          style={({pressed}) => [
                             styles.statusBadge,
-                            event.completed
-                              ? styles.statusDone
-                              : styles.statusPending,
+                            event.completed ? styles.statusDone : styles.statusPending,
+                            pressed && styles.buttonPressed,
                           ]}>
-                          <Text
-                            style={[
-                              styles.statusText,
-                              event.completed
-                                ? styles.statusDoneText
-                                : styles.statusPendingText,
-                            ]}>
-                            {event.completed
-                              ? '✓  Tamamlandı'
-                              : '◷  Bekliyor'}
+                          <Text style={[
+                            styles.statusText,
+                            event.completed ? styles.statusDoneText : styles.statusPendingText,
+                          ]}>
+                            {completingEventId === event.id
+                              ? 'İşleniyor...'
+                              : event.completed ? 'Tamamlandı' : 'Tamamla'}
                           </Text>
-                        </View>
+                        </Pressable>
 
                         <View style={styles.careActions}>
                           <Pressable
-                            onPress={() => handleToggleCompleted(event)}
-                            disabled={completingEventId === event.id}
-                            style={({pressed}) => [
-                              styles.moreCircle,
-                              pressed && styles.buttonPressed,
-                            ]}>
-                            <Text style={styles.moreCircleText}>
-                              {completingEventId === event.id
-                                ? '…'
-                                : event.completed
-                                  ? '↶'
-                                  : '✓'}
-                            </Text>
-                          </Pressable>
-
-                          <Pressable
-                            onPress={() => handleDeleteEvent(event.id)}
+                            onPress={pressEvent => handleEventActions(
+                              event,
+                              pressEvent.nativeEvent.pageX,
+                              pressEvent.nativeEvent.pageY,
+                            )}
                             style={({pressed}) => [
                               styles.moreCircle,
                               pressed && styles.buttonPressed,
@@ -1385,17 +1523,31 @@ export default function CalendarScreen() {
           </Pressable>
         </View>
 
-        {upcomingEvents.length > 0 ? (
+
           <View style={styles.upcomingSection}>
             <View style={styles.upcomingHeader}>
               <Text style={styles.upcomingTitle}>Yaklaşan Bakımlar</Text>
 
-              <View style={styles.seeAllButton}>
+              {upcomingEvents.length > 0 && <Pressable onPress={() => { setUpcomingNow(Date.now()); setUpcomingModalVisible(true); }}
+                accessibilityRole="button" style={styles.seeAllButton}>
                 <Text style={styles.seeAllText}>Tümünü Gör</Text>
                 <Text style={styles.seeAllArrow}>›</Text>
-              </View>
+              </Pressable>}
             </View>
 
+            {loading ? (
+              <View style={styles.plannerEmpty}>
+                <Text style={styles.plannerEmptyText}>Yaklaşan bakımlar yükleniyor.</Text>
+              </View>
+            ) : upcomingEvents.length === 0 ? (
+              <View style={styles.plannerEmpty}>
+                <View style={styles.emptyIconCircle}>
+                  <CalendarDays size={22} color="#9275DF" />
+                </View>
+                <Text style={styles.plannerEmptyTitle}>Yaklaşan bakım yok</Text>
+                <Text style={styles.plannerEmptyText}>Önümüzdeki 1 ay için bekleyen bakım bulunmuyor.</Text>
+              </View>
+            ) : (
             <View style={styles.upcomingList}>
               {upcomingEvents.map((event, index) => {
                 const eventColor = event.color || '#A78BFA';
@@ -1438,61 +1590,212 @@ export default function CalendarScreen() {
                 );
               })}
             </View>
+            )}
           </View>
-        ) : null}
+
 
       </ScrollView>
+
+      {actionMenu && (
+        <View style={styles.actionMenuOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setActionMenu(null)}
+            accessibilityLabel="Menüyü kapat"
+          />
+          <View style={[styles.actionMenu, {left: actionMenu.x, top: actionMenu.y}]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Bakım görevini düzenle"
+              onPress={() => {
+                const event = actionMenu.event;
+                setActionMenu(null);
+                handleEditEvent(event);
+              }}
+              style={({pressed}) => [styles.actionMenuItem, pressed && styles.actionMenuItemPressed]}>
+              <Pencil size={16} color="#7256E8" strokeWidth={2} />
+              <Text style={styles.actionMenuEditText}>Düzenle</Text>
+            </Pressable>
+            <View style={styles.actionMenuDivider} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Bakım görevini sil"
+              onPress={() => {
+                const eventId = actionMenu.event.id;
+                setActionMenu(null);
+                handleDeleteEvent(eventId);
+              }}
+              style={({pressed}) => [styles.actionMenuItem, pressed && styles.actionMenuItemPressed]}>
+              <Trash2 size={16} color="#E45B72" strokeWidth={2} />
+              <Text style={styles.actionMenuDeleteText}>Sil</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* =====================================================
           ADD MODAL
       ===================================================== */}
 
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
+      <Modal visible={upcomingModalVisible} transparent animationType="slide"
+        onRequestClose={() => setUpcomingModalVisible(false)}>
+        <View style={styles.careSheetBackdrop}>
+          <View style={[styles.careSheet, {paddingBottom: 24}]}>
+            <View style={styles.careSheetHandle} />
+            <View style={styles.careSheetHeader}>
+              <Text style={styles.careSheetTitle}>Yaklaşan bakımlar</Text>
+              <Pressable style={styles.careSheetClose} accessibilityLabel="Listeyi kapat"
+                onPress={() => setUpcomingModalVisible(false)}><X size={20} color="#817B9E" /></Pressable>
+            </View>
+            <Text style={{fontFamily: 'Quicksand-SemiBold', fontSize: 12, color: '#817B9E', marginHorizontal: 20, marginBottom: 14}}>
+              Önümüzdeki 1 ay · {upcomingMonthEvents.length} bakım
+            </Text>
+            <ScrollView contentContainerStyle={{paddingHorizontal: 20}}>
+              {upcomingMonthEvents.length === 0 ? (
+                <Text style={styles.plannerEmptyText}>Önümüzdeki 1 ay için bekleyen bakım bulunmuyor.</Text>
+              ) : upcomingMonthEvents.map(event => (
+                <Pressable key={event.id} style={styles.upcomingCard}
+                  onPress={() => { setSelectedDate(event.date); setUpcomingModalVisible(false); }}>
+                  <View style={[styles.upcomingIconCircle, {backgroundColor: '#F0ECFF'}]}>
+                    <PawPrint size={21} color="#7954EF" />
+                  </View>
+                  <View style={styles.upcomingText}>
+                    <Text style={styles.upcomingDate}>{formatTurkishDate(event.date)} · {event.time || '09:00'}</Text>
+                    <Text style={styles.upcomingEventTitle}>{event.title}</Text>
+                    <Text style={styles.upcomingPet}>{event.petName}</Text>
+                  </View>
+                  <Text style={styles.upcomingArrow}>›</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
+      <Modal visible={modalVisible} transparent animationType="slide"
         onRequestClose={() => {
-          resetForm();
-          setModalVisible(false);
+          if (saving) return;
+          if (datePickerVisible) { setDatePickerVisible(false); return; }
+          if (timePickerVisible) { setTimePickerVisible(false); return; }
+          Keyboard.dismiss(); resetForm(); setModalVisible(false);
         }}>
-
-        <View style={styles.modalOverlay}>
-
-          <View style={styles.modalCard}>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled">
-
-              <Text style={styles.modalEmoji}>
-                ✨
-              </Text>
-
-              <Text style={styles.modalTitle}>
-                Yeni Bakım Görevi
-              </Text>
-
-              <Text style={styles.modalSubtitle}>
-                Seçili tarih: {selectedDate}
-              </Text>
-
-              {/* TITLE */}
-
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder={TITLE_PLACEHOLDERS[selectedType]}
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
-
-              {/* PET */}
-
-              <Text style={styles.petPickerLabel}>
-                Dostunu seç
-              </Text>
-
+        <KeyboardAvoidingView style={styles.careSheetBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {datePickerVisible ? (
+            <View style={styles.datePickerCard}>
+              <View style={styles.careSheetHandle} />
+              <View style={styles.datePickerHeading}>
+                <View style={styles.datePickerIconBadge}>
+                  <CalendarDays size={24} color="#7256E8" />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.datePickerTitle}>Bakım tarihi</Text>
+                </View>
+                <Pressable onPress={() => setDatePickerVisible(false)}
+                  accessibilityLabel="Takvimi kapat" style={styles.datePickerClose}>
+                  <Text style={styles.datePickerCloseText}>×</Text>
+                </Pressable>
+              </View>
+              <View style={styles.datePickerMonthRow}>
+                <Pressable onPress={() => shiftPickerMonth(-1)}
+                  accessibilityLabel="Önceki ay" style={styles.datePickerArrow}>
+                  <ChevronLeft size={20} color="#7256E8" />
+                </Pressable>
+                <Text style={styles.datePickerMonthTitle}>
+                  {datePickerMonth.toLocaleDateString('tr-TR', {month: 'long', year: 'numeric'})}
+                </Text>
+                <Pressable onPress={() => shiftPickerMonth(1)}
+                  accessibilityLabel="Sonraki ay" style={styles.datePickerArrow}>
+                  <ChevronRight size={20} color="#7256E8" />
+                </Pressable>
+              </View>
+              <View style={styles.datePickerGrid}>
+                {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(day => (
+                  <View key={day} style={styles.datePickerCell}>
+                    <Text style={styles.datePickerWeekday}>{day}</Text>
+                  </View>
+                ))}
+                {datePickerCells.map((day, index) => {
+                  const value = day ? getLocalDateString(new Date(
+                    datePickerMonth.getFullYear(), datePickerMonth.getMonth(), day,
+                  )) : '';
+                  const selected = value === pendingDate;
+                  return (
+                    <View key={index} style={styles.datePickerCell}>
+                      {day !== null && (
+                        <Pressable onPress={() => setPendingDate(value)}
+                          accessibilityRole="button"
+                          accessibilityLabel={value}
+                          accessibilityState={{selected}}
+                          style={[styles.datePickerDay, selected && styles.datePickerDaySelected]}>
+                          <Text style={[styles.datePickerDayText,
+                            value === today && styles.datePickerTodayText,
+                            selected && styles.datePickerDaySelectedText]}>{day}</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={styles.datePickerSelectedDate}>Seçili tarih: {pendingDate}</Text>
+              <View style={styles.modalButtons}>
+                <Pressable style={styles.cancelButton} onPress={() => setDatePickerVisible(false)}>
+                  <Text style={styles.cancelButtonText}>İptal</Text>
+                </Pressable>
+                <Pressable style={styles.saveButton} onPress={() => {
+                  if (editingEvent) setEditDate(pendingDate);
+                  else setNewEventDate(pendingDate);
+                  setDatePickerVisible(false);
+                }}>
+                  <Text style={styles.saveButtonText}>Onayla</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : timePickerVisible ? (
+            <View style={styles.careSheetTimeCard}>
+              <View style={styles.careSheetHeader}>
+                <View style={styles.careSheetHeadingIcon}><Clock3 size={23} color="#FFFFFF" /></View>
+                <Text style={styles.careSheetTitle}>Saat seç</Text>
+                <Pressable style={styles.careSheetClose} onPress={() => setTimePickerVisible(false)} accessibilityLabel="Saat seçimini kapat">
+                  <X size={20} color="#817B9E" />
+                </Pressable>
+              </View>
+              <View style={styles.careSheetTimeColumns}>
+                {[{label: 'Saat', count: 24, value: pendingHour, set: setPendingHour},
+                  {label: 'Dakika', count: 60, value: pendingMinute, set: setPendingMinute}].map(column => (
+                  <View key={column.label} style={styles.careSheetTimeColumn}>
+                    <Text style={styles.careSheetLabel}>{column.label}</Text>
+                    <ScrollView style={{height: 220}} showsVerticalScrollIndicator={false}
+                      contentOffset={{x: 0, y: Math.max(0, Number(column.value) * 44 - 88)}}>
+                      {Array.from({length: column.count}, (_, index) => {
+                        const value = String(index).padStart(2, '0');
+                        const active = value === column.value;
+                        return <Pressable key={value} onPress={() => column.set(value)}
+                          accessibilityState={{selected: active}}
+                          style={[styles.careSheetTimeOption, active && styles.careSheetCategoryActive]}>
+                          <Text style={[styles.careSheetTimeValue, active && {color: '#7954EF'}]}>{value}</Text>
+                        </Pressable>;
+                      })}
+                    </ScrollView>
+                  </View>
+                ))}
+              </View>
+              <Pressable style={styles.careSheetSave} onPress={() => {
+                setSelectedHour(pendingHour); setSelectedMinute(pendingMinute); setTimePickerVisible(false);
+              }}><Check size={19} color="#FFFFFF" /><Text style={styles.careSheetSaveText}>Onayla</Text></Pressable>
+            </View>
+          ) : (
+            <View style={styles.careSheet}>
+              <View style={styles.careSheetHandle} />
+              <View style={styles.careSheetHeader}>
+                <View style={styles.careSheetHeadingIcon}><PawPrint size={24} color="#FFFFFF" /></View>
+                <Text style={styles.careSheetTitle}>{editingEvent ? 'Bakımı düzenle' : 'Yeni bakım'}</Text>
+                <Pressable disabled={saving} hitSlop={8} accessibilityLabel="Kaydetmeden kapat"
+                  onPress={() => { Keyboard.dismiss(); resetForm(); setModalVisible(false); }}
+                  style={styles.careSheetClose}><X size={20} color="#817B9E" /></Pressable>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.careSheetBody}>
               <View style={styles.petDropdownContainer}>
 
                 <Pressable
@@ -1501,6 +1804,7 @@ export default function CalendarScreen() {
                   }
                   style={[
                     styles.petSelectButton,
+                    styles.careSheetPetButton,
                     petDropdownOpen &&
                       styles.petSelectButtonOpen,
                   ]}>
@@ -1541,7 +1845,7 @@ export default function CalendarScreen() {
                                   selectedPet.photoUrl ||
                                   selectedPet.photoUri,
                               }}
-                              style={styles.petSelectImage}
+                              style={styles.careSheetPetImage}
                               resizeMode="cover"
                             />
                           ) : (
@@ -1549,14 +1853,18 @@ export default function CalendarScreen() {
                               source={getDefaultPetImage(
                                 selectedPet.type,
                               )}
-                              style={styles.petSelectImage}
+                              style={styles.careSheetPetImage}
                               resizeMode="contain"
                             />
                           )}
 
-                          <Text style={styles.petSelectText}>
-                            {selectedPet.name}
-                          </Text>
+                          <View style={{flex: 1, justifyContent: 'center'}}>
+                            <Text style={[styles.petSelectText, {
+                              flex: 0,
+                              lineHeight: 20,
+                              includeFontPadding: false,
+                            }]}>{selectedPet.name}</Text>
+                          </View>
                         </>
                       );
                     })()
@@ -1661,478 +1969,128 @@ export default function CalendarScreen() {
 
               </View>
 
-              <Text style={styles.typePickerLabel}>
-                Görev türü
-              </Text>
 
-              <View style={styles.typeGrid}>
-                {([
-                  ['Vaccination', 'Aşı'],
-                  ['Vet Visit', 'Veteriner'],
-                  ['Medication', 'İlaç / Parazit'],
-                  ['Grooming', 'Bakım'],
-                  ['Operation', 'Ameliyat / Kısırlaştırma'],
-                  ['Custom', 'Diğer'],
-                ] as [CareEventType, string][]).map(([value, label]) => {
-                  const active = selectedType === value;
-
-                  return (
-                    <Pressable
-                      key={value}
-                      onPress={() => setSelectedType(value)}
-                      style={({pressed}) => [
-                        styles.typeOption,
-                        active && styles.typeOptionActive,
-                        pressed && styles.typeOptionPressed,
-                      ]}>
-                      <Text
-                        style={[
-                          styles.typeOptionText,
-                          active && styles.typeOptionTextActive,
-                        ]}>
-                        {label}
+                <Text style={styles.careSheetLabel}>Görev adı</Text>
+                <TextInput value={title} onChangeText={setTitle}
+                  placeholder={TITLE_PLACEHOLDERS[selectedType]} placeholderTextColor="#A19BB2"
+                  style={styles.careSheetInput} />
+                <Text style={styles.careSheetLabel}>Kategori</Text>
+                <View style={styles.careSheetCategories}>
+                  {([
+                    ['Vaccination', 'Aşı', Syringe], ['Vet Visit', 'Veteriner', Stethoscope],
+                    ['Medication', 'İlaç', Pill], ['Grooming', 'Bakım', PawPrint],
+                    ['Operation', 'Ameliyat', Scissors], ['Custom', 'Diğer', MoreHorizontal],
+                  ] as const).map(([value, label, Icon]) => {
+                    const active = selectedType === value;
+                    return <Pressable key={value} onPress={() => setSelectedType(value)}
+                      accessibilityState={{selected: active}}
+                      style={({pressed}) => [styles.careSheetCategory, active && styles.careSheetCategoryActive,
+                        pressed && styles.buttonPressed]}>
+                      <Icon size={19} color={active ? '#7954EF' : '#77718F'} strokeWidth={1.8} />
+                      <Text style={[styles.careSheetCategoryText, active && {color: '#7954EF'}]}>{label}</Text>
+                    </Pressable>;
+                  })}
+                </View>
+                <View style={styles.careSheetSchedule}>
+                  <Pressable style={styles.careSheetScheduleItem} onPress={openDatePicker} accessibilityLabel="Tarih seç">
+                    <CalendarDays size={22} color="#7954EF" />
+                    <View style={{flex: 1}}>
+                      <Text style={styles.careSheetSmallLabel}>Tarih</Text>
+                      <Text style={styles.careSheetScheduleValue}>
+                        {(getNotificationDate(editingEvent ? editDate : newEventDate, '12:00') || new Date())
+                          .toLocaleDateString('tr-TR', {day: 'numeric', month: 'short', year: 'numeric'})}
                       </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* =================================================
-                  TIME
-              ================================================= */}
-
-              <Text style={styles.timePickerLabel}>
-                Hatırlatma saati
-              </Text>
-
-              <View style={styles.timePickerContainer}>
-
-                {/* HOUR */}
-
-                <View style={styles.timeBlock}>
-
-                  <Pressable
-                    onPress={() => {
-                      const hour =
-                        Number(selectedHour);
-
-                      const nextHour =
-                        hour >= 23
-                          ? 0
-                          : hour + 1;
-
-                      setSelectedHour(
-                        String(
-                          nextHour,
-                        ).padStart(2, '0'),
-                      );
-                    }}
-                    style={({pressed}) => [
-                      styles.timeControlButton,
-                      pressed &&
-                        styles.timeControlButtonPressed,
-                    ]}>
-
-                    <Text
-                      style={
-                        styles.timeControlText
-                      }>
-                      +
-                    </Text>
-
+                    </View><ChevronDown size={16} color="#77718F" />
                   </Pressable>
-
-                  <TextInput
-                    value={selectedHour}
-                    onChangeText={text => {
-                      const digits = text.replace(/\D/g, '');
-
-                      if (digits.length === 0) {
-                        setSelectedHour('');
-                        return;
-                      }
-
-                      if (digits.length === 1) {
-                        setSelectedHour(digits);
-                        return;
-                      }
-
-                      const value = Number(digits);
-
-                      if (value >= 0 && value <= 23) {
-                        setSelectedHour(digits);
-                      }
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    style={styles.timeInput}
-                    textAlign="center"
-                  />
-
-                  <Pressable
-                    onPress={() => {
-                      const hour =
-                        Number(selectedHour);
-
-                      const nextHour =
-                        hour <= 0
-                          ? 23
-                          : hour - 1;
-
-                      setSelectedHour(
-                        String(
-                          nextHour,
-                        ).padStart(2, '0'),
-                      );
-                    }}
-                    style={({pressed}) => [
-                      styles.timeControlButton,
-                      pressed &&
-                        styles.timeControlButtonPressed,
-                    ]}>
-
-                    <Text
-                      style={
-                        styles.timeControlText
-                      }>
-                      −
-                    </Text>
-
+                  <View style={styles.careSheetScheduleDivider} />
+                  <Pressable style={styles.careSheetScheduleItem} accessibilityLabel="Saat seç" onPress={() => {
+                    Keyboard.dismiss(); setPendingHour(selectedHour); setPendingMinute(selectedMinute); setTimePickerVisible(true);
+                  }}>
+                    <Clock3 size={22} color="#7954EF" />
+                    <View style={{flex: 1}}><Text style={styles.careSheetSmallLabel}>Saat</Text>
+                      <Text style={styles.careSheetScheduleValue}>{selectedHour}:{selectedMinute}</Text>
+                    </View><ChevronDown size={16} color="#77718F" />
                   </Pressable>
-
-                  <Text style={styles.timeUnit}>
-                    Saat
-                  </Text>
-
                 </View>
-
-                {/* COLON */}
-
-                <Text style={styles.timeColon}>
-                  :
-                </Text>
-
-                {/* MINUTE */}
-
-                <View style={styles.timeBlock}>
-
-                  <Pressable
-                    onPress={() => {
-                      const minute =
-                        Number(selectedMinute);
-
-                      const nextMinute =
-                        minute >= 59
-                          ? 0
-                          : minute + 1;
-
-                      setSelectedMinute(
-                        String(
-                          nextMinute,
-                        ).padStart(2, '0'),
-                      );
-                    }}
-                    style={({pressed}) => [
-                      styles.timeControlButton,
-                      pressed &&
-                        styles.timeControlButtonPressed,
-                    ]}>
-
-                    <Text
-                      style={
-                        styles.timeControlText
-                      }>
-                      +
-                    </Text>
-
-                  </Pressable>
-
-                  <TextInput
-                    value={selectedMinute}
-                    onChangeText={text => {
-                      const digits = text.replace(/\D/g, '');
-
-                      if (digits.length === 0) {
-                        setSelectedMinute('');
-                        return;
-                      }
-
-                      if (digits.length === 1) {
-                        setSelectedMinute(digits);
-                        return;
-                      }
-
-                      const value = Number(digits);
-
-                      if (value >= 0 && value <= 59) {
-                        setSelectedMinute(digits);
-                      }
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    style={styles.timeInput}
-                    textAlign="center"
-                  />
-
-                  <Pressable
-                    onPress={() => {
-                      const minute =
-                        Number(selectedMinute);
-
-                      const nextMinute =
-                        minute <= 0
-                          ? 59
-                          : minute - 1;
-
-                      setSelectedMinute(
-                        String(
-                          nextMinute,
-                        ).padStart(2, '0'),
-                      );
-                    }}
-                    style={({pressed}) => [
-                      styles.timeControlButton,
-                      pressed &&
-                        styles.timeControlButtonPressed,
-                    ]}>
-
-                    <Text
-                      style={
-                        styles.timeControlText
-                      }>
-                      −
-                    </Text>
-
-                  </Pressable>
-
-                  <Text style={styles.timeUnit}>
-                    Dakika
-                  </Text>
-
+                <View style={styles.careSheetRow}>
+                  <Bell size={21} color="#77718F" /><Text style={styles.careSheetRowText}>Hatırlatma</Text>
+                  <Switch value={reminderEnabled} onValueChange={setReminderEnabled}
+                    trackColor={{false: '#E5E0EE', true: '#7954EF'}} thumbColor="#FFFFFF"
+                    ios_backgroundColor="#E5E0EE" accessibilityLabel="Bakım hatırlatması" />
                 </View>
-
-              </View>
-
-              <View style={styles.selectedTimePreview}>
-
-                <Text
-                  style={
-                    styles.selectedTimePreviewLabel
-                  }>
-                  Bildirim
-                </Text>
-
-                <Text
-                  style={
-                    styles.selectedTimePreviewValue
-                  }>
-                  ⏰ {selectedHour}:{selectedMinute}
-                </Text>
-
-              </View>
-
-              {/* COLOR */}
-
-              <Text style={styles.colorPickerLabel}>
-                Görev rengi seç
-              </Text>
-
-              <View style={styles.colorGrid}>
-
-                {PASTEL_COLORS.map(color => {
-                  const selected =
-                    selectedColor === color;
-
-                  return (
-                    <Pressable
-                      key={color}
-
-                      onPress={() =>
-                        setSelectedColor(color)
-                      }
-
-                      style={[
-                        styles.colorOption,
-                        {
-                          backgroundColor:
-                            color,
-                        },
-                        selected &&
-                          styles.colorOptionSelected,
-                      ]}>
-
-                      {selected ? (
-                        <Text
-                          style={styles.colorCheck}>
-                          ✓
-                        </Text>
-                      ) : null}
-
-                    </Pressable>
-                  );
-                })}
-
-              </View>
-
-              {/* NOTE */}
-
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-
-                placeholder="Not ekle"
-                placeholderTextColor="#9CA3AF"
-
-                multiline
-
-                style={[
-                  styles.input,
-                  styles.noteInput,
-                ]}
-              />
-
-              {/* BUTTONS */}
-
-              <View style={styles.modalButtons}>
-
-                <Pressable
-                  onPress={() => {
-                    resetForm();
-                    setModalVisible(false);
-                  }}
-
-                  disabled={saving}
-
-                  style={({pressed}) => [
-                    styles.cancelButton,
-                    pressed &&
-                      styles.cancelButtonPressed,
-                  ]}>
-
-                  <Text
-                    style={
-                      styles.cancelButtonText
-                    }>
-                    İptal
-                  </Text>
-
+                <Pressable style={styles.careSheetRow} onPress={() => setNoteExpanded(value => !value)}>
+                  <FileText size={21} color="#77718F" /><Text style={styles.careSheetRowText}>Not ekle</Text>
+                  {noteExpanded ? <ChevronDown size={21} color="#77718F" /> : <Plus size={21} color="#77718F" />}
                 </Pressable>
-
-                <Pressable
-                  onPress={handleAddEvent}
-                  disabled={saving}
-
-                  style={({pressed}) => [
-                    styles.saveButton,
-                    pressed &&
-                      styles.saveButtonPressed,
-                    saving &&
-                      styles.disabledButton,
-                  ]}>
-
-                  <Text
-                    style={
-                      styles.saveButtonText
-                    }>
-                    {saving
-                      ? 'Kaydediliyor...'
-                      : 'Kaydet'}
-                  </Text>
-
+                {noteExpanded && <TextInput value={note} onChangeText={setNote} multiline
+                  placeholder="Notunu yaz..." placeholderTextColor="#A19BB2"
+                  style={[styles.careSheetInput, {minHeight: 88, textAlignVertical: 'top', marginTop: 8}]} />}
+                <View style={styles.careSheetRow}>
+                  <Palette size={21} color="#77718F" /><Text style={styles.careSheetRowText}>Görev rengi</Text>
+                  <View style={styles.careSheetSwatches}>
+                    {PASTEL_COLORS.slice(0, 5).map(color => <Pressable key={color} onPress={() => setSelectedColor(color)}
+                      accessibilityLabel={`Görev rengi ${color}`} accessibilityState={{selected: color === selectedColor}}
+                      hitSlop={4} style={[styles.careSheetSwatch, {backgroundColor: color},
+                        color === selectedColor && styles.careSheetSwatchSelected]}>
+                      {color === selectedColor && <Check size={17} color="#5B36CE" strokeWidth={2.5} />}
+                    </Pressable>)}
+                  </View>
+                </View>
+              </ScrollView>
+              <View style={styles.careSheetFooter}>
+                <Pressable onPress={handleAddEvent} disabled={saving}
+                  style={({pressed}) => [styles.careSheetSave, pressed && styles.buttonPressed, saving && styles.disabledButton]}>
+                  <Check size={20} color="#FFFFFF" />
+                  <Text style={styles.careSheetSaveText}>{saving ? 'Kaydediliyor...' : editingEvent ? 'Değişiklikleri kaydet' : 'Bakımı kaydet'}</Text>
                 </Pressable>
-
               </View>
-
-            </ScrollView>
-
-          </View>
-
-        </View>
-
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* =====================================================
           DELETE MODAL
       ===================================================== */}
 
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-
-        onRequestClose={() =>
-          setDeleteModalVisible(false)
-        }>
-
-        <View style={styles.modalOverlay}>
-
-          <View style={styles.deleteModalCard}>
-
-            <Text style={styles.deleteEmoji}>
-              ⚠️
-            </Text>
-
-            <Text style={styles.deleteTitle}>
-              Görevi sil
-            </Text>
-
-            <Text style={styles.deleteText}>
-              Bu bakım görevini silmek
-              istediğine emin misin?
-            </Text>
-
-            <View style={styles.deleteButtons}>
-
-              <Pressable
-                onPress={() => {
-                  setDeleteModalVisible(false);
-                  setSelectedEventId(null);
-                }}
-
-                style={({pressed}) => [
-                  styles.cancelDeleteBtn,
-                  pressed &&
-                    styles.cancelDeleteBtnPressed,
-                ]}>
-
-                <Text
-                  style={
-                    styles.cancelDeleteText
-                  }>
-                  Vazgeç
-                </Text>
-
+      <Modal visible={deleteModalVisible} transparent animationType="fade"
+        onRequestClose={() => {
+          if (deleting) return;
+          setDeleteModalVisible(false); setSelectedEventId(null);
+        }}>
+        <View style={styles.deleteConfirmOverlay}>
+          <View style={styles.deleteConfirmCard}>
+            <Text style={styles.deleteConfirmTitle}>Bu bakımı silelim mi?</Text>
+            <Text style={styles.deleteConfirmDescription}>Bakım kaydı takviminden kaldırılacak. Bu işlem geri alınamaz.</Text>
+            {(() => {
+              const event = events.find(item => item.id === selectedEventId);
+              if (!event) return null;
+              return <View style={styles.deleteConfirmSummary}>
+                <View style={styles.deleteConfirmPetIcon}><PawPrint size={20} color="#7954EF" /></View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.deleteConfirmPetName} numberOfLines={1}>{event.petName}</Text>
+                  <Text style={styles.deleteConfirmEventName} numberOfLines={2}>{event.title}</Text>
+                  <View style={styles.deleteConfirmDateRow}>
+                    <CalendarDays size={12} color="#918BA5" />
+                    <Text style={styles.deleteConfirmDate}>{event.date.split('-').reverse().join('.')} · {event.time || '09:00'}</Text>
+                  </View>
+                </View>
+              </View>;
+            })()}
+            <View style={styles.deleteConfirmActions}>
+              <Pressable disabled={deleting} onPress={() => {
+                setDeleteModalVisible(false); setSelectedEventId(null);
+              }} style={({pressed}) => [styles.deleteConfirmCancel, pressed && styles.buttonPressed]}>
+                <Text style={styles.deleteConfirmCancelText}>Vazgeç</Text>
               </Pressable>
-
-              <Pressable
-                onPress={confirmDelete}
-                disabled={deleting}
-
-                style={({pressed}) => [
-                  styles.confirmDeleteBtn,
-                  pressed &&
-                    styles.confirmDeleteBtnPressed,
-                  deleting &&
-                    styles.disabledButton,
-                ]}>
-
-                <Text
-                  style={
-                    styles.confirmDeleteText
-                  }>
-                  {deleting
-                    ? 'Siliniyor...'
-                    : 'Sil'}
-                </Text>
-
+              <Pressable disabled={deleting} onPress={confirmDelete}
+                style={({pressed}) => [styles.deleteConfirmDelete, pressed && styles.buttonPressed, deleting && styles.disabledButton]}>
+                <Trash2 size={17} color="#FFFFFF" strokeWidth={1.8} />
+                <Text style={styles.deleteConfirmDeleteText}>{deleting ? 'Siliniyor...' : 'Bakımı sil'}</Text>
               </Pressable>
-
             </View>
-
           </View>
-
         </View>
-
       </Modal>
 
       {/* =====================================================
@@ -2227,7 +2185,7 @@ export default function CalendarScreen() {
         </Animated.View>
       ) : null}
 
-    </>
+    </View>
   );
 }
 
@@ -2236,6 +2194,138 @@ export default function CalendarScreen() {
 ========================================================= */
 
 const styles = StyleSheet.create({
+  deleteConfirmOverlay: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: 'rgba(25,22,56,0.40)'},
+  deleteConfirmCard: {width: '100%', maxWidth: 380, backgroundColor: '#FFFFFF', borderRadius: 26, padding: 22},
+  deleteConfirmHeader: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8},
+  deleteConfirmIcon: {width: 54, height: 54, borderRadius: 18, backgroundColor: '#FFF0F3', alignItems: 'center', justifyContent: 'center'},
+  deleteConfirmClose: {width: 32, height: 32, borderRadius: 16, backgroundColor: '#F6F3FB', alignItems: 'center', justifyContent: 'center'},
+  deleteConfirmTitle: {fontFamily: 'Quicksand-Bold', fontSize: 20, lineHeight: 26, color: '#191638', marginBottom: 8},
+  deleteConfirmDescription: {fontFamily: 'Quicksand-Regular', fontSize: 12, lineHeight: 19, color: '#817B9E'},
+  deleteConfirmSummary: {flexDirection: 'row', gap: 12, alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: '#F7F4FD', borderWidth: 1, borderColor: '#EEE7FA', marginVertical: 20},
+  deleteConfirmPetIcon: {width: 38, height: 38, borderRadius: 13, backgroundColor: '#EDE5FF', alignItems: 'center', justifyContent: 'center'},
+  deleteConfirmPetName: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#302A59', marginBottom: 3},
+  deleteConfirmEventName: {fontFamily: 'Quicksand-SemiBold', fontSize: 12, lineHeight: 17, color: '#575171'},
+  deleteConfirmDateRow: {flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7},
+  deleteConfirmDate: {fontFamily: 'Quicksand-Regular', fontSize: 10, color: '#918BA5'},
+  deleteConfirmActions: {flexDirection: 'row', gap: 10},
+  deleteConfirmCancel: {flex: 1, minHeight: 46, borderRadius: 13, borderWidth: 1, borderColor: '#E7E0F1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center'},
+  deleteConfirmCancelText: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#6F6688'},
+  deleteConfirmDelete: {flex: 1, flexDirection: 'row', gap: 7, minHeight: 46, borderRadius: 13, backgroundColor: '#D94B65', alignItems: 'center', justifyContent: 'center'},
+  deleteConfirmDeleteText: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#FFFFFF'},
+
+  careSheetBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(25,22,56,0.32)'},
+  careSheet: {backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%', overflow: 'hidden'},
+  careSheetHandle: {width: 38, height: 4, borderRadius: 2, backgroundColor: '#D6D0E5', alignSelf: 'center', marginTop: 9, marginBottom: 12},
+  careSheetHeader: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 10, marginBottom: 16},
+  careSheetHeadingIcon: {width: 42, height: 42, borderRadius: 21, backgroundColor: '#7954EF', alignItems: 'center', justifyContent: 'center'},
+  careSheetTitle: {flex: 1, fontFamily: 'Quicksand-Bold', fontSize: 21, color: '#191638'},
+  careSheetClose: {width: 36, height: 36, borderRadius: 18, backgroundColor: '#F4F0FF', alignItems: 'center', justifyContent: 'center'},
+  careSheetBody: {paddingHorizontal: 20, paddingBottom: 16},
+  careSheetPetButton: {backgroundColor: '#F4F0FF', borderColor: '#F4F0FF', minHeight: 64, borderRadius: 16, marginBottom: 4},
+  careSheetPetImage: {width: 42, height: 42, borderRadius: 21, marginRight: 12},
+  careSheetPetHint: {fontFamily: 'Quicksand-Regular', fontSize: 11, color: '#918BA5', marginTop: 2},
+  careSheetLabel: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#302A59', marginTop: 16, marginBottom: 9},
+  careSheetInput: {borderWidth: 1, borderColor: '#DFD8ED', borderRadius: 13, paddingHorizontal: 13, paddingVertical: 12, fontFamily: 'Quicksand-SemiBold', fontSize: 14, color: '#191638', backgroundColor: '#FFFFFF'},
+  careSheetCategories: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 17},
+  careSheetCategory: {width: '31.5%', minHeight: 44, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E8E2F3', backgroundColor: '#FBFAFE'},
+  careSheetCategoryActive: {backgroundColor: '#F0E9FF', borderColor: '#7954EF'},
+  careSheetCategoryText: {fontFamily: 'Quicksand-Bold', fontSize: 11, color: '#575171'},
+  careSheetSchedule: {flexDirection: 'row', alignItems: 'center', backgroundColor: '#F4F0FF', borderWidth: 1, borderColor: '#E6DDF9', borderRadius: 15, marginBottom: 5},
+  careSheetScheduleItem: {flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 15, gap: 7},
+  careSheetScheduleDivider: {width: 1, height: 34, backgroundColor: '#DFD5F3'},
+  careSheetSmallLabel: {fontFamily: 'Quicksand-Regular', fontSize: 11, color: '#918BA5', marginBottom: 3},
+  careSheetScheduleValue: {fontFamily: 'Quicksand-Bold', fontSize: 12, color: '#191638'},
+  careSheetRow: {flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, borderWidth: 1, borderColor: '#E4DEEE', borderRadius: 14, paddingHorizontal: 12, marginTop: 9},
+  careSheetRowText: {flex: 1, fontFamily: 'Quicksand-SemiBold', fontSize: 13, color: '#302A59'},
+  careSheetSwatches: {flexDirection: 'row', gap: 5},
+  careSheetSwatch: {width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center'},
+  careSheetSwatchSelected: {borderWidth: 2, borderColor: '#7954EF'},
+  careSheetFooter: {paddingHorizontal: 20, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 30 : 20, borderTopWidth: 1, borderTopColor: '#F1EDF8', backgroundColor: '#FFFFFF'},
+  careSheetSave: {minHeight: 50, backgroundColor: '#7954EF', borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9},
+  careSheetSaveText: {fontFamily: 'Quicksand-Bold', fontSize: 15, color: '#FFFFFF'},
+  careSheetTimeCard: {backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingVertical: 24, paddingBottom: 32},
+  careSheetTimeColumns: {flexDirection: 'row', gap: 16, paddingHorizontal: 24, marginBottom: 18},
+  careSheetTimeColumn: {flex: 1},
+  careSheetTimeOption: {height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
+  careSheetTimeValue: {fontFamily: 'Quicksand-Bold', fontSize: 20, color: '#575171'},
+
+  formCloseButton: {
+    position: 'absolute', top: 12, right: 12, zIndex: 10,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#F5F3FA', alignItems: 'center', justifyContent: 'center',
+  },
+
+  dateInputRow: {position: 'relative'},
+  dateInputField: {paddingRight: 58},
+  dateInputIcon: {
+    position: 'absolute', right: 8, top: 5, width: 40, height: 40,
+    borderRadius: 20, backgroundColor: '#F0ECFF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  datePickerCard: {
+    width: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+  },
+  datePickerHeading: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20},
+  datePickerIconBadge: {
+    width: 48, height: 48, borderRadius: 16, backgroundColor: '#F0ECFF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  datePickerTitle: {fontFamily: 'Quicksand-Bold', fontSize: 19, color: '#17143F'},
+  datePickerSubtitle: {fontFamily: 'Quicksand-Regular', fontSize: 11, color: '#817B9E', marginTop: 4},
+  datePickerClose: {width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F3FA', alignItems: 'center', justifyContent: 'center'},
+  datePickerCloseText: {fontSize: 25, color: '#817B9E'},
+  datePickerMonthRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10},
+  datePickerArrow: {width: 40, height: 40, alignItems: 'center', justifyContent: 'center'},
+  datePickerMonthTitle: {fontFamily: 'Quicksand-Bold', fontSize: 16, color: '#302A59', textTransform: 'capitalize'},
+  datePickerGrid: {flexDirection: 'row', flexWrap: 'wrap'},
+  datePickerCell: {width: '14.285714%', height: 44, alignItems: 'center', justifyContent: 'center'},
+  datePickerWeekday: {fontFamily: 'Quicksand-SemiBold', fontSize: 10, color: '#918B9F'},
+  datePickerDay: {width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center'},
+  datePickerDaySelected: {backgroundColor: '#7256E8'},
+  datePickerDayText: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#302A59'},
+  datePickerTodayText: {color: '#7256E8'},
+  datePickerDaySelectedText: {color: '#FFFFFF'},
+  datePickerSelectedDate: {fontFamily: 'Quicksand-SemiBold', fontSize: 12, color: '#817B9E', textAlign: 'center', marginTop: 14},
+
+  actionMenuOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 20,
+  },
+  actionMenu: {
+    position: 'absolute',
+    width: 160,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EEE9F6',
+    shadowColor: '#302A59',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  actionMenuItem: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 10,
+    borderRadius: 10,
+  },
+  actionMenuItemPressed: {backgroundColor: '#F7F4FD'},
+  actionMenuDivider: {height: 1, marginHorizontal: 12, backgroundColor: '#F1EDF7'},
+  actionMenuEditText: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#7256E8'},
+  actionMenuDeleteText: {fontFamily: 'Quicksand-Bold', fontSize: 13, color: '#E45B72'},
+
   screen: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -3743,6 +3833,11 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  completeCheckText: {
+    color: '#16A34A',
+    fontSize: 18,
   },
 
   moreCircleText: {

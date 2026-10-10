@@ -1329,8 +1329,11 @@ export const addCareEventToFirestore = async (
       description:
         event.description || '',
 
+      note: event.note ?? event.notes ?? '',
+      reminderEnabled: event.reminderEnabled !== false,
+      color: event.color || '#C4B5FD',
       notes:
-        event.notes || '',
+        event.notes ?? event.note ?? '',
 
       completed:
         Boolean(event.completed),
@@ -1423,7 +1426,12 @@ export const updateCareEventInFirestore = async (
     );
   }
 
-  await eventRef.update({
+  const nextPetId = event.petId || existingData.petId || '';
+  if (nextPetId && nextPetId !== existingData.petId) {
+    await getPetAccessData(nextPetId, uid);
+  }
+  const batch = firestore().batch();
+  batch.update(eventRef, {
     petId:
       event.petId ||
       existingData.petId ||
@@ -1460,12 +1468,12 @@ export const updateCareEventInFirestore = async (
       '',
 
     description:
-      event.description ||
-      '',
+      event.description ?? existingData.description ?? '',
 
-    notes:
-      event.notes ||
-      '',
+    note: event.note ?? event.notes ?? existingData.note ?? existingData.notes ?? '',
+    reminderEnabled: event.reminderEnabled ?? existingData.reminderEnabled ?? true,
+    color: event.color ?? existingData.color ?? '#C4B5FD',
+    notes: event.notes ?? event.note ?? existingData.notes ?? existingData.note ?? '',
 
     completed:
       typeof event.completed === 'boolean'
@@ -1489,6 +1497,39 @@ export const updateCareEventInFirestore = async (
     updatedAt:
       firestore.FieldValue.serverTimestamp(),
   });
+  // Keep the linked health record in sync without changing completion metadata.
+  const completed = typeof event.completed === 'boolean'
+    ? event.completed : Boolean(existingData.completed);
+  if (existingData.completed && existingData.petId &&
+      (nextPetId !== existingData.petId || !completed)) {
+    await getPetAccessData(existingData.petId, uid);
+    batch.delete(firestore().collection('pets').doc(existingData.petId)
+      .collection('healthHistory').doc(`careEvent_${event.id}`));
+  }
+  if (completed && nextPetId) {
+    await getPetAccessData(nextPetId, uid);
+    const merged = {...existingData, ...event};
+    const {category, categoryLabel} = getHealthCategoryFromCareEventType(merged.type);
+    batch.set(firestore().collection('pets').doc(nextPetId)
+      .collection('healthHistory').doc(`careEvent_${event.id}`), {
+      petId: nextPetId,
+      title: merged.title || merged.name || 'Bakım etkinliği',
+      name: merged.title || merged.name || 'Bakım etkinliği',
+      type: merged.type || 'Custom',
+      category,
+      categoryLabel,
+      date: merged.date || '',
+      description: merged.description || '',
+      notes: event.notes ?? event.note ?? existingData.notes ?? '',
+      source: 'careEvent',
+      sourceId: event.id,
+      sourceEventId: event.id,
+      completedAt: existingData.completedAt || firestore.FieldValue.serverTimestamp(),
+      completedBy: existingData.completedBy || uid,
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    }, {merge: true});
+  }
+  await batch.commit();
 };
 
 /* =========================================================
