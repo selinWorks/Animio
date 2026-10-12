@@ -292,6 +292,10 @@ export default function AddPetScreen({navigation}: any) {
   const [nameErrorVisible, setNameErrorVisible] =
     useState(false);
 
+  const selectedPetType = PET_TYPES.find(
+    item => item.name === type,
+  );
+
   const [typeErrorVisible, setTypeErrorVisible] =
     useState(false);
 
@@ -1532,16 +1536,25 @@ export default function AddPetScreen({navigation}: any) {
 
             <View style={styles.previewCard}>
 
-              <View
-                style={
-                  styles.previewIconCircle
-                }>
-
-                <PawPrint
-                  size={22}
-                  color="#6C5CE7"
-                />
-
+              <View style={styles.previewIconCircle}>
+                {photoUrl ? (
+                  <Image
+                    source={{uri: photoUrl}}
+                    style={styles.previewPetImage}
+                    resizeMode="cover"
+                  />
+                ) : selectedPetType?.image ? (
+                  <Image
+                    source={selectedPetType.image}
+                    style={styles.previewPetImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <PawPrint
+                    size={22}
+                    color="#6C5CE7"
+                  />
+                )}
               </View>
 
               <View>
@@ -3947,6 +3960,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+  },
+
+  previewPetImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
 
   previewName: {
