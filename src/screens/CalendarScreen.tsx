@@ -153,6 +153,9 @@ export default function CalendarScreen() {
 
   const {user} = useAuth();
   const {pets} = usePets();
+
+  const [discardChangesModalVisible, setDiscardChangesModalVisible] =
+    useState(false);
   /* =========================================================
      STATE
   ========================================================= */
@@ -602,6 +605,46 @@ export default function CalendarScreen() {
   /* =========================================================
      ADD EVENT
   ========================================================= */
+
+  const hasUnsavedChanges = () => {
+    if (!editingEvent) return false;
+
+    const originalNote =
+      editingEvent.note ??
+      editingEvent.notes ??
+      editingEvent.description ??
+      '';
+
+    return (
+      title !== editingEvent.title ||
+      editDate !== editingEvent.date ||
+      selectedHour !== (editingEvent.time || '09:00').split(':')[0] ||
+      selectedMinute !== (editingEvent.time || '09:00').split(':')[1] ||
+      note !== originalNote ||
+      selectedType !== (editingEvent.type || 'Custom') ||
+      selectedColor !== (editingEvent.color || PASTEL_COLORS[2]) ||
+      reminderEnabled !== (editingEvent.reminderEnabled !== false) ||
+      selectedPetId !== String(
+        editingEvent.petId ??
+        pets.find(pet => pet.name === editingEvent.petName)?.id ??
+        '',
+      )
+    );
+  };
+
+  const requestCloseForm = () => {
+    if (saving) return;
+
+    Keyboard.dismiss();
+
+    if (editingEvent && hasUnsavedChanges()) {
+      setDiscardChangesModalVisible(true);
+      return;
+    }
+
+    resetForm();
+    setModalVisible(false);
+  };
 
   const handleEditEvent = (event: CareEvent) => {
     resetForm();
@@ -1566,11 +1609,30 @@ export default function CalendarScreen() {
                         styles.upcomingIconCircle,
                         {backgroundColor: `${eventColor}22`},
                       ]}>
-                      <PawPrint
-                        size={22}
-                        color={eventColor}
-                        strokeWidth={2}
-                      />
+                      {(() => {
+                        const eventPet = pets.find(
+                          pet =>
+                            (event.petId &&
+                              String(pet.id) === String(event.petId)) ||
+                            (!event.petId && pet.name === event.petName),
+                        );
+
+                        const petImage = eventPet
+                          ? eventPet.photoUrl || eventPet.photoUri
+                          : null;
+
+                        return (
+                          <Image
+                            source={
+                              petImage
+                                ? {uri: petImage}
+                                : getDefaultPetImage(eventPet?.type)
+                            }
+                            style={styles.upcomingPetImage}
+                            resizeMode="contain"
+                          />
+                        );
+                      })()}
                     </View>
 
                     <View style={styles.upcomingText}>
@@ -1790,9 +1852,14 @@ export default function CalendarScreen() {
               <View style={styles.careSheetHeader}>
                 <View style={styles.careSheetHeadingIcon}><PawPrint size={24} color="#FFFFFF" /></View>
                 <Text style={styles.careSheetTitle}>{editingEvent ? 'Bakımı düzenle' : 'Yeni bakım'}</Text>
-                <Pressable disabled={saving} hitSlop={8} accessibilityLabel="Kaydetmeden kapat"
-                  onPress={() => { Keyboard.dismiss(); resetForm(); setModalVisible(false); }}
-                  style={styles.careSheetClose}><X size={20} color="#817B9E" /></Pressable>
+                <Pressable
+                  disabled={saving}
+                  hitSlop={8}
+                  accessibilityLabel="Formu kapat"
+                  onPress={requestCloseForm}
+                  style={styles.careSheetClose}>
+                  <X size={20} color="#817B9E" />
+                </Pressable>
               </View>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
                 contentContainerStyle={styles.careSheetBody}>
@@ -2049,6 +2116,45 @@ export default function CalendarScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <Modal
+          visible={discardChangesModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDiscardChangesModalVisible(false)}>
+          <View style={styles.discardOverlay}>
+            <View style={styles.discardCard}>
+              <View style={styles.discardIcon}>
+                <TriangleAlert size={27} color="#E5A23B" strokeWidth={1.9} />
+              </View>
+
+              <Text style={styles.discardTitle}>
+                Kaydedilmemiş değişiklikler
+              </Text>
+
+              <Text style={styles.discardDescription}>
+                Yaptığın değişiklikleri kaydetmedin. Kaydetmeden çıkmak istiyor musun?
+              </Text>
+
+              <View style={styles.discardActions}>
+                <Pressable
+                  onPress={() => setDiscardChangesModalVisible(false)}
+                  style={styles.discardStayButton}>
+                  <Text style={styles.discardStayText}>Düzenlemeye devam et</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    setDiscardChangesModalVisible(false);
+                    resetForm();
+                    setModalVisible(false);
+                  }}
+                  style={styles.discardLeaveButton}>
+                  <Text style={styles.discardLeaveText}>Kaydetmeden çık</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+      </Modal>
       {/* =====================================================
           DELETE MODAL
       ===================================================== */}
@@ -4037,5 +4143,86 @@ const styles = StyleSheet.create({
     color: '#817B9E',
     marginLeft: 8,
   },
+
+  upcomingPetImage: {
+    width: 38,
+    height: 38,
+  },
+
+
+discardOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(27, 21, 46, 0.42)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 24,
+},
+discardCard: {
+  width: '100%',
+  maxWidth: 360,
+  borderRadius: 26,
+  padding: 24,
+  backgroundColor: '#FFFFFF',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#EEE8FC',
+},
+discardIcon: {
+  width: 58,
+  height: 58,
+  borderRadius: 20,
+  backgroundColor: '#FFF3D8',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 16,
+},
+discardTitle: {
+  fontFamily: 'Quicksand-Bold',
+  fontSize: 17,
+  color: '#201A35',
+  textAlign: 'center',
+},
+discardDescription: {
+  fontFamily: 'Quicksand-Medium',
+  fontSize: 13,
+  lineHeight: 20,
+  color: '#777187',
+  textAlign: 'center',
+  marginTop: 10,
+  marginBottom: 22,
+},
+discardActions: {
+  width: '100%',
+  gap: 10,
+},
+discardStayButton: {
+  minHeight: 46,
+  borderRadius: 15,
+  backgroundColor: '#F0EBFF',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 12,
+},
+discardStayText: {
+  fontFamily: 'Quicksand-Bold',
+  fontSize: 12,
+  color: '#6D50D8',
+},
+discardLeaveButton: {
+  minHeight: 46,
+  borderRadius: 15,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E8E2F1',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 12,
+},
+discardLeaveText: {
+  fontFamily: 'Quicksand-SemiBold',
+  fontSize: 12,
+  color: '#8A5264',
+},
+
 
 });
