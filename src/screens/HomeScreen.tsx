@@ -159,57 +159,45 @@ export default function HomeScreen() {
     [slideAnim],
   );
 
-  useEffect(() => {
-    const unsubscribe = notifee.onForegroundEvent(
-      ({type, detail}) => {
-        if (type !== EventType.DELIVERED) {
-          return;
-        }
 
-        const notification =
-          detail.notification;
+useEffect(() => {
+  const unsubscribe = notifee.onForegroundEvent(
+    ({type, detail}) => {
+      if (type !== EventType.DELIVERED) {
+        return;
+      }
 
-        if (!notification) {
-          return;
-        }
+      const notification = detail.notification;
 
-        const data =
-          notification.data || {};
+      if (!notification) {
+        return;
+      }
 
-        const bannerNotification = {
-          id: data.eventId || notification.id,
+      // Yeni bildirim geldi: kırmızı noktayı göster.
+      setHasNewNotifications(true);
 
-          title:
-            data.title ||
-            notification.title ||
-            'Bakım zamanı geldi',
+      const data = notification.data || {};
 
-          note:
-            data.note ||
-            notification.body ||
-            '',
+      const bannerNotification = {
+        id: data.eventId || notification.id,
+        title:
+          data.title ||
+          notification.title ||
+          'Bakım zamanı geldi',
+        note: data.note || notification.body || '',
+        petName: data.petName || '',
+        type: data.type || 'Custom',
+        color: data.color || '#C4B5FD',
+        date: data.date || '',
+      };
 
-          petName:
-            data.petName || '',
+      triggerBanner(bannerNotification);
+    },
+  );
 
-          type:
-            data.type || 'Custom',
+  return unsubscribe;
+}, [triggerBanner]);
 
-          color:
-            data.color || '#C4B5FD',
-
-          date:
-            data.date || '',
-        };
-
-        triggerBanner(
-          bannerNotification,
-        );
-      },
-    );
-
-    return unsubscribe;
-  }, [triggerBanner]);
 
   useFocusEffect(
     useCallback(() => {
@@ -222,15 +210,13 @@ export default function HomeScreen() {
         }
 
         try {
-          const events =
-            await getCareEventsFromFirestore(user.uid);
+          const events = await getCareEventsFromFirestore(user.uid);
+
+          const lastRead = await AsyncStorage.getItem(
+            'last_notification_read_time',
+          );
 
           if (!isMounted) return;
-
-          const lastRead =
-            await AsyncStorage.getItem(
-              'last_notification_read_time',
-            );
 
           const lastReadDate = lastRead
             ? new Date(lastRead)
@@ -238,38 +224,36 @@ export default function HomeScreen() {
 
           const now = new Date();
 
-          const activeEvents = events.filter(
-            (item: any) => {
-              if (!item.date) return false;
+          const activeEvents = events.filter((item: any) => {
+            if (!item.date) return false;
 
-              const eventDate = new Date(
-                `${item.date}T${item.time || '00:00'}:00`,
-              );
+            const eventDate = new Date(
+              `${item.date}T${item.time || '00:00'}:00`,
+            );
 
-              return (
-                eventDate.getTime() <=
-                  now.getTime() &&
-                eventDate.getTime() >
-                  lastReadDate.getTime()
-              );
-            },
-          );
+            return (
+              !Number.isNaN(eventDate.getTime()) &&
+              eventDate.getTime() <= now.getTime() &&
+              eventDate.getTime() > lastReadDate.getTime()
+            );
+          });
 
-          setHasNewNotifications(
-            activeEvents.length > 0,
-          );
+          setHasNewNotifications(activeEvents.length > 0);
         } catch (error) {
-          console.log(
-            'Bildirim kontrol hatası:',
-            error,
-          );
+          console.log('Bildirim kontrol hatası:', error);
         }
       };
 
       checkActiveNotifications();
 
+      // Ana sayfa açıkken de yeni etkinlikleri düzenli kontrol et.
+      const intervalId = setInterval(() => {
+        checkActiveNotifications();
+      }, 10000);
+
       return () => {
         isMounted = false;
+        clearInterval(intervalId);
       };
     }, [user?.uid]),
   );
