@@ -106,6 +106,7 @@ const PASTEL_COLORS = [
   '#FDBA74',
 ];
 
+
 function getDefaultPetImage(type?: string) {
   const value = (type || '')
     .toLocaleLowerCase('tr-TR')
@@ -131,8 +132,42 @@ function getDefaultPetImage(type?: string) {
     return require('../assets/images/pets/default-hamster-pixel.png');
   }
 
+  if (value.includes('balık') || value.includes('balik') || value.includes('fish')) {
+    return require('../assets/images/pets/default-fish-pixel.png');
+  }
+
+  if (
+    value.includes('amfibi') ||
+    value.includes('kurbağa') ||
+    value.includes('kurbaga') ||
+    value.includes('semender') ||
+    value.includes('aksolotl')
+  ) {
+    return require('../assets/images/pets/default-amfibi-pixel-head.png');
+  }
+
+  if (
+    value.includes('sürüngen') ||
+    value.includes('surungen') ||
+    value.includes('kaplumbağa') ||
+    value.includes('kaplumbaga') ||
+    value.includes('yılan') ||
+    value.includes('yilan') ||
+    value.includes('kertenkele') ||
+    value.includes('iguana') ||
+    value.includes('geko') ||
+    value.includes('bukalemun')
+  ) {
+    return require('../assets/images/pets/default-reptile-pixel.png');
+  }
+
+  if (value.includes('inek') || value.includes('cow')) {
+    return require('../assets/images/pets/default-cow-pixel.png');
+  }
+
   return require('../assets/images/pets/default-other-pixel.png');
 }
+
 
 export default function CalendarScreen() {
   const navigation = useNavigation<any>();

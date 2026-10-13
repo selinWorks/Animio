@@ -922,6 +922,12 @@ export default function AddPetScreen({navigation}: any) {
     try {
       const finalType = customType.trim() || type;
 
+      console.log('[PET TYPE DEBUG]', {
+        selectedType: type,
+        customType,
+        finalType,
+      });
+
       const trimmedWeight = weight.trim();
       const trimmedWeightGrams = weightGrams.trim();
 

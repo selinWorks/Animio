@@ -110,25 +110,17 @@ const petDetailRabbitHero = require(
 
 /* DEFAULT AVATARS */
 
-const defaultCatAvatar = require(
-  '../assets/images/pets/default-cat-pixel.png',
-);
 
-const defaultDogAvatar = require(
-  '../assets/images/pets/default-dog-pixel.png',
-);
+const defaultCatAvatar = require('../assets/images/pets/default-cat-pixel.png');
+const defaultDogAvatar = require('../assets/images/pets/default-dog-pixel.png');
+const defaultRabbitAvatar = require('../assets/images/pets/default-rabbit-pixel.png');
+const defaultBirdAvatar = require('../assets/images/pets/default-bird-pixel.png');
+const defaultHamsterAvatar = require('../assets/images/pets/default-hamster-pixel.png');
+const defaultAmphibianAvatar = require('../assets/images/pets/default-amfibi-pixel-head.png');
+const defaultCowAvatar = require('../assets/images/pets/default-cow-pixel.png');
+const defaultReptileAvatar = require('../assets/images/pets/default-reptile-pixel.png');
+const defaultFishAvatar = require('../assets/images/pets/default-fish-pixel.png');
 
-const defaultRabbitAvatar = require(
-  '../assets/images/pets/default-rabbit-pixel.png',
-);
-
-const defaultBirdAvatar = require(
-  '../assets/images/pets/default-bird-pixel.png',
-);
-
-const defaultHamsterAvatar = require(
-  '../assets/images/pets/default-hamster-pixel.png',
-);
 
 const defaultOtherAvatar = require(
   '../assets/images/pets/default-other-pixel.png',
@@ -228,47 +220,212 @@ function getPetEmoji(type: string) {
 function getDefaultPetAvatar(type: string) {
   const lowerType = normalizePetType(type);
 
-  /* KEDİ */
-
-  if (lowerType.includes('kedi')) {
+  // KEDİ
+  if (
+    lowerType.includes('kedi') ||
+    lowerType.includes('cat') ||
+    [
+      'british shorthair',
+      'scottish fold',
+      'siyam',
+      'iran kedisi',
+      'maine coon',
+      'ragdoll',
+      'van kedisi',
+      'tekir',
+      'sfenks',
+      'bengal',
+      'birman',
+      'abyssinian',
+    ].some(name => lowerType.includes(name))
+  ) {
     return defaultCatAvatar;
   }
 
-  /* KÖPEK */
-
+  // KÖPEK
   if (
     lowerType.includes('köpek') ||
-    lowerType.includes('kopek')
+    lowerType.includes('kopek') ||
+    lowerType.includes('dog') ||
+    [
+      'golden retriever',
+      'labrador',
+      'alman kurdu',
+      'french bulldog',
+      'poodle',
+      'chihuahua',
+      'beagle',
+      'husky',
+      'pomeranian',
+      'rottweiler',
+      'cocker spaniel',
+      'dachshund',
+      'maltese',
+      'shih tzu',
+      'border collie',
+    ].some(name => lowerType.includes(name))
   ) {
     return defaultDogAvatar;
   }
 
-  /* TAVŞAN */
-
-  if (
-    lowerType.includes('tavşan') ||
-    lowerType.includes('tavsan')
-  ) {
-    return defaultRabbitAvatar;
-  }
-
-  /* KUŞ */
-
+  // KUŞ
   if (
     lowerType.includes('kuş') ||
-    lowerType.includes('kus')
+    lowerType.includes('kus') ||
+    lowerType.includes('bird') ||
+    [
+      'muhabbet',
+      'papağan',
+      'papagan',
+      'kanarya',
+      'sultan papağanı',
+      'sultan papagani',
+      'sevda papağanı',
+      'sevda papagani',
+      'ispinoz',
+      'güvercin',
+      'guvercin',
+      'serçe',
+      'serce',
+      'bülbül',
+      'bulbul',
+      'hint bülbülü',
+      'hint bulbulu',
+    ].some(name => lowerType.includes(name))
   ) {
     return defaultBirdAvatar;
   }
 
-  /* HAMSTER */
+  // BALIK
+  if (
+    lowerType.includes('balık') ||
+    lowerType.includes('balik') ||
+    lowerType.includes('fish') ||
+    [
+      'japon balığı',
+      'japon baligi',
+      'beta',
+      'lepistes',
+      'melek balığı',
+      'melek baligi',
+      'koi',
+      'çöpçü balığı',
+      'copcu baligi',
+      'neon tetra',
+      'moli',
+      'plati',
+    ].some(name => lowerType.includes(name))
+  ) {
+    return defaultFishAvatar;
+  }
 
-  if (lowerType.includes('hamster')) {
+  // KEMİRGENLER
+  if (
+    [
+      'kemirgen',
+      'hamster',
+      'kobay',
+      'çinçilla',
+      'cincilla',
+      'fare',
+      'sıçan',
+      'sican',
+      'gerbil',
+      'sincap',
+    ].some(name => lowerType.includes(name))
+  ) {
     return defaultHamsterAvatar;
   }
 
-  /* DİĞER */
+  // SÜRÜNGENLER
+  if (
+    [
+      'sürüngen',
+      'surungen',
+      'kaplumbağa',
+      'kaplumbaga',
+      'yılan',
+      'yilan',
+      'kertenkele',
+      'iguana',
+      'geko',
+      'sakallı ejder',
+      'sakalli ejder',
+      'bukalemun',
+    ].some(name => lowerType.includes(name))
+  ) {
+    return defaultReptileAvatar;
+  }
 
+  // AMFİBİLER
+  if (
+    [
+      'amfibi',
+      'kurbağa',
+      'kurbaga',
+      'semender',
+      'aksolotl',
+    ].some(name => lowerType.includes(name))
+  ) {
+    return defaultAmphibianAvatar;
+  }
+
+  // ÇİFTLİK HAYVANLARI
+  if (
+    [
+      'çiftlik hayvanı',
+      'ciftlik hayvani',
+      'at',
+      'inek',
+      'koyun',
+      'keçi',
+      'keci',
+      'ördek',
+      'ordek',
+      'tavuk',
+      'kaz',
+      'manda',
+      'eşek',
+      'esek',
+      'deve',
+    ].some(name =>
+      lowerType === name ||
+      lowerType.startsWith(`${name} `)
+    )
+  ) {
+    return defaultCowAvatar;
+  }
+
+  // DİĞER MEMELİLER
+  if (
+    [
+      'tavşan',
+      'tavsan',
+      'rabbit',
+      'kirpi',
+      'gelincik',
+    ].some(name => lowerType.includes(name))
+  ) {
+    return defaultRabbitAvatar;
+  }
+
+  // OMURGASIZLAR
+  if (
+    [
+      'omurgasız',
+      'omurgasiz',
+      'örümcek',
+      'orumcek',
+      'akrep',
+      'salyangoz',
+      'yengeç',
+      'yengec',
+    ].some(name => lowerType.includes(name))
+  ) {
+    return defaultReptileAvatar;
+  }
+
+  // DİĞER / TANINMAYAN TÜRLER
   if (
     lowerType.includes('diğer') ||
     lowerType.includes('diger') ||
@@ -277,10 +434,6 @@ function getDefaultPetAvatar(type: string) {
     return defaultOtherAvatar;
   }
 
-  /*
-   * Balık, kaplumbağa veya ileride eklenebilecek
-   * tanımlanmamış türler için nötr avatar.
-   */
   return defaultOtherAvatar;
 }
 

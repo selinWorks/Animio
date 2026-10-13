@@ -70,6 +70,22 @@ const defaultHamsterAvatar = require(
   '../assets/images/pets/default-hamster-pixel.png',
 );
 
+const defaultAmphibianAvatar = require(
+  '../assets/images/pets/default-amfibi-pixel-head.png',
+);
+
+const defaultCowAvatar = require(
+  '../assets/images/pets/default-cow-pixel.png',
+);
+
+const defaultReptileAvatar = require(
+  '../assets/images/pets/default-reptile-pixel.png',
+);
+
+const defaultFishAvatar = require(
+  '../assets/images/pets/default-fish-pixel.png',
+);
+
 /* =========================================================
    FONTS & COLORS
 ========================================================= */
@@ -108,15 +124,219 @@ function normalizePetType(type?: string) {
     .trim();
 }
 
+
+
+
 function getDefaultPetAvatar(type?: string): ImageSourcePropType {
-  const value = normalizePetType(type);
-  if (value.includes('kedi') || value.includes('cat')) return defaultCatAvatar;
-  if (value.includes('köpek') || value.includes('kopek') || value.includes('dog')) return defaultDogAvatar;
-  if (value.includes('tavşan') || value.includes('tavsan') || value.includes('rabbit')) return defaultRabbitAvatar;
-  if (value.includes('kuş') || value.includes('kus') || value.includes('bird')) return defaultBirdAvatar;
-  if (value.includes('hamster')) return defaultHamsterAvatar;
+  const value = (type ?? '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+
+  if (!value) {
+    return defaultCatAvatar;
+  }
+
+  // Kedi ve kedi alt türleri
+  if (
+    value === 'kedi' ||
+    value.includes('cat') ||
+    [
+      'british shorthair',
+      'scottish fold',
+      'siyam',
+      'iran kedisi',
+      'maine coon',
+      'ragdoll',
+      'van kedisi',
+      'tekir',
+      'sfenks',
+      'bengal',
+      'birman',
+      'abyssinian',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultCatAvatar;
+  }
+
+  // Köpek ve köpek alt türleri
+  if (
+    value === 'köpek' ||
+    value === 'kopek' ||
+    value.includes('dog') ||
+    [
+      'golden retriever',
+      'labrador',
+      'alman kurdu',
+      'french bulldog',
+      'poodle',
+      'chihuahua',
+      'beagle',
+      'husky',
+      'pomeranian',
+      'rottweiler',
+      'cocker spaniel',
+      'dachshund',
+      'maltese',
+      'shih tzu',
+      'border collie',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultDogAvatar;
+  }
+
+  // Kuş ve kuş alt türleri
+  if (
+    value === 'kuş' ||
+    value === 'kus' ||
+    value.includes('bird') ||
+    [
+      'muhabbet kuşu',
+      'muhabbet kusu',
+      'papağan',
+      'papagan',
+      'kanarya',
+      'sultan papağanı',
+      'sultan papagani',
+      'sevda papağanı',
+      'sevda papagani',
+      'ispinoz',
+      'güvercin',
+      'guvercin',
+      'serçe',
+      'serce',
+      'bülbül',
+      'bulbul',
+      'hint bülbülü',
+      'hint bulbulu',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultBirdAvatar;
+  }
+
+  // Balık ve balık alt türleri
+  if (
+    value === 'balık' ||
+    value === 'balik' ||
+    value.includes('fish') ||
+    [
+      'japon balığı',
+      'japon baligi',
+      'beta',
+      'lepistes',
+      'melek balığı',
+      'melek baligi',
+      'koi',
+      'çöpçü balığı',
+      'copcu baligi',
+      'neon tetra',
+      'moli',
+      'plati',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultFishAvatar;
+  }
+
+  // Kemirgen ve kemirgen alt türleri
+  if (
+    value === 'kemirgen' ||
+    [
+      'hamster',
+      'kobay',
+      'çinçilla',
+      'cincilla',
+      'fare',
+      'sıçan',
+      'sican',
+      'gerbil',
+      'sincap',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultHamsterAvatar;
+  }
+
+  // Sürüngen ve sürüngen alt türleri
+  if (
+    value === 'sürüngen' ||
+    value === 'surungen' ||
+    value.includes('reptile') ||
+    [
+      'kaplumbağa',
+      'kaplumbaga',
+      'yılan',
+      'yilan',
+      'kertenkele',
+      'iguana',
+      'geko',
+      'sakallı ejder',
+      'sakalli ejder',
+      'bukalemun',
+    ].some(subtype => value.includes(subtype))
+  ) {
+    return defaultReptileAvatar;
+  }
+
+  // Çiftlik hayvanları
+  if (
+    value === 'çiftlik hayvanı' ||
+    value === 'ciftlik hayvani' ||
+    [
+      'at',
+      'inek',
+      'koyun',
+      'keçi',
+      'keci',
+      'ördek',
+      'ordek',
+      'tavuk',
+      'kaz',
+      'manda',
+      'eşek',
+      'esek',
+      'deve',
+    ].some(subtype => value === subtype || value.startsWith(`${subtype} `))
+  ) {
+    // Mevcut görsel havuzunda çiftlik hayvanları için inek görseli kullanılıyor.
+    return defaultCowAvatar;
+  }
+
+  // Amfibi ve alt türleri
+  if (
+    value === 'amfibi' ||
+    value.includes('amphibian') ||
+    ['kurbağa', 'kurbaga', 'semender', 'aksolotl', 'frog', 'salamander', 'axolotl']
+      .some(subtype => value.includes(subtype))
+  ) {
+    return defaultAmphibianAvatar;
+  }
+
+  // Diğer memeliler
+  if (
+    value === 'diğer memeliler' ||
+    value === 'diger memeliler' ||
+    ['tavşan', 'tavsan', 'rabbit', 'kirpi', 'gelincik', 'hedgehog', 'ferret']
+      .some(subtype => value.includes(subtype))
+  ) {
+    return defaultRabbitAvatar;
+  }
+
+  // Omurgasızlar
+  if (
+    value === 'omurgasız' ||
+    value === 'omurgasiz' ||
+    ['örümcek', 'orumcek', 'akrep', 'salyangoz', 'yengeç', 'yengec', 'spider', 'scorpion']
+      .some(subtype => value.includes(subtype))
+  ) {
+    // Mevcut görsel havuzunda omurgasızlar için özel görsel bulunmuyor.
+    return defaultReptileAvatar;
+  }
+
+  console.log('[PetAvatar] Tanınmayan tür:', JSON.stringify(type));
+
   return defaultCatAvatar;
 }
+
+
+
 
 export default function HomeScreen() {
   const {pets} = usePets();
@@ -529,6 +749,7 @@ function PetProfile({
   pet: Pet;
   onPress: () => void;
 }) {
+
   return (
     <Pressable
       onPress={onPress}
