@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Calendar as RNCalendar} from 'react-native-calendars';
 import auth from '@react-native-firebase/auth';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -248,6 +249,7 @@ function WheelPickerColumn({
 }
 
 export default function AddPetScreen({navigation}: any) {
+  const insets = useSafeAreaInsets();
   const {addPet} = usePets();
 
   const [step, setStep] = useState(1);
@@ -1127,7 +1129,7 @@ export default function AddPetScreen({navigation}: any) {
         '#FAF9FF',
         '#FAF9FF',
       ]}
-      style={styles.screen}>
+      style={[styles.screen, {paddingTop: insets.top}]}>
 
       {/* ================================================= */}
       {/* HEADER                                            */}
@@ -1237,7 +1239,10 @@ export default function AddPetScreen({navigation}: any) {
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}>
+        contentContainerStyle={[
+          styles.container,
+          {paddingBottom: 120 + insets.bottom},
+        ]}>
 
         {/* DECORATION */}
 
@@ -4565,4 +4570,3 @@ const styles = StyleSheet.create({
   },
 
 });
-

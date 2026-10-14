@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+
 import React, {useEffect, useState} from 'react';
 
 import {
@@ -8,6 +9,7 @@ import {
   ActivityIndicator,
   Pressable,
   LogBox,
+  StatusBar,
 } from 'react-native';
 
 import NetInfo from '@react-native-community/netinfo';
@@ -19,17 +21,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import {PetProvider} from './src/data/PetContext';
 import {AuthProvider} from './src/data/AuthContext';
 
-/*
- * FIREBASE DEPRECATED API WARNINGS
- *
- * React Native Firebase'in eski namespaced API kullanımından
- * gelen uyarıları uygulama üzerinde göstermiyoruz.
- *
- * Diğer warningler görünmeye devam eder.
- */
-LogBox.ignoreLogs([
-  'This method is deprecated',
-]);
+LogBox.ignoreLogs(['This method is deprecated']);
 
 const COLORS = {
   bg: '#FAF9FF',
@@ -41,11 +33,7 @@ const COLORS = {
   purpleSoft: '#F1EDFF',
 };
 
-function NoInternetScreen({
-  onRetry,
-}: {
-  onRetry: () => void;
-}) {
+function NoInternetScreen({onRetry}: {onRetry: () => void}) {
   return (
     <View style={styles.noInternetContainer}>
       <View style={styles.iconCircle}>
@@ -61,8 +49,8 @@ function NoInternetScreen({
       </Text>
 
       <Text style={styles.noInternetDescription}>
-        Uygulamayı kullanabilmek için internet bağlantını
-        kontrol edip tekrar deneyebilirsin.
+        Uygulamayı kullanabilmek için internet bağlantını kontrol edip
+        tekrar deneyebilirsin.
       </Text>
 
       <Pressable
@@ -73,7 +61,7 @@ function NoInternetScreen({
         ]}>
         <RefreshCw
           size={18}
-          color="#FFFFFF"
+          color={COLORS.white}
           strokeWidth={2}
         />
 
@@ -119,10 +107,6 @@ function AppContent() {
     setIsConnected(connected);
   };
 
-  /*
-   * İlk internet kontrolü yapılırken
-   * kısa yükleme ekranı
-   */
   if (isConnected === null) {
     return (
       <View style={styles.loadingContainer}>
@@ -134,16 +118,8 @@ function AppContent() {
     );
   }
 
-  /*
-   * İnternet yoksa uygulamanın
-   * tamamında bu ekran gösterilir
-   */
   if (!isConnected) {
-    return (
-      <NoInternetScreen
-        onRetry={retryInternet}
-      />
-    );
+    return <NoInternetScreen onRetry={retryInternet} />;
   }
 
   return (
@@ -158,7 +134,18 @@ function AppContent() {
 }
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <>
+      {/* Durum çubuğu tüm ekranlarda aynı ayarı kullanır. */}
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="dark-content"
+      />
+
+      <AppContent />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -217,7 +204,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-
     shadowColor: COLORS.purpleDark,
     shadowOpacity: 0.18,
     shadowRadius: 10,
@@ -225,7 +211,6 @@ const styles = StyleSheet.create({
       width: 0,
       height: 5,
     },
-
     elevation: 4,
   },
 
@@ -237,6 +222,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 13,
     fontFamily: 'Quicksand-Bold',
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
 });

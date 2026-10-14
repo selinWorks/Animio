@@ -1,13 +1,12 @@
 import 'react-native-gesture-handler';
 
-import React, {
-  useEffect,
-  useRef,
-} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 import {
   Animated,
   Easing,
+  Keyboard,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -17,14 +16,28 @@ import {
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
 
+import type {
+  BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
+
 import {
   createNativeStackNavigator,
 } from '@react-navigation/native-stack';
 
+import {
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
-/* =========================================================
-   SCREENS
-========================================================= */
+import {PawPrint} from 'lucide-react-native';
+
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  LinearGradient,
+  Path,
+  Stop,
+} from 'react-native-svg';
 
 import HomeScreen from '../screens/HomeScreen';
 import PetsScreen from '../screens/PetsScreen';
@@ -43,140 +56,187 @@ import AboutAppScreen from '../screens/AboutAppScreen';
 import UpcomingFeaturesScreen from '../screens/UpcomingFeaturesScreen';
 
 import PetJoinScreen from '../screens/PetJoinScreen';
-
 import FamilyManagementScreen from '../screens/FamilyManagementScreen';
-
 import PetSummaryScreen from '../screens/PetSummaryScreen';
 
-/* =========================================================
-   AUTH
-========================================================= */
-
 import AuthNavigator from './AuthNavigator';
+import {useAuth} from '../data/AuthContext';
+import {Pet} from '../types/Pet';
 
-import {
-  useAuth,
-} from '../data/AuthContext';
-
-
-/* =========================================================
-   TYPES
-========================================================= */
-
-import {
-  Pet,
-} from '../types/Pet';
-
-
-/* =========================================================
-   ICONS
-========================================================= */
-
-import {
-  Home,
-  PawPrint,
-  PlusCircle,
-  Bot,
-  User,
-} from 'lucide-react-native';
-
-
-/* =========================================================
-   NAVIGATION TYPES
-========================================================= */
+/* NAVIGATION TYPES */
 
 export type TabParamList = {
   Home: undefined;
-
   Pets: undefined;
-
   AddPet: undefined;
-
   Assistant: undefined;
-
   Profile: undefined;
 };
 
-
 export type RootStackParamList = {
   MainTabs: undefined;
-
-  PetDetail: {
-    pet: Pet;
-  };
-
-  EditPet: {
-    pet: Pet;
-  };
-
-  WeightHistory: {
-    pet: Pet;
-  };
-
-  HealthHistory: {
-    pet: Pet;
-  };
-
-  PetSummary: {
-    pet: Pet;
-  };
-
+  PetDetail: {pet: Pet};
+  EditPet: {pet: Pet};
+  WeightHistory: {pet: Pet};
+  HealthHistory: {pet: Pet};
+  PetSummary: {pet: Pet};
   PetJoin: undefined;
-
   Calendar: undefined;
-
   Notifications: undefined;
-
   AboutApp: undefined;
-
   UpcomingFeatures: undefined;
-
   FirestoreTest: undefined;
-
   FamilyManagement: {petId?: string} | undefined;
 };
 
+const Tab = createBottomTabNavigator<TabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-/* =========================================================
-   NAVIGATORS
-========================================================= */
+const BAR_ITEMS = [
+  {name: 'Home', label: 'Ana Sayfa'},
+  {name: 'AddPet', label: 'Ekle'},
+  {name: 'Assistant', label: 'Asistan'},
+  {name: 'Profile', label: 'Profil'},
+] as const;
 
-const Tab =
-  createBottomTabNavigator<
-    TabParamList
-  >();
+type BarRouteName = (typeof BAR_ITEMS)[number]['name'];
 
-const Stack =
-  createNativeStackNavigator<
-    RootStackParamList
-  >();
+/* CUSTOM BAR ICONS */
 
+function BarIcon({
+  name,
+  focused,
+}: {
+  name: BarRouteName;
+  focused: boolean;
+}) {
+  const color = focused ? '#6942CC' : '#928BAA';
+  const gradientId = `bar-icon-${name}`;
 
-/* =========================================================
-   PETCARE LOADING
-========================================================= */
+  const paint = focused
+    ? `url(#${gradientId})`
+    : color;
+
+  return (
+    <Svg width={28} height={28} viewBox="0 0 28 28">
+      <Defs>
+        <LinearGradient
+          id={gradientId}
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%">
+          <Stop offset="0%" stopColor="#9563EF" />
+          <Stop offset="100%" stopColor="#5130B3" />
+        </LinearGradient>
+      </Defs>
+
+      {name === 'Home' && (
+        <Path
+          fill={paint}
+          d="
+            M12.2 3.3
+            a2.7 2.7 0 0 1 3.6 0
+            l8 7.2
+            a2.7 2.7 0 0 1 .9 2
+            V23
+            a2 2 0 0 1-2 2
+            h-4.3
+            a.8.8 0 0 1-.8-.8
+            v-6
+            a3.6 3.6 0 0 0-7.2 0
+            v6
+            a.8.8 0 0 1-.8.8
+            H5.3
+            a2 2 0 0 1-2-2
+            V12.5
+            a2.7 2.7 0 0 1 .9-2
+            z
+          "
+        />
+      )}
+
+      {name === 'AddPet' && (
+        <Path
+          d="M14 5.5V22.5M5.5 14H22.5"
+          fill="none"
+          stroke={paint}
+          strokeWidth={2.8}
+          strokeLinecap="round"
+        />
+      )}
+
+      {name === 'Assistant' && (
+        <>
+          <Ellipse
+            cx={14}
+            cy={14}
+            rx={11.4}
+            ry={6.1}
+            rotation={-35}
+            origin="14, 14"
+            fill="none"
+            stroke={color}
+            strokeWidth={2}
+          />
+
+          <Circle
+            cx={14}
+            cy={14}
+            r={5}
+            fill={paint}
+          />
+
+          <Circle
+            cx={22}
+            cy={6}
+            r={2.25}
+            fill={paint}
+            stroke={focused ? '#EFE6FD' : '#FCFAFF'}
+            strokeWidth={1.3}
+          />
+        </>
+      )}
+
+      {name === 'Profile' && (
+        <>
+          <Circle
+            cx={14}
+            cy={8.2}
+            r={5.1}
+            fill={paint}
+          />
+
+          <Path
+            d="
+              M14 15.4
+              C7.8 15.4 4.5 18.5 4.5 22.2
+              V23
+              C4.5 24.3 8.7 25 14 25
+              C19.3 25 23.5 24.3 23.5 23
+              V22.2
+              C23.5 18.5 20.2 15.4 14 15.4
+              Z
+            "
+            fill={paint}
+          />
+        </>
+      )}
+    </Svg>
+  );
+}
+
+/* LOADING */
 
 function PetCareLoading() {
-  const rotateAnimation =
-    useRef(new Animated.Value(0)).current;
+  const rotateAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(0)).current;
 
-  const pulseAnimation =
-    useRef(new Animated.Value(0)).current;
-
-  const dot1Animation =
-    useRef(new Animated.Value(0)).current;
-
-  const dot2Animation =
-    useRef(new Animated.Value(0)).current;
-
-  const dot3Animation =
-    useRef(new Animated.Value(0)).current;
+  const dot1Animation = useRef(new Animated.Value(0)).current;
+  const dot2Animation = useRef(new Animated.Value(0)).current;
+  const dot3Animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // -----------------------------
-    // RING ANIMATION
-    // -----------------------------
-
     const rotateLoop = Animated.loop(
       Animated.timing(rotateAnimation, {
         toValue: 1,
@@ -185,10 +245,6 @@ function PetCareLoading() {
         useNativeDriver: true,
       }),
     );
-
-    // -----------------------------
-    // PAW PULSE ANIMATION
-    // -----------------------------
 
     const pulseLoop = Animated.loop(
       Animated.sequence([
@@ -208,76 +264,42 @@ function PetCareLoading() {
       ]),
     );
 
-    // -----------------------------
-    // DOT ANIMATION
-    // 1 → 2 → 3 → 1 → 2 → 3
-    // Aynı anda sadece bir nokta hareket eder
-    // -----------------------------
-
-    const dotAnimation = Animated.loop(
+    const animateDot = (value: Animated.Value) =>
       Animated.sequence([
-
-        // 1. NOKTA
-        Animated.timing(dot1Animation, {
+        Animated.timing(value, {
           toValue: 1,
           duration: 250,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
 
-        Animated.timing(dot1Animation, {
+        Animated.timing(value, {
           toValue: 0,
           duration: 250,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
+      ]);
 
+    const dotLoop = Animated.loop(
+      Animated.sequence([
+        animateDot(dot1Animation),
         Animated.delay(80),
-
-        // 2. NOKTA
-        Animated.timing(dot2Animation, {
-          toValue: 1,
-          duration: 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(dot2Animation, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-
+        animateDot(dot2Animation),
         Animated.delay(80),
-
-        // 3. NOKTA
-        Animated.timing(dot3Animation, {
-          toValue: 1,
-          duration: 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(dot3Animation, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-
+        animateDot(dot3Animation),
         Animated.delay(180),
       ]),
     );
 
     rotateLoop.start();
     pulseLoop.start();
-    dotAnimation.start();
+    dotLoop.start();
 
     return () => {
       rotateLoop.stop();
       pulseLoop.stop();
-      dotAnimation.stop();
+      dotLoop.stop();
     };
   }, [
     rotateAnimation,
@@ -287,512 +309,249 @@ function PetCareLoading() {
     dot3Animation,
   ]);
 
-  // -----------------------------
-  // RING ROTATION
-  // -----------------------------
-  const rotation =
-    rotateAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
+  const rotation = rotateAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
-  // -----------------------------
-  // PAW SCALE
-  // -----------------------------
-  const pawScale =
-    pulseAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 1.1],
-    });
+  const pawScale = pulseAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
 
-  // -----------------------------
-  // PAW OPACITY
-  // -----------------------------
-  const pawOpacity =
-    pulseAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.78, 1],
-    });
-
-  // -----------------------------
-  // DOT POSITION
-  // -----------------------------
-  const dot1TranslateY =
-    dot1Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -6],
-    });
-
-  const dot2TranslateY =
-    dot2Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -6],
-    });
-
-  const dot3TranslateY =
-    dot3Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -6],
-    });
-
-  // -----------------------------
-  // DOT SIZE
-  // Hareket eden nokta büyür
-  // -----------------------------
-  const dot1Scale =
-    dot1Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 1.5],
-    });
-
-  const dot2Scale =
-    dot2Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 1.5],
-    });
-
-  const dot3Scale =
-    dot3Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 1.5],
-    });
-
-  // -----------------------------
-  // DOT COLOR
-  // Hareket eden nokta koyulaşır
-  // -----------------------------
-  const dot1Opacity =
-    dot1Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-    });
-
-  const dot2Opacity =
-    dot2Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-    });
-
-  const dot3Opacity =
-    dot3Animation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-    });
+  const pawOpacity = pulseAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.78, 1],
+  });
 
   return (
     <View style={loadingStyles.container}>
-
-      {/* BACKGROUND */}
-
-      <View
-        style={loadingStyles.glowTop}
-      />
-
-      <View
-        style={loadingStyles.glowBottom}
-      />
+      <View style={loadingStyles.glowTop} />
+      <View style={loadingStyles.glowBottom} />
 
       <View style={loadingStyles.content}>
-
-        {/* LOADER */}
-
         <View style={loadingStyles.loaderWrapper}>
-
           <Animated.View
             style={[
               loadingStyles.rotatingRing,
-              {
-                transform: [
-                  {
-                    rotate: rotation,
-                  },
-                ],
-              },
-            ]}
-          >
-            <View
-              style={loadingStyles.ringAccent}
-            />
+              {transform: [{rotate: rotation}]},
+            ]}>
+            <View style={loadingStyles.ringAccent} />
           </Animated.View>
 
           <View style={loadingStyles.pawCircle}>
-
             <Animated.View
               style={{
                 opacity: pawOpacity,
-                transform: [
-                  {
-                    scale: pawScale,
-                  },
-                ],
-              }}
-            >
+                transform: [{scale: pawScale}],
+              }}>
               <PawPrint
                 size={42}
                 color="#7457E8"
                 strokeWidth={2.2}
               />
             </Animated.View>
-
           </View>
-
         </View>
 
-        {/* BRAND */}
-
-        <Text style={loadingStyles.brand}>
-          PetCare
-        </Text>
+        <Text style={loadingStyles.brand}>PetCare</Text>
 
         <Text style={loadingStyles.loadingText}>
           PetCare hazırlanıyor...
         </Text>
 
         <View style={loadingStyles.dots}>
-
-          {/* 1. NOKTA */}
-
-          <Animated.View
-            style={[
-              loadingStyles.dot,
-              {
-                transform: [
-                  {
-                    translateY: dot1TranslateY,
-                  },
-                  {
-                    scale: dot1Scale,
-                  },
-                ],
-              },
-            ]}
-          >
+          {[
+            dot1Animation,
+            dot2Animation,
+            dot3Animation,
+          ].map((value, index) => (
             <Animated.View
+              key={index}
               style={[
-                loadingStyles.activeDot,
+                loadingStyles.dot,
                 {
-                  opacity: dot1Opacity,
+                  transform: [
+                    {
+                      translateY: value.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -6],
+                      }),
+                    },
+                    {
+                      scale: value.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.5],
+                      }),
+                    },
+                  ],
                 },
-              ]}
-            />
-          </Animated.View>
-
-
-          {/* 2. NOKTA */}
-
-          <Animated.View
-            style={[
-              loadingStyles.dot,
-              {
-                transform: [
-                  {
-                    translateY: dot2TranslateY,
-                  },
-                  {
-                    scale: dot2Scale,
-                  },
-                ],
-              },
-            ]}
-          >
-            <Animated.View
-              style={[
-                loadingStyles.activeDot,
-                {
-                  opacity: dot2Opacity,
-                },
-              ]}
-            />
-          </Animated.View>
-
-
-          {/* 3. NOKTA */}
-
-          <Animated.View
-            style={[
-              loadingStyles.dot,
-              {
-                transform: [
-                  {
-                    translateY: dot3TranslateY,
-                  },
-                  {
-                    scale: dot3Scale,
-                  },
-                ],
-              },
-            ]}
-          >
-            <Animated.View
-              style={[
-                loadingStyles.activeDot,
-                {
-                  opacity: dot3Opacity,
-                },
-              ]}
-            />
-          </Animated.View>
-
+              ]}>
+              <Animated.View
+                style={[
+                  loadingStyles.activeDot,
+                  {opacity: value},
+                ]}
+              />
+            </Animated.View>
+          ))}
         </View>
-
       </View>
-
     </View>
   );
 }
 
+/* SHARED BOTTOM BAR */
 
-/* =========================================================
-   BOTTOM TAB NAVIGATOR
-========================================================= */
+function FloatingTabBar({
+  state,
+  descriptors,
+  navigation,
+}: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true),
+    );
+
+    const hideSubscription = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false),
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  if (keyboardVisible) {
+    return null;
+  }
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        barStyles.wrapper,
+        {bottom: Math.max(insets.bottom, 12) + 8},
+      ]}>
+      <View style={barStyles.shadow}>
+        <View style={barStyles.dock}>
+          {BAR_ITEMS.map(item => {
+            const route = state.routes.find(
+              candidate => candidate.name === item.name,
+            );
+
+            if (!route) {
+              return null;
+            }
+
+            const focused =
+              state.routes[state.index].key === route.key;
+
+            const options = descriptors[route.key].options;
+
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  options.tabBarAccessibilityLabel ?? item.label
+                }
+                accessibilityState={{selected: focused}}
+                onPress={() => {
+                  const event = navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+
+                  if (!focused && !event.defaultPrevented) {
+                    navigation.navigate(route.name, route.params);
+                  }
+                }}
+                onLongPress={() => {
+                  navigation.emit({
+                    type: 'tabLongPress',
+                    target: route.key,
+                  });
+                }}
+                style={({pressed}) => [
+                  barStyles.item,
+                  pressed && barStyles.pressed,
+                ]}>
+                <View style={barStyles.capsule}>
+                  {focused && (
+                    <View
+                      pointerEvents="none"
+                      style={barStyles.activeBackground}
+                    />
+                  )}
+
+                  <BarIcon
+                    name={item.name}
+                    focused={focused}
+                  />
+
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      barStyles.label,
+                      focused && barStyles.activeLabel,
+                    ]}>
+                    {item.label}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* TAB NAVIGATOR */
 
 function TabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({
-        route,
-      }) => ({
-        headerShown: false,
-
-        tabBarActiveTintColor:
-          '#7457E8',
-
-        tabBarInactiveTintColor:
-          '#9CA3AF',
-
-        tabBarLabelStyle: {
-          fontSize: 11,
-
-          fontFamily:
-            'Quicksand-SemiBold',
-
-          marginTop: 1,
-        },
-
-        tabBarStyle: {
-          position:
-            'absolute',
-
-          left: 0,
-
-          right: 0,
-
-          bottom: 0,
-
-          height: 72,
-
-          backgroundColor:
-            '#FFFFFF',
-
-          borderTopLeftRadius:
-            24,
-
-          borderTopRightRadius:
-            24,
-
-          borderBottomLeftRadius:
-            0,
-
-          borderBottomRightRadius:
-            0,
-
-          borderTopWidth: 1,
-
-          borderTopColor:
-            '#F0EDF7',
-
-          paddingTop: 8,
-
-          paddingBottom: 8,
-
-          elevation: 14,
-
-          shadowColor:
-            '#31275A',
-
-          shadowOpacity:
-            0.1,
-
-          shadowRadius:
-            16,
-
-          shadowOffset: {
-            width: 0,
-
-            height: -4,
-          },
-        },
-
-        tabBarItemStyle: {
-          paddingVertical: 2,
-        },
-
-        tabBarIconStyle: {
-          marginTop: 2,
-        },
-
-        tabBarIcon: ({
-          color,
-          size,
-        }) => {
-          const iconSize =
-            Math.min(
-              size,
-              22,
-            );
-
-
-          if (
-            route.name ===
-            'Home'
-          ) {
-            return (
-              <Home
-                color={color}
-                size={iconSize}
-                strokeWidth={1.9}
-              />
-            );
-          }
-
-
-          if (
-            route.name ===
-            'Pets'
-          ) {
-            return (
-              <PawPrint
-                color={color}
-                size={iconSize}
-                strokeWidth={1.9}
-              />
-            );
-          }
-
-
-          if (
-            route.name ===
-            'AddPet'
-          ) {
-            return (
-              <PlusCircle
-                color={color}
-                size={iconSize}
-                strokeWidth={1.9}
-              />
-            );
-          }
-
-
-          if (
-            route.name ===
-            'Assistant'
-          ) {
-            return (
-              <Bot
-                color={color}
-                size={iconSize}
-                strokeWidth={1.9}
-              />
-            );
-          }
-
-
-          if (
-            route.name ===
-            'Profile'
-          ) {
-            return (
-              <User
-                color={color}
-                size={iconSize}
-                strokeWidth={1.9}
-              />
-            );
-          }
-
-
-          return null;
-        },
-      })}>
-
-      {/* HOME */}
-
+      tabBar={props => <FloatingTabBar {...props} />}
+      screenOptions={{headerShown: false}}>
       <Tab.Screen
         name="Home"
-        component={
-          HomeScreen
-        }
-        options={{
-          tabBarLabel:
-            'Home',
-        }}
+        component={HomeScreen}
       />
 
-
-      {/* PETS */}
-
+      {/* Dostlar sayfası erişilebilir; barda görünmez. */}
       <Tab.Screen
         name="Pets"
-        component={
-          PetsScreen
-        }
-        options={{
-          tabBarLabel:
-            'Pets',
-        }}
+        component={PetsScreen}
       />
-
-
-      {/* ADD PET */}
 
       <Tab.Screen
         name="AddPet"
-        component={
-          AddPetScreen
-        }
-        options={{
-          tabBarLabel:
-            'Add',
-        }}
+        component={AddPetScreen}
       />
-
-
-      {/* ASSISTANT */}
 
       <Tab.Screen
         name="Assistant"
-        component={
-          AssistantScreen
-        }
-        options={{
-          tabBarLabel:
-            'AI',
-        }}
+        component={AssistantScreen}
       />
-
-
-      {/* PROFILE */}
 
       <Tab.Screen
         name="Profile"
-        component={
-          ProfileScreen
-        }
-        options={{
-          tabBarLabel:
-            'Profile',
-        }}
+        component={ProfileScreen}
       />
-
     </Tab.Navigator>
   );
 }
 
-
-/* =========================================================
-   MAIN STACK
-========================================================= */
+/* MAIN STACK */
 
 function MainAppNavigator() {
   return (
@@ -800,470 +559,290 @@ function MainAppNavigator() {
       initialRouteName="MainTabs"
       screenOptions={{
         headerStyle: {
-          backgroundColor:
-            '#FFFFFF',
+          backgroundColor: '#FFFFFF',
         },
-
-        headerShadowVisible:
-          false,
-
+        headerShadowVisible: false,
         headerTitleStyle: {
-          fontFamily:
-            'Quicksand-Bold',
-
+          fontFamily: 'Quicksand-Bold',
           fontSize: 18,
-
-          color:
-            '#111827',
+          color: '#111827',
         },
-
-        headerTintColor:
-          '#6366F1',
+        headerTintColor: '#6366F1',
       }}>
-
-      {/* =====================================================
-          MAIN TABS
-      ===================================================== */}
-
       <Stack.Screen
         name="MainTabs"
-        component={
-          TabNavigator
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={TabNavigator}
+        options={{headerShown: false}}
       />
-
-
-      {/* =====================================================
-          PET DETAIL
-      ===================================================== */}
 
       <Stack.Screen
         name="PetDetail"
-        component={
-          PetDetailScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={PetDetailScreen}
+        options={{headerShown: false}}
       />
-
-
-      {/* =====================================================
-          EDIT PET
-      ===================================================== */}
 
       <Stack.Screen
         name="EditPet"
-        component={
-          EditPetScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={EditPetScreen}
+        options={{headerShown: false}}
       />
-
-
-      {/* =====================================================
-          WEIGHT HISTORY
-      ===================================================== */}
 
       <Stack.Screen
         name="WeightHistory"
-        component={
-          WeightHistoryScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={WeightHistoryScreen}
+        options={{headerShown: false}}
       />
-
-      {/* =====================================================
-          HEALTH HISTORY
-      ===================================================== */}
 
       <Stack.Screen
         name="HealthHistory"
-        component={
-          HealthHistoryScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={HealthHistoryScreen}
+        options={{headerShown: false}}
       />
-
-
-
-
-      {/* =====================================================
-          PET JOIN
-      ===================================================== */}
 
       <Stack.Screen
         name="PetJoin"
-        component={
-          PetJoinScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
+        component={PetJoinScreen}
+        options={{headerShown: false}}
       />
-
-
-      {/* =====================================================
-          CALENDAR
-      ===================================================== */}
 
       <Stack.Screen
         name="Calendar"
-        component={
-          CalendarScreen
-        }
-        options={{
-          title:
-            'Takvim',
-        }}
+        component={CalendarScreen}
+        options={{title: 'Takvim'}}
       />
-
-
-      {/* =====================================================
-          NOTIFICATIONS
-      ===================================================== */}
 
       <Stack.Screen
         name="Notifications"
-        component={
-          NotificationsScreen
-        }
-        options={{
-          title:
-            'Bildirimler',
-        }}
+        component={NotificationsScreen}
+        options={{title: 'Bildirimler'}}
       />
-
-
-      {/* =====================================================
-          ABOUT APP
-      ===================================================== */}
 
       <Stack.Screen
         name="AboutApp"
-        component={
-          AboutAppScreen
-        }
-        options={{
-          title:
-            'PetCare Hakkında',
-        }}
+        component={AboutAppScreen}
+        options={{title: 'PetCare Hakkında'}}
       />
-
-
-      {/* =====================================================
-          UPCOMING FEATURES
-      ===================================================== */}
 
       <Stack.Screen
         name="UpcomingFeatures"
-        component={
-          UpcomingFeaturesScreen
-        }
-        options={{
-          title:
-            'Yakında',
-        }}
+        component={UpcomingFeaturesScreen}
+        options={{title: 'Yakında'}}
       />
 
       <Stack.Screen
         name="FamilyManagement"
         component={FamilyManagementScreen}
-        options={{
-          headerShown: false,
-        }}
+        options={{headerShown: false}}
       />
 
       <Stack.Screen
         name="PetSummary"
         component={PetSummaryScreen}
-        options={{
-          headerShown: false,
-        }}
+        options={{headerShown: false}}
       />
-
     </Stack.Navigator>
   );
 }
 
-
-/* =========================================================
-   ROOT NAVIGATOR
-========================================================= */
+/* ROOT NAVIGATOR */
 
 export default function AppNavigator() {
-  const {
-    user,
-    loading,
-  } = useAuth();
-
+  const {user, loading} = useAuth();
 
   if (loading) {
-    return (
-      <PetCareLoading />
-    );
+    return <PetCareLoading />;
   }
 
-  return user
-    ? (
-      <MainAppNavigator />
-    )
-    : (
-      <AuthNavigator />
-    );
+  return user ? <MainAppNavigator /> : <AuthNavigator />;
 }
 
-
-/* =========================================================
-   LOADING STYLES
-========================================================= */
-
-const loadingStyles =
-  StyleSheet.create({
-
-    container: {
-      flex: 1,
-
-      backgroundColor:
-        '#F7F5FF',
-
-      justifyContent:
-        'center',
-
-      alignItems:
-        'center',
-
-      overflow:
-        'hidden',
-    },
-
-
-    glowTop: {
-      position:
-        'absolute',
-
-      width: 330,
-
-      height: 330,
-
-      borderRadius:
-        165,
-
-      backgroundColor:
-        '#EEE9FF',
-
-      top: -150,
-
-      right: -120,
-    },
-
-
-    glowBottom: {
-      position:
-        'absolute',
-
-      width: 300,
-
-      height: 300,
-
-      borderRadius:
-        150,
-
-      backgroundColor:
-        '#F0ECFF',
-
-      bottom: -160,
-
-      left: -130,
-    },
-
-
-    content: {
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-    },
-
-
-    loaderWrapper: {
-      width: 116,
-
-      height: 116,
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      marginBottom:
-        22,
-    },
-
-
-    rotatingRing: {
-      position:
-        'absolute',
-
-      width: 112,
-
-      height: 112,
-
-      borderRadius:
-        56,
-
-      borderWidth:
-        3,
-
-      borderColor:
-        '#E4DEFF',
-
-      borderTopColor:
-        '#7457E8',
-
-      borderRightColor:
-        '#A58FF3',
-    },
-
-
-    ringAccent: {
-      position:
-        'absolute',
-
-      width: 10,
-
-      height: 10,
-
-      borderRadius:
-        5,
-
-      backgroundColor:
-        '#7457E8',
-
-      top: 5,
-
-      right: 18,
-    },
-
-
-    pawCircle: {
-      width: 84,
-
-      height: 84,
-
-      borderRadius:
-        42,
-
-      backgroundColor:
-        '#FFFFFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-
-      borderWidth:
-        1,
-
-      borderColor:
-        '#EEEAFE',
-
-      elevation:
-        7,
-
-      shadowColor:
-        '#7560D9',
-
-      shadowOffset: {
-        width: 0,
-
-        height: 7,
-      },
-
-      shadowOpacity:
-        0.14,
-
-      shadowRadius:
-        14,
-    },
-
-
-    brand: {
-      fontFamily:
-        'Quicksand-Bold',
-
-      fontSize:
-        25,
-
-      color:
-        '#17183F',
-
-      letterSpacing:
-        -0.5,
-    },
-
-
-    loadingText: {
-      marginTop:
-        6,
-
-      fontFamily:
-        'Quicksand-Medium',
-
-      fontSize:
-        13,
-
-      color:
-        '#7A819B',
-    },
-
-
-    dots: {
-      marginTop:
-        15,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      gap:
-        6,
-    },
-
-
-    dot: {
-      width: 5,
-      height: 5,
-      borderRadius: 3,
-      backgroundColor: '#C8BDF7',
-    },
-
-    activeDot: {
-      position: 'absolute',
-      width: 5,
-      height: 5,
-      borderRadius: 3,
-      backgroundColor: '#8068E9',
-    },
-
-  });
+/* BAR STYLES */
+
+const barStyles = StyleSheet.create({
+  wrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+
+  shadow: {
+    borderRadius: 32,
+    backgroundColor: '#FCFAFF',
+    shadowColor: '#49366E',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 9,
+  },
+
+  dock: {
+    height: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: '#FCFAFF',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+
+  item: {
+    flex: 1,
+    height: 78,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  capsule: {
+    width: '100%',
+    maxWidth: 96,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  activeBackground: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+    backgroundColor: '#EFE6FD',
+  },
+
+  label: {
+    marginTop: 6,
+    fontSize: 11,
+    fontFamily: 'Quicksand-Bold',
+    color: '#928BAA',
+  },
+
+  activeLabel: {
+    color: '#6138BE',
+  },
+
+  pressed: {
+    opacity: 0.75,
+    transform: [{scale: 0.96}],
+  },
+});
+
+/* LOADING STYLES */
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  glowTop: {
+    position: 'absolute',
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    backgroundColor: '#EEE9FF',
+    top: -150,
+    right: -120,
+  },
+
+  glowBottom: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: '#F0ECFF',
+    bottom: -160,
+    left: -130,
+  },
+
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loaderWrapper: {
+    width: 116,
+    height: 116,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+
+  rotatingRing: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 3,
+    borderColor: '#E4DEFF',
+    borderTopColor: '#7457E8',
+    borderRightColor: '#A58FF3',
+  },
+
+  ringAccent: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#7457E8',
+    top: 5,
+    right: 18,
+  },
+
+  pawCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#EEEAFE',
+    elevation: 7,
+    shadowColor: '#7560D9',
+    shadowOffset: {width: 0, height: 7},
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+  },
+
+  brand: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 25,
+    color: '#17183F',
+    letterSpacing: -0.5,
+  },
+
+  loadingText: {
+    marginTop: 6,
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 13,
+    color: '#7A819B',
+  },
+
+  dots: {
+    marginTop: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#C8BDF7',
+  },
+
+  activeDot: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#8068E9',
+  },
+});

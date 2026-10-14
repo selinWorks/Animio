@@ -1,769 +1,669 @@
 import React, {
   useCallback,
-  useState,
-  useRef,
   useEffect,
+  useRef,
+  useState,
 } from 'react';
 
-import notifee, {
-  EventType,
-} from '@notifee/react-native';
-
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  StatusBar,
-  Image,
-  ImageSourcePropType,
   Animated,
-  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 import {
-  PawPrint,
-  Plus,
-  CalendarDays,
-  Bot,
-  ChevronRight,
-  Heart,
   Bell,
-  Calendar,
-  Stethoscope,
-  Utensils,
-  Lightbulb,
+  CalendarDays,
+  ChevronRight,
+  FileText,
+  PawPrint,
+  X,
 } from 'lucide-react-native';
 
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import Svg, {Rect} from 'react-native-svg';
+
+import {
+  useFocusEffect,
+  useNavigation,
+} from '@react-navigation/native';
+
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import notifee, {EventType} from '@notifee/react-native';
 
 import {usePets} from '../data/PetContext';
 import {useAuth} from '../data/AuthContext';
-import {Pet} from '../types/Pet';
 import {getCareEventsFromFirestore} from '../services/firestore';
 
-const {width} = Dimensions.get('window');
+const garden = require('../assets/images/home/animio-garden.png');
+const logo = require('../assets/images/home/animio-logo.png');
 
-/* =========================================================
-   DEFAULT PET AVATARS
-========================================================= */
+const gardenSize = Image.resolveAssetSource(garden);
 
-const defaultCatAvatar = require(
-  '../assets/images/pets/default-cat-pixel.png',
-);
-
-const defaultDogAvatar = require(
-  '../assets/images/pets/default-dog-pixel.png',
-);
-
-const defaultRabbitAvatar = require(
-  '../assets/images/pets/default-rabbit-pixel.png',
-);
-
-const defaultBirdAvatar = require(
-  '../assets/images/pets/default-bird-pixel.png',
-);
-
-const defaultHamsterAvatar = require(
-  '../assets/images/pets/default-hamster-pixel.png',
-);
-
-const defaultAmphibianAvatar = require(
-  '../assets/images/pets/default-amfibi-pixel-head.png',
-);
-
-const defaultCowAvatar = require(
-  '../assets/images/pets/default-cow-pixel.png',
-);
-
-const defaultReptileAvatar = require(
-  '../assets/images/pets/default-reptile-pixel.png',
-);
-
-const defaultFishAvatar = require(
-  '../assets/images/pets/default-fish-pixel.png',
-);
-
-/* =========================================================
-   FONTS & COLORS
-========================================================= */
-
-const F = {
-  light: 'Quicksand-Light',
-  regular: 'Quicksand-Regular',
-  medium: 'Quicksand-Medium',
-  semiBold: 'Quicksand-SemiBold',
-  bold: 'Quicksand-Bold',
+const COLORS = {
+  purple: '#6942C8',
+  dark: '#422A73',
+  buttonBackground: '#FAF9F6',
 };
 
-const C = {
-  bg: '#FAF9FF',
-  white: '#FFFFFF',
-  text: '#18162B',
-  secondary: '#66647A',
-  muted: '#9693A7',
-  purple: '#7457E8',
-  purpleDark: '#5D42CF',
-  purpleSoft: '#F1EDFF',
-  pink: '#FFF0F4',
-  pinkText: '#EF557A',
-  orange: '#FFF2E5',
-  orangeText: '#F28A32',
-  blue: '#EEF3FF',
-  blueText: '#536FE8',
-  green: '#EAF9F4',
-  greenText: '#2FA77D',
-  border: '#ECE9F4',
+type BannerData = {
+  title: string;
+  note: string;
+  petName: string;
 };
 
-function normalizePetType(type?: string) {
-  return (type || '')
-    .toLocaleLowerCase('tr-TR')
-    .trim();
-}
-
-
-
-
-function getDefaultPetAvatar(type?: string): ImageSourcePropType {
-  const value = (type ?? '')
-    .toLocaleLowerCase('tr-TR')
-    .trim();
-
-  if (!value) {
-    return defaultCatAvatar;
-  }
-
-  // Kedi ve kedi alt türleri
-  if (
-    value === 'kedi' ||
-    value.includes('cat') ||
-    [
-      'british shorthair',
-      'scottish fold',
-      'siyam',
-      'iran kedisi',
-      'maine coon',
-      'ragdoll',
-      'van kedisi',
-      'tekir',
-      'sfenks',
-      'bengal',
-      'birman',
-      'abyssinian',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultCatAvatar;
-  }
-
-  // Köpek ve köpek alt türleri
-  if (
-    value === 'köpek' ||
-    value === 'kopek' ||
-    value.includes('dog') ||
-    [
-      'golden retriever',
-      'labrador',
-      'alman kurdu',
-      'french bulldog',
-      'poodle',
-      'chihuahua',
-      'beagle',
-      'husky',
-      'pomeranian',
-      'rottweiler',
-      'cocker spaniel',
-      'dachshund',
-      'maltese',
-      'shih tzu',
-      'border collie',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultDogAvatar;
-  }
-
-  // Kuş ve kuş alt türleri
-  if (
-    value === 'kuş' ||
-    value === 'kus' ||
-    value.includes('bird') ||
-    [
-      'muhabbet kuşu',
-      'muhabbet kusu',
-      'papağan',
-      'papagan',
-      'kanarya',
-      'sultan papağanı',
-      'sultan papagani',
-      'sevda papağanı',
-      'sevda papagani',
-      'ispinoz',
-      'güvercin',
-      'guvercin',
-      'serçe',
-      'serce',
-      'bülbül',
-      'bulbul',
-      'hint bülbülü',
-      'hint bulbulu',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultBirdAvatar;
-  }
-
-  // Balık ve balık alt türleri
-  if (
-    value === 'balık' ||
-    value === 'balik' ||
-    value.includes('fish') ||
-    [
-      'japon balığı',
-      'japon baligi',
-      'beta',
-      'lepistes',
-      'melek balığı',
-      'melek baligi',
-      'koi',
-      'çöpçü balığı',
-      'copcu baligi',
-      'neon tetra',
-      'moli',
-      'plati',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultFishAvatar;
-  }
-
-  // Kemirgen ve kemirgen alt türleri
-  if (
-    value === 'kemirgen' ||
-    [
-      'hamster',
-      'kobay',
-      'çinçilla',
-      'cincilla',
-      'fare',
-      'sıçan',
-      'sican',
-      'gerbil',
-      'sincap',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultHamsterAvatar;
-  }
-
-  // Sürüngen ve sürüngen alt türleri
-  if (
-    value === 'sürüngen' ||
-    value === 'surungen' ||
-    value.includes('reptile') ||
-    [
-      'kaplumbağa',
-      'kaplumbaga',
-      'yılan',
-      'yilan',
-      'kertenkele',
-      'iguana',
-      'geko',
-      'sakallı ejder',
-      'sakalli ejder',
-      'bukalemun',
-    ].some(subtype => value.includes(subtype))
-  ) {
-    return defaultReptileAvatar;
-  }
-
-  // Çiftlik hayvanları
-  if (
-    value === 'çiftlik hayvanı' ||
-    value === 'ciftlik hayvani' ||
-    [
-      'at',
-      'inek',
-      'koyun',
-      'keçi',
-      'keci',
-      'ördek',
-      'ordek',
-      'tavuk',
-      'kaz',
-      'manda',
-      'eşek',
-      'esek',
-      'deve',
-    ].some(subtype => value === subtype || value.startsWith(`${subtype} `))
-  ) {
-    // Mevcut görsel havuzunda çiftlik hayvanları için inek görseli kullanılıyor.
-    return defaultCowAvatar;
-  }
-
-  // Amfibi ve alt türleri
-  if (
-    value === 'amfibi' ||
-    value.includes('amphibian') ||
-    ['kurbağa', 'kurbaga', 'semender', 'aksolotl', 'frog', 'salamander', 'axolotl']
-      .some(subtype => value.includes(subtype))
-  ) {
-    return defaultAmphibianAvatar;
-  }
-
-  // Diğer memeliler
-  if (
-    value === 'diğer memeliler' ||
-    value === 'diger memeliler' ||
-    ['tavşan', 'tavsan', 'rabbit', 'kirpi', 'gelincik', 'hedgehog', 'ferret']
-      .some(subtype => value.includes(subtype))
-  ) {
-    return defaultRabbitAvatar;
-  }
-
-  // Omurgasızlar
-  if (
-    value === 'omurgasız' ||
-    value === 'omurgasiz' ||
-    ['örümcek', 'orumcek', 'akrep', 'salyangoz', 'yengeç', 'yengec', 'spider', 'scorpion']
-      .some(subtype => value.includes(subtype))
-  ) {
-    // Mevcut görsel havuzunda omurgasızlar için özel görsel bulunmuyor.
-    return defaultReptileAvatar;
-  }
-
-  console.log('[PetAvatar] Tanınmayan tür:', JSON.stringify(type));
-
-  return defaultCatAvatar;
-}
-
-
-
+type ButtonPosition = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
 
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+
   const {pets} = usePets();
   const {user} = useAuth();
-  const navigation = useNavigation<any>();
 
-  const [hasNewNotifications, setHasNewNotifications] = useState(false);
-  const [activeBannerNotification, setActiveBannerNotification] = useState<any>(null);
+  const [layout, setLayout] = useState({
+    width: 0,
+    height: 0,
+  });
 
-  // Sağdan sola kayma animasyonu için başlangıç pozisyonu (ekran dışından başlar)
-  const slideAnim = useRef(new Animated.Value(width)).current;
-  const hideBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pdfModalVisible, setPdfModalVisible] = useState(false);
+  const [hasNewNotifications, setHasNewNotifications] =
+    useState(false);
+  const [banner, setBanner] = useState<BannerData | null>(null);
 
-  // Bildirimi gösteren ve kaydırma animasyonunu tetikleyen fonksiyon
-  const triggerBanner = useCallback(
-    (notification: any) => {
-      setActiveBannerNotification(notification);
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
 
-      slideAnim.setValue(width);
+  const bannerTimer = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
 
-      Animated.spring(slideAnim, {
-        toValue: 0,
+  const petList = pets ?? [];
+  const totalPets = petList.length;
+
+  const petsWithVaccines = petList.filter(
+    pet => Boolean(pet.vaccines?.trim()),
+  ).length;
+
+  /* ANLIK BİLDİRİM */
+
+  const showBanner = useCallback(
+    (notification: BannerData) => {
+      if (bannerTimer.current) {
+        clearTimeout(bannerTimer.current);
+      }
+
+      setBanner(notification);
+      bannerOpacity.stopAnimation();
+      bannerOpacity.setValue(0);
+
+      Animated.timing(bannerOpacity, {
+        toValue: 1,
+        duration: 220,
         useNativeDriver: true,
-        speed: 14,
-        bounciness: 6,
       }).start();
 
-      setTimeout(() => {
-        Animated.timing(slideAnim, {
-          toValue: width,
-          duration: 300,
+      bannerTimer.current = setTimeout(() => {
+        Animated.timing(bannerOpacity, {
+          toValue: 0,
+          duration: 220,
           useNativeDriver: true,
-        }).start(({finished}) => {
-          if (finished) {
-            setActiveBannerNotification(null);
-          }
-        });
+        }).start();
       }, 4000);
     },
-    [slideAnim],
+    [bannerOpacity],
   );
 
-
-useEffect(() => {
-  const unsubscribe = notifee.onForegroundEvent(
-    ({type, detail}) => {
-      if (type !== EventType.DELIVERED) {
-        return;
-      }
-
-      const notification = detail.notification;
-
-      if (!notification) {
-        return;
-      }
-
-      // Yeni bildirim geldi: kırmızı noktayı göster.
-      setHasNewNotifications(true);
-
-      const data = notification.data || {};
-
-      const bannerNotification = {
-        id: data.eventId || notification.id,
-        title:
-          data.title ||
-          notification.title ||
-          'Bakım zamanı geldi',
-        note: data.note || notification.body || '',
-        petName: data.petName || '',
-        type: data.type || 'Custom',
-        color: data.color || '#C4B5FD',
-        date: data.date || '',
-      };
-
-      triggerBanner(bannerNotification);
-    },
-  );
-
-  return unsubscribe;
-}, [triggerBanner]);
-
-
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-
-      const checkActiveNotifications = async () => {
-        if (!user?.uid) {
-          setHasNewNotifications(false);
+  useEffect(() => {
+    const unsubscribe = notifee.onForegroundEvent(
+      ({type, detail}) => {
+        if (
+          type !== EventType.DELIVERED ||
+          !detail.notification
+        ) {
           return;
         }
 
+        const notification = detail.notification;
+        const data = notification.data ?? {};
+
+        setHasNewNotifications(true);
+
+        showBanner({
+          title: String(
+            data.title ??
+              notification.title ??
+              'Bakım zamanı geldi',
+          ),
+          note: String(data.note ?? notification.body ?? ''),
+          petName: String(data.petName ?? ''),
+        });
+      },
+    );
+
+    return () => {
+      unsubscribe();
+
+      if (bannerTimer.current) {
+        clearTimeout(bannerTimer.current);
+      }
+
+      bannerOpacity.stopAnimation();
+    };
+  }, [showBanner, bannerOpacity]);
+
+  /* OKUNMAMIŞ BİLDİRİMLER */
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      let checking = false;
+
+      const checkNotifications = async () => {
+        if (!user?.uid) {
+          if (active) {
+            setHasNewNotifications(false);
+          }
+
+          return;
+        }
+
+        if (checking) {
+          return;
+        }
+
+        checking = true;
+
         try {
-          const events = await getCareEventsFromFirestore(user.uid);
+          const events = await getCareEventsFromFirestore(
+            user.uid,
+          );
 
           const lastRead = await AsyncStorage.getItem(
             'last_notification_read_time',
           );
 
-          if (!isMounted) return;
+          if (!active) {
+            return;
+          }
 
-          const lastReadDate = lastRead
-            ? new Date(lastRead)
-            : new Date(0);
+          const parsedLastRead = lastRead
+            ? new Date(lastRead).getTime()
+            : 0;
 
-          const now = new Date();
+          const lastReadTime = Number.isNaN(parsedLastRead)
+            ? 0
+            : parsedLastRead;
 
-          const activeEvents = events.filter((item: any) => {
-            if (!item.date) return false;
+          const now = Date.now();
 
-            const eventDate = new Date(
-              `${item.date}T${item.time || '00:00'}:00`,
-            );
+          const hasUnread = events.some((event: any) => {
+            if (!event.date) {
+              return false;
+            }
+
+            const eventTime = new Date(
+              `${event.date}T${event.time || '00:00'}:00`,
+            ).getTime();
 
             return (
-              !Number.isNaN(eventDate.getTime()) &&
-              eventDate.getTime() <= now.getTime() &&
-              eventDate.getTime() > lastReadDate.getTime()
+              !Number.isNaN(eventTime) &&
+              eventTime <= now &&
+              eventTime > lastReadTime
             );
           });
 
-          setHasNewNotifications(activeEvents.length > 0);
+          setHasNewNotifications(hasUnread);
         } catch (error) {
           console.log('Bildirim kontrol hatası:', error);
+        } finally {
+          checking = false;
         }
       };
 
-      checkActiveNotifications();
+      checkNotifications();
 
-      // Ana sayfa açıkken de yeni etkinlikleri düzenli kontrol et.
-      const intervalId = setInterval(() => {
-        checkActiveNotifications();
-      }, 10000);
+      const interval = setInterval(
+        checkNotifications,
+        10000,
+      );
 
       return () => {
-        isMounted = false;
-        clearInterval(intervalId);
+        active = false;
+        clearInterval(interval);
       };
     }, [user?.uid]),
   );
 
-  const petList: Pet[] = pets || [];
-  const totalPets = petList.length;
-  const petsWithVaccines = petList.filter(pet => pet.vaccines?.trim()).length;
+  /* WALLPAPER KONUM HESABI */
+
+  const scale = Math.max(
+    layout.width / gardenSize.width,
+    layout.height / gardenSize.height,
+  );
+
+  const renderedWidth = gardenSize.width * scale;
+  const renderedHeight = gardenSize.height * scale;
+
+  const offsetX = (layout.width - renderedWidth) / 2;
+  const offsetY = (layout.height - renderedHeight) / 2;
+
+  const positionAt = (
+    x: number,
+    y: number,
+    buttonWidth: number,
+    buttonHeight = 44,
+  ): ButtonPosition => ({
+    left: Math.max(
+      12,
+      Math.min(
+        layout.width - buttonWidth - 12,
+        offsetX + renderedWidth * x - buttonWidth / 2,
+      ),
+    ),
+    top: offsetY + renderedHeight * y - buttonHeight / 2,
+    width: buttonWidth,
+    height: buttonHeight,
+  });
+
+  const uiScale = Math.max(
+    0.85,
+    Math.min(layout.width / 390, 1.15),
+  );
+
+  const calendarWidth = 100 * uiScale;
+  const petsWidth = 118 * uiScale;
+  const pdfWidth = 122 * uiScale;
+
+  const layoutReady = layout.width > 0 && layout.height > 0;
 
   return (
-    <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+    <View
+      style={styles.screen}
+      onLayout={event => {
+        const {width, height} = event.nativeEvent.layout;
 
-      {/* SAĞDAN KİRAYARAK GELEN ANLIK BİLDİRİM BALONU */}
-      {activeBannerNotification && (
-        <Animated.View
+        setLayout(current => {
+          if (
+            current.width === width &&
+            current.height === height
+          ) {
+            return current;
+          }
+
+          return {width, height};
+        });
+      }}>
+      <Image
+        source={garden}
+        style={styles.background}
+        resizeMode="cover"
+      />
+
+      {/* LOGO */}
+
+      <Image
+        source={logo}
+        style={[
+          styles.animioLogo,
+          {top: insets.top + 4},
+        ]}
+        resizeMode="contain"
+        accessibilityLabel="Animio"
+        pointerEvents="none"
+      />
+
+      {/* BİLDİRİMLER */}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Bildirimler"
+        onPress={() => {
+          setHasNewNotifications(false);
+          navigation.navigate('Notifications');
+        }}
+        style={({pressed}) => [
+          styles.notificationButton,
+          {top: insets.top + 18},
+          pressed && styles.pressed,
+        ]}>
+        <Bell
+          size={23}
+          color={COLORS.dark}
+          strokeWidth={1.9}
+        />
+
+        {hasNewNotifications && (
+          <View style={styles.notificationDot} />
+        )}
+      </Pressable>
+
+      {/* DOST SAYILARI */}
+
+      {layoutReady && (
+        <View
           style={[
-            styles.topBanner,
+            styles.statsPill,
             {
+              left: Math.max(
+                22,
+                offsetX + renderedWidth * 0.07,
+              ),
+              top: Math.max(
+                insets.top + 100,
+                offsetY + renderedHeight * 0.135,
+              ),
+            },
+          ]}>
+          <Text style={styles.statsText}>
+            {totalPets} dost
+          </Text>
+
+          <Text style={styles.statsDot}>·</Text>
+
+          <Text style={styles.statsText}>
+            {petsWithVaccines} aşı kayıtlı dost
+          </Text>
+        </View>
+      )}
+
+      {/* BAHÇE BUTONLARI */}
+
+      {layoutReady && (
+        <>
+          <GardenButton
+            title="Takvim"
+            angle="-5deg"
+            icon={
+              <CalendarDays
+                size={18}
+                color={COLORS.purple}
+                strokeWidth={2}
+              />
+            }
+            position={positionAt(
+              0.14,
+              0.480,
+              calendarWidth,
+            )}
+            onPress={() => navigation.navigate('Calendar')}
+          />
+
+          <GardenButton
+            title="Dostlarım"
+            angle="4deg"
+            icon={
+              <PawPrint
+                size={18}
+                color={COLORS.purple}
+                fill={COLORS.purple}
+                strokeWidth={1.4}
+              />
+            }
+            position={positionAt(
+              0.84,
+              0.405,
+              petsWidth,
+            )}
+            onPress={() => navigation.navigate('Pets')}
+          />
+
+          <GardenButton
+            title={'PDF Belge\nOluştur'}
+            angle="6deg"
+            icon={
+              <FileText
+                size={20}
+                color={COLORS.purple}
+                strokeWidth={2}
+              />
+            }
+            position={positionAt(
+              0.80,
+              0.66,
+              pdfWidth,
+              48,
+            )}
+            onPress={() => setPdfModalVisible(true)}
+          />
+        </>
+      )}
+
+      {/* ANLIK BİLDİRİM */}
+
+      {banner && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.banner,
+            {
+              top: insets.top + 12,
+              opacity: bannerOpacity,
               transform: [
                 {
-                  translateX: slideAnim,
+                  translateY: bannerOpacity.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-15, 0],
+                  }),
                 },
               ],
             },
-          ]}
-        >
-          <View style={styles.topBannerIcon}>
-            <Calendar
-              size={21}
-              color="#7257FF"
-              strokeWidth={2}
-            />
-          </View>
+          ]}>
+          <CalendarDays
+            size={23}
+            color={COLORS.purple}
+          />
 
-          <View
-            style={
-              styles.topBannerContent
-            }
-          >
-            <Text
-              style={
-                styles.topBannerTitle
-              }
-            >
-              Bakım zamanı geldi ✨
+          <View style={styles.bannerContent}>
+            <Text style={styles.bannerTitle}>
+              Bakım zamanı geldi
             </Text>
 
             <Text
-              style={
-                styles.topBannerText
-              }
-              numberOfLines={2}
-            >
-              {activeBannerNotification.petName
-                ? `${activeBannerNotification.petName} · `
-                : ''}
-
-              {activeBannerNotification.title}
-
-              {activeBannerNotification.note
-                ? ` · ${activeBannerNotification.note}`
-                : ''}
+              style={styles.bannerText}
+              numberOfLines={2}>
+              {banner.petName ? `${banner.petName} · ` : ''}
+              {banner.title}
+              {banner.note ? ` · ${banner.note}` : ''}
             </Text>
           </View>
         </Animated.View>
       )}
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}>
+      {/* PDF İÇİN DOST SEÇİMİ */}
 
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View style={styles.brandArea}>
-            <View style={styles.logo}>
-              <PawPrint size={24} color={C.purple} strokeWidth={2.3} />
-            </View>
-            <View>
-              <Text style={styles.brand}>PetCare</Text>
-              <Text style={styles.tagline}>Happy Pets, Happier Lives</Text>
-            </View>
-          </View>
-
+      <Modal
+        visible={pdfModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPdfModalVisible(false)}>
+        <View style={styles.modalOverlay}>
           <Pressable
-            onPress={() => {
-              setHasNewNotifications(false);
-              navigation.navigate('Notifications');
-            }}
-            style={({pressed}) => [styles.notification, pressed && styles.pressed]}>
-            <Bell size={21} color={C.text} strokeWidth={1.9} />
-            {hasNewNotifications && <View style={styles.notificationDot} />}
-          </Pressable>
-        </View>
-
-        {/* HERO */}
-        <View style={styles.hero}>
-          <Image
-            source={require('../assets/images/hero/petcare-home-hero.png')}
-            style={styles.heroImage}
-            resizeMode="cover"
+            style={StyleSheet.absoluteFillObject}
+            accessibilityLabel="Pencereyi kapat"
+            onPress={() => setPdfModalVisible(false)}
           />
-        </View>
 
-        {/* STATS */}
-        <View style={styles.stats}>
-          <Pressable
-            onPress={() => navigation.navigate('Pets')}
-            style={({pressed}) => [styles.statCard, pressed && styles.pressed]}>
-            <View style={styles.statIconPurple}>
-              <PawPrint size={22} color={C.purple} strokeWidth={2} />
+          <View
+            accessibilityViewIsModal
+            style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                PDF Belge Oluştur
+              </Text>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                hitSlop={10}
+                onPress={() => setPdfModalVisible(false)}
+                style={styles.closeButton}>
+                <X size={21} color={COLORS.dark} />
+              </Pressable>
             </View>
-            <View style={styles.statContent}>
-              <Text style={styles.statNumber}>{totalPets}</Text>
-              <Text style={styles.statLabel}>Kayıtlı dost</Text>
-            </View>
-            <ChevronRight size={17} color="#B4AFC0" />
-          </Pressable>
 
-          <View style={styles.statCard}>
-            <View style={styles.statIconPink}>
-              <Heart size={21} color={C.pinkText} strokeWidth={2} />
-            </View>
-            <View style={styles.statContent}>
-              <Text style={styles.statNumber}>{petsWithVaccines}</Text>
-              <Text style={styles.statLabel}>Aşı kaydı</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* HIZLI İŞLEMLER */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
-        </View>
-
-        <View style={styles.quickGrid}>
-          <View style={styles.quickRow}>
-            <QuickAction
-              title="Takvim"
-              description="Yaklaşan etkinlikleri takip et"
-              background={C.orange}
-              iconBackground="#FFE7CD"
-              onPress={() => navigation.navigate('Calendar')}
-              icon={<CalendarDays size={24} color={C.orangeText} strokeWidth={1.9} />}
-            />
-            <QuickAction
-              title="Sağlık Kaydı"
-              description="Sağlık bilgilerini görüntüle"
-              background={C.blue}
-              iconBackground="#DDE7FF"
-              onPress={() => navigation.navigate('Pets')}
-              icon={<Stethoscope size={24} color={C.blueText} strokeWidth={1.9} />}
-            />
-          </View>
-
-          <View style={styles.quickRow}>
-            <QuickAction
-              title="Mama Rehberi"
-              description="Beslenme hakkında bilgi al"
-              background={C.green}
-              iconBackground="#D8F2E8"
-              onPress={() => navigation.navigate('Assistant')}
-              icon={<Utensils size={23} color={C.greenText} strokeWidth={1.9} />}
-            />
-            <QuickAction
-              title="Uzmanına Sor"
-              description="PetCare asistana danış"
-              background={C.purpleSoft}
-              iconBackground="#E2DAFF"
-              onPress={() => navigation.navigate('Assistant')}
-              icon={<Bot size={24} color={C.purple} strokeWidth={1.9} />}
-            />
-          </View>
-        </View>
-
-        {/* DOSTLARIN */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Dostların</Text>
-          {totalPets > 0 && (
-            <Pressable onPress={() => navigation.navigate('Pets')}>
-              <Text style={styles.seeAll}>Tümünü Gör</Text>
-            </Pressable>
-          )}
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.petProfiles}>
-          {petList.map(pet => (
-            <PetProfile
-              key={pet.id}
-              pet={pet}
-              onPress={() => navigation.navigate('PetDetail', {pet})}
-            />
-          ))}
-          <Pressable
-            onPress={() => navigation.navigate('AddPet')}
-            style={({pressed}) => [styles.addPetProfile, pressed && styles.pressed]}>
-            <View style={styles.addPetCircle}>
-              <Plus size={27} color={C.purple} strokeWidth={1.8} />
-            </View>
-            <Text style={styles.addPetText}>Dost Ekle</Text>
-          </Pressable>
-        </ScrollView>
-
-        {/* BUGÜNÜN ÖNERİSİ */}
-        <View style={styles.tipCard}>
-          <View style={styles.tipCircleTop} />
-          <View style={styles.tipCircleRight} />
-          <View style={styles.tipCircleBottom} />
-          <View style={styles.tipIcon}>
-            <Lightbulb size={28} color="#F2A900" strokeWidth={1.9} />
-          </View>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Bugünün Önerisi</Text>
-            <Text style={styles.tipDescription}>
-              Dostlarının su tüketimini{'\n'}kontrol etmeyi unutma!
+            <Text style={styles.modalDescription}>
+              Belgesini hazırlamak istediğin dostunu seç.
             </Text>
-          </View>
-          <View style={styles.tipCatArea}>
-            <Image
-              source={require('../assets/images/home/tip-turtle.png')}
-              style={styles.tipCatImage}
-              resizeMode="contain"
-            />
+
+            {petList.length === 0 ? (
+              <View style={styles.emptyState}>
+                <PawPrint
+                  size={32}
+                  color={COLORS.purple}
+                />
+
+                <Text style={styles.emptyText}>
+                  Henüz kayıtlı bir dostun yok.
+                </Text>
+
+                <Pressable
+                  style={styles.emptyButton}
+                  onPress={() => {
+                    setPdfModalVisible(false);
+                    navigation.navigate('AddPet');
+                  }}>
+                  <Text style={styles.emptyButtonText}>
+                    Dost Ekle
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.petList}
+                showsVerticalScrollIndicator={false}>
+                {petList.map(pet => (
+                  <Pressable
+                    key={pet.id}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setPdfModalVisible(false);
+                      navigation.navigate('PetSummary', {pet});
+                    }}
+                    style={({pressed}) => [
+                      styles.petRow,
+                      pressed && styles.pressed,
+                    ]}>
+                    <View style={styles.petIcon}>
+                      <PawPrint
+                        size={22}
+                        color={COLORS.purple}
+                      />
+                    </View>
+
+                    <View style={styles.petInfo}>
+                      <Text style={styles.petName}>
+                        {pet.name}
+                      </Text>
+
+                      <Text style={styles.petType}>
+                        {pet.type}
+                      </Text>
+                    </View>
+
+                    <ChevronRight
+                      size={19}
+                      color={COLORS.purple}
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
           </View>
         </View>
-
-      </ScrollView>
+      </Modal>
     </View>
   );
 }
 
-function QuickAction({
-  icon,
+function GardenButton({
   title,
-  description,
-  background,
-  iconBackground,
+  angle,
+  icon,
+  position,
   onPress,
 }: {
-  icon: React.ReactNode;
   title: string;
-  description: string;
-  background: string;
-  iconBackground: string;
+  angle: string;
+  icon: React.ReactNode;
+  position: ButtonPosition;
   onPress: () => void;
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title.replace('\n', ' ')}
       onPress={onPress}
       style={({pressed}) => [
-        styles.quickCard,
-        {backgroundColor: background},
-        pressed && styles.pressed,
+        styles.gardenButton,
+        position,
+        {
+          transform: [
+            {rotate: angle},
+            {scale: pressed ? 0.96 : 1},
+          ],
+          opacity: pressed ? 0.85 : 1,
+        },
       ]}>
-      <View style={[styles.quickIcon, {backgroundColor: iconBackground}]}>
+      <Svg
+        pointerEvents="none"
+        width="100%"
+        height="100%"
+        viewBox="0 0 160 56"
+        preserveAspectRatio="none"
+        style={StyleSheet.absoluteFillObject}>
+        <Rect
+          x={2}
+          y={2}
+          width={156}
+          height={52}
+          rx={24}
+          fill={COLORS.buttonBackground}
+          stroke="#9D74DA"
+          strokeWidth={2.5}
+        />
+
+        <Rect
+          x={5}
+          y={5}
+          width={150}
+          height={46}
+          rx={21}
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth={1.5}
+        />
+      </Svg>
+
+      <View
+        pointerEvents="none"
+        style={styles.gardenButtonContent}>
         {icon}
-      </View>
-      <Text style={styles.quickTitle}>{title}</Text>
-      <Text style={styles.quickDescription}>{description}</Text>
-      <View style={styles.quickArrow}>
-        <ChevronRight size={15} color={C.secondary} strokeWidth={2} />
-      </View>
-    </Pressable>
-  );
-}
 
-function PetProfile({
-  pet,
-  onPress,
-}: {
-  pet: Pet;
-  onPress: () => void;
-}) {
+        <Text
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          style={styles.gardenButtonText}>
+          {title}
+        </Text>
 
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({pressed}) => [styles.petProfile, pressed && styles.pressed]}>
-      <View style={styles.petProfileCircle}>
-        <View style={styles.petProfileBlob} />
-        <Image
-          source={getDefaultPetAvatar(pet.type)}
-          style={styles.petProfileImage}
-          resizeMode="contain"
+        <ChevronRight
+          size={16}
+          color={COLORS.purple}
+          strokeWidth={2.3}
         />
       </View>
-      <Text numberOfLines={1} style={styles.petProfileName}>{pet.name}</Text>
-      <Text numberOfLines={1} style={styles.petProfileType}>{pet.type}</Text>
     </Pressable>
   );
 }
@@ -771,440 +671,257 @@ function PetProfile({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: C.bg,
-  },
-  content: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 125,
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [{scale: 0.985}],
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 17,
-  },
-  brandArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: C.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 11,
-    borderWidth: 1,
-    borderColor: '#EFECF6',
-    shadowColor: '#44366C',
-    shadowOpacity: 0.07,
-    shadowRadius: 11,
-    shadowOffset: {width: 0, height: 5},
-    elevation: 2,
-  },
-  brand: {
-    fontSize: 22,
-    fontFamily: F.bold,
-    color: C.text,
-    letterSpacing: -0.7,
-  },
-  tagline: {
-    fontSize: 9.5,
-    fontFamily: F.regular,
-    color: C.muted,
-    marginTop: 1,
-  },
-  notification: {
-    width: 45,
-    height: 45,
-    borderRadius: 23,
-    backgroundColor: C.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EFECF6',
-    shadowColor: '#44366C',
-    shadowOpacity: 0.07,
-    shadowRadius: 11,
-    shadowOffset: {width: 0, height: 5},
-    elevation: 2,
-  },
-  notificationDot: {
-    position: 'absolute',
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: '#F0525E',
-    right: 8,
-    top: 7,
-    borderWidth: 2,
-    borderColor: C.white,
-  },
-  hero: {
-    width: '100%',
-    height: 250,
-    borderRadius: 28,
+    backgroundColor: '#DCD9E9',
     overflow: 'hidden',
-    backgroundColor: '#EEE9FF',
-    marginBottom: 14,
-    shadowColor: '#513B92',
-    shadowOpacity: 0.09,
-    shadowRadius: 15,
-    shadowOffset: {width: 0, height: 7},
-    elevation: 3,
   },
-  heroImage: {
+
+  background: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
-  stats: {
-    flexDirection: 'row',
-    gap: 11,
-    marginBottom: 30,
+
+  animioLogo: {
+    marginTop: -15,
+    position: 'absolute',
+    left: 22,
+    width: 190,
+    height: 106,
   },
-  statCard: {
-    flex: 1,
-    height: 88,
-    borderRadius: 20,
-    backgroundColor: C.white,
-    paddingHorizontal: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEEAF4',
-    shadowColor: '#392D65',
-    shadowOpacity: 0.06,
-    shadowRadius: 11,
-    shadowOffset: {width: 0, height: 5},
-    elevation: 2,
-  },
-  statIconPurple: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
-    backgroundColor: C.purpleSoft,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  statIconPink: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
-    backgroundColor: C.pink,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 21,
-    fontFamily: F.bold,
-    color: C.text,
-  },
-  statLabel: {
-    fontSize: 10.5,
-    fontFamily: F.regular,
-    color: C.secondary,
-    marginTop: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 19,
-    fontFamily: F.bold,
-    letterSpacing: -0.35,
-    color: C.text,
-  },
-  seeAll: {
-    fontSize: 11.5,
-    fontFamily: F.semiBold,
-    color: C.purple,
-  },
-  quickGrid: {
-    gap: 10,
-    marginBottom: 31,
-  },
-  quickRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  quickCard: {
-    flex: 1,
-    height: 122,
+
+  notificationButton: {
+    position: 'absolute',
+    right: 22,
+    width: 44,
+    height: 44,
     borderRadius: 22,
-    padding: 14,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  quickIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
+    backgroundColor: '#FFFBF5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 9,
-  },
-  quickTitle: {
-    fontSize: 13,
-    fontFamily: F.bold,
-    color: C.text,
-  },
-  quickDescription: {
-    fontSize: 9.5,
-    lineHeight: 13,
-    fontFamily: F.regular,
-    color: C.secondary,
-    marginTop: 3,
-    maxWidth: '78%',
-  },
-  quickArrow: {
-    position: 'absolute',
-    right: 12,
-    bottom: 12,
-    width: 27,
-    height: 27,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  petProfiles: {
-    paddingBottom: 4,
-    paddingRight: 10,
-    gap: 15,
-    marginBottom: 29,
-  },
-  petProfile: {
-    width: 78,
-    alignItems: 'center',
-  },
-  petProfileCircle: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    backgroundColor: '#EEE9FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginBottom: 7,
-  },
-  petProfileBlob: {
-    position: 'absolute',
-    width: 65,
-    height: 65,
-    borderRadius: 33,
-    backgroundColor: '#DDD3FF',
-    right: -16,
-    bottom: -18,
-  },
-  petProfileImage: {
-    width: 68,
-    height: 68,
-    zIndex: 2,
-  },
-  petProfileName: {
-    fontSize: 12.5,
-    fontFamily: F.bold,
-    color: C.text,
-    maxWidth: 75,
-  },
-  petProfileType: {
-    fontSize: 10,
-    fontFamily: F.regular,
-    color: C.muted,
-    marginTop: 2,
-    maxWidth: 75,
-  },
-  addPetProfile: {
-    width: 78,
-    alignItems: 'center',
-  },
-  addPetCircle: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    backgroundColor: C.purpleSoft,
-    borderWidth: 1.5,
-    borderColor: '#DED5FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 7,
-  },
-  addPetText: {
-    fontSize: 11,
-    fontFamily: F.semiBold,
-    color: C.purple,
-  },
-  tipCard: {
-    width: '100%',
-    height: 132,
-    borderRadius: 25,
-    backgroundColor: '#EEE9FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 17,
-    paddingRight: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    marginTop: 2,
     borderWidth: 1,
-    borderColor: '#E9E3FC',
-  },
-  tipCircleTop: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F8F6FF',
-    left: -45,
-    top: -55,
-  },
-  tipCircleRight: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#E5DCFF',
-    right: -55,
-    top: -65,
-  },
-  tipCircleBottom: {
-    position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: '#DCD1FF',
-    right: -65,
-    bottom: -95,
-  },
-  tipIcon: {
-    width: 59,
-    height: 68,
-    borderRadius: 18,
-    backgroundColor: '#FFF3C9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-    zIndex: 3,
-    shadowColor: '#E5B13B',
-    shadowOpacity: 0.05,
-    shadowRadius: 7,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+    shadowColor: '#49366E',
     shadowOffset: {width: 0, height: 3},
-    elevation: 1,
+    shadowOpacity: 0.12,
+    shadowRadius: 7,
   },
-  tipContent: {
-    flex: 1,
-    zIndex: 5,
-    paddingRight: 78,
-  },
-  tipTitle: {
-    fontSize: 15.5,
-    lineHeight: 20,
-    fontFamily: F.bold,
-    color: C.text,
-    letterSpacing: -0.2,
-  },
-  tipDescription: {
-    fontSize: 11,
-    lineHeight: 16,
-    fontFamily: F.regular,
-    color: C.secondary,
-    marginTop: 6,
-  },
-  tipCatArea: {
+
+  notificationDot: {
     position: 'absolute',
-    right: -2,
-    bottom: -20,
-    width: 105,
-    height: 105,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    zIndex: 4,
+    top: 3,
+    right: 3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#F37879',
+    borderWidth: 1.5,
+    borderColor: '#FFFBF5',
   },
-  tipCatImage: {
-    width: 145,
-    height: 115,
-  },
-  /* ANLIK KAYARAK GELEN BİLDİRİM BALONU (TOAST) */
-  topBanner: {
+
+  statsPill: {
     position: 'absolute',
-
-    top: 12,
-    left: 18,
-    right: 18,
-
-    zIndex: 999,
-
     flexDirection: 'row',
     alignItems: 'center',
-
-    backgroundColor: '#FFFFFF',
-
-    borderRadius: 18,
-
-    paddingVertical: 12,
-    paddingHorizontal: 13,
-
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,250,241,0.95)',
+    gap: 9,
     borderWidth: 1,
-    borderColor: '#E9E3FC',
-
-    shadowColor: '#7257FF',
-
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-
-    elevation: 8,
+    borderColor: 'rgba(255,255,255,0.9)',
+    marginTop: -20,
   },
-  topBannerIcon: {
+
+  statsText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 12,
+    color: COLORS.dark,
+  },
+
+  statsDot: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 16,
+    color: COLORS.purple,
+  },
+
+  gardenButton: {
+    position: 'absolute',
+    shadowColor: '#513371',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+  },
+
+  gardenButtonContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    gap: 4,
+  },
+
+  gardenButtonText: {
+    flex: 1,
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 12,
+    lineHeight: 15,
+    textAlign: 'center',
+    color: '#38216B',
+  },
+
+  pressed: {
+    opacity: 0.8,
+    transform: [{scale: 0.97}],
+  },
+
+  banner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    elevation: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 15,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9E0FA',
+  },
+
+  bannerContent: {
+    flex: 1,
+  },
+
+  bannerTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 13,
+    color: COLORS.purple,
+  },
+
+  bannerText: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.dark,
+    marginTop: 4,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28,18,45,0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '75%',
+    backgroundColor: '#FFFCF8',
+    borderRadius: 26,
+    padding: 22,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  modalTitle: {
+    flex: 1,
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 20,
+    color: COLORS.dark,
+    marginRight: 12,
+  },
+
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0EAF8',
+  },
+
+  modalDescription: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#82718E',
+    marginTop: 10,
+    marginBottom: 18,
+  },
+
+  petList: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+
+  petRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 9,
+    borderRadius: 17,
+    backgroundColor: '#F3EDF9',
+  },
+
+  petIcon: {
     width: 42,
     height: 42,
-
     borderRadius: 14,
-
-    backgroundColor: '#F0ECFF',
-
-    justifyContent: 'center',
     alignItems: 'center',
-
-    marginRight: 11,
+    justifyContent: 'center',
+    backgroundColor: '#E7DCF8',
   },
-  topBannerContent: {
+
+  petInfo: {
     flex: 1,
+    marginLeft: 12,
   },
-  topBannerTitle: {
+
+  petName: {
     fontFamily: 'Quicksand-Bold',
-
-    fontSize: 12,
-
-    color: '#7257FF',
-
-    marginBottom: 2,
+    fontSize: 15,
+    color: COLORS.dark,
   },
-  topBannerText: {
+
+  petType: {
     fontFamily: 'Quicksand-Medium',
-
     fontSize: 11,
+    color: '#82718E',
+    marginTop: 3,
+  },
 
-    color: '#11163A',
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
 
-    lineHeight: 16,
+  emptyText: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 14,
+    color: COLORS.dark,
+    marginTop: 12,
+  },
+
+  emptyButton: {
+    marginTop: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: COLORS.purple,
+  },
+
+  emptyButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
   },
 });
