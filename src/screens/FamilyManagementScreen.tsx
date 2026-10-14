@@ -9,7 +9,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import {
   ArrowLeft, PawPrint, Users, UserRound, ShieldCheck, Trash2,
   ChevronRight, RefreshCw, ShieldAlert, UserMinus, CheckCircle2,
-  CircleX, X, CircleHelp, UserPlus, Copy, Check, Share2, Mail, Info,
+  CircleX, X, UserPlus, Copy, Check, Share2, Mail, Info,
 } from 'lucide-react-native';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
@@ -290,10 +290,7 @@ export default function FamilyManagementScreen() {
           <ArrowLeft size={25} color={DARK_PURPLE} />
         </Pressable>
         <Text style={styles.headerTitle}>Aile yönetimi</Text>
-        <Pressable style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Aile yönetimi hakkında"
-          onPress={() => showMessage('warning', 'Aile yönetimi', 'Üstten bir dost seçerek aile üyelerini yönetebilir ve e-posta adreslerine özel davet kodları oluşturabilirsin.')}>
-          <CircleHelp size={24} color={DARK_PURPLE} />
-        </Pressable>
+        <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {managedPets.length === 0 ? <View style={styles.emptyCard}>
@@ -335,7 +332,6 @@ export default function FamilyManagementScreen() {
                   <View style={styles.memberAvatar}><UserRound size={25} color={PURPLE} /></View>
                   <View style={styles.memberText}>
                     <Text style={styles.memberName} numberOfLines={2}>{member.uid === user?.uid ? 'Sen' : member.email || 'Aile üyesi'}</Text>
-                    <Text style={styles.memberSubtitle}>{member.isOwner ? 'Aile yöneticisi' : 'Aile üyesi'}</Text>
                   </View>
                   {member.isOwner ? <View style={styles.roleBadge}><Text style={styles.roleText}>Yönetici</Text></View>
                     : member.uid !== user?.uid ? <Pressable disabled={!!removingUid} style={styles.removeButton}
@@ -485,6 +481,7 @@ const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: '#F7F7FC'},
   header: {height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   iconButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
+  headerSpacer: {width: 44},
   headerTitle: {flex: 1, textAlign: 'center', fontFamily: 'Quicksand-Bold', fontSize: 21, color: DARK_PURPLE},
   content: {paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8},
   petSwitcher: {flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 4},
@@ -505,16 +502,16 @@ const styles = StyleSheet.create({
   countBadge: {minWidth: 28, height: 28, borderRadius: 14, backgroundColor: '#ECE9F8', paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center'},
   countText: {fontFamily: 'Quicksand-Bold', color: '#5B449A', fontSize: 13},
   membersCard: {backgroundColor: '#FFFFFF', borderRadius: 18, paddingHorizontal: 15, shadowColor: '#544479', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.035, shadowRadius: 12, elevation: 1},
-  memberRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 16, minHeight: 88},
+  memberRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 10, minHeight: 66},
   memberDivider: {borderTopWidth: 1, borderTopColor: '#F0EEF6'},
-  memberAvatar: {width: 48, height: 48, borderRadius: 24, backgroundColor: '#EEE8FF', alignItems: 'center', justifyContent: 'center'},
+  memberAvatar: {width: 40, height: 40, borderRadius: 20, backgroundColor: '#EEE8FF', alignItems: 'center', justifyContent: 'center'},
   memberText: {flex: 1, marginLeft: 12, marginRight: 8},
   memberName: {fontFamily: 'Quicksand-Bold', fontSize: 15, color: DARK_PURPLE},
   memberSubtitle: {fontFamily: 'Quicksand-Medium', fontSize: 12, color: '#9190A6', marginTop: 4},
   roleBadge: {backgroundColor: '#F0ECFF', borderRadius: 13, paddingHorizontal: 10, paddingVertical: 6},
   roleText: {fontFamily: 'Quicksand-SemiBold', fontSize: 11, color: PURPLE},
   removeButton: {width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF0F2', alignItems: 'center', justifyContent: 'center'},
-  permissionRow: {flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 13, borderTopWidth: 1, borderTopColor: '#EFEDF6'},
+  permissionRow: {flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#EFEDF6'},
   permissionText: {flex: 1, fontFamily: 'Quicksand-Medium', fontSize: 12, color: '#9190A6'},
   inviteCard: {flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: '#9A83F6', borderRadius: 16, padding: 13, marginTop: 18, backgroundColor: '#FDFCFF'},
   inviteIcon: {width: 47, height: 47, borderRadius: 24, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center'},
