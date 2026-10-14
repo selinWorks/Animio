@@ -328,6 +328,26 @@ const SYMPTOMS: ProblemType[] = [
    FOLLOW UP OPTIONS
    ========================================================= */
 
+// Her ek bilgi sorusunun seçili seçenekleri için ayrı pastel renk.
+const FOLLOW_UP_COLORS: Record<keyof FollowUpAnswers, {background: string; border: string; text: string}> = {
+  vomitingFrequency: {background: '#FCEAF0', border: '#E9A3BC', text: '#9B365D'},
+  vomitAppearance: {background: '#FFF0E5', border: '#E8B389', text: '#985322'},
+  canKeepWater: {background: '#E7F4FC', border: '#91C5E5', text: '#286A96'},
+  abdominalPain: {background: '#FBECE7', border: '#E7AB99', text: '#984D38'},
+  foreignBodyRisk: {background: '#FFF5DE', border: '#DDC17B', text: '#80601B'},
+  foodIntake: {background: '#E5F5EF', border: '#8FCDB9', text: '#286F5D'},
+  waterIntake: {background: '#E8F1FF', border: '#9CBDEC', text: '#315F9E'},
+  weightLoss: {background: '#FFF0E9', border: '#EAB39A', text: '#945236'},
+  careType: {background: '#F1EAFE', border: '#C3A8E8', text: '#70509D'},
+  careTiming: {background: '#E6F5F7', border: '#93CBD3', text: '#2C737D'},
+  careProblem: {background: '#FCEAEA', border: '#E4AAAA', text: '#9A4545'},
+  foodChange: {background: '#F8F2DF', border: '#D6C38C', text: '#7B642B'},
+  unusualFood: {background: '#F1F4E3', border: '#BEC990', text: '#60702F'},
+  energyLevel: {background: '#EDEDFB', border: '#B1AFE0', text: '#59569A'},
+  canWalkNormally: {background: '#E9F2ED', border: '#A1C5AE', text: '#426E52'},
+  otherDetails: {background: '#F2EDF3', border: '#C8AFCB', text: '#79557E'},
+};
+
 const FOLLOW_UP_OPTIONS = {
   vomitingFrequency: [
     '1 kez',
@@ -1223,6 +1243,7 @@ const AssistantScreen = () => {
   }) => {
     const selectedValue =
       followUpAnswers[answerKey];
+    const questionColors = FOLLOW_UP_COLORS[answerKey];
 
     return (
       <View
@@ -1261,8 +1282,10 @@ const AssistantScreen = () => {
                 activeOpacity={0.8}
                 style={[
                   styles.followUpOption,
-                  selected &&
-                    styles.followUpOptionSelected,
+                  selected && {
+                    backgroundColor: questionColors.background,
+                    borderColor: questionColors.border,
+                  },
                 ]}
                 onPress={() => {
                   setFollowUpAnswers(
@@ -1280,8 +1303,10 @@ const AssistantScreen = () => {
                 <Text
                   style={[
                     styles.followUpOptionText,
-                    selected &&
+                    selected && [
                       styles.followUpOptionTextSelected,
+                      {color: questionColors.text},
+                    ],
                   ]}>
                   {option}
                 </Text>
@@ -4026,11 +4051,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
 
-  followUpOptionSelected: {
-    backgroundColor: '#EEEAFE',
-    borderColor: '#8C7AF1',
-  },
-
   followUpOptionText: {
     color: '#536079',
     fontSize: 10.5,
@@ -4040,7 +4060,6 @@ const styles = StyleSheet.create({
   },
 
   followUpOptionTextSelected: {
-    color: '#5141F4',
     fontFamily: 'Quicksand-Bold',
   },
 

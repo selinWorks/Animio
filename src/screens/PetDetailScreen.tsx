@@ -1282,8 +1282,8 @@ export default function PetDetailScreen({
                 pressed && styles.actionPressed,
               ]}
               onPress={() =>
-                navigation.navigate('PetInvite', {
-                  pet: currentPet,
+                navigation.navigate('FamilyManagement', {
+                  petId: currentPet.id,
                 })
               }>
 

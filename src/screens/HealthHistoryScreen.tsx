@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Animated,
+  Keyboard,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -21,6 +23,8 @@ import {
   FileText,
   Check,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   X,
   Plus,
   Pencil,
@@ -296,6 +300,129 @@ const toFirestoreDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const CALENDAR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const calendarInputDate = (date: Date) =>
+  `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+
+function HealthDateSheet({value, onSelect, onClose}: {
+  value: string;
+  onSelect: (date: string) => void;
+  onClose: () => void;
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const minimum = new Date(2000, 0, 1);
+  const parsed = parseFirestoreDate(value);
+  const initial = parsed && parsed >= minimum && parsed <= today ? parsed : today;
+  const [month, setMonth] = useState(() => new Date(initial.getFullYear(), initial.getMonth(), 1));
+  const [selected, setSelected] = useState<Date | null>(parsed && parsed >= minimum && parsed <= today ? parsed : null);
+  const [choosingYear, setChoosingYear] = useState(false);
+  const slide = useRef(new Animated.Value(600)).current;
+  useEffect(() => {
+    Animated.timing(slide, {toValue: 0, duration: 240, useNativeDriver: true}).start();
+  }, [slide]);
+  const close = (commit = false) => {
+    Animated.timing(slide, {toValue: 600, duration: 180, useNativeDriver: true}).start(({finished}) => {
+      if (finished) {
+        if (commit && selected) onSelect(calendarInputDate(selected));
+        onClose();
+      }
+    });
+  };
+  const offset = (month.getDay() + 6) % 7;
+  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const cells = Math.ceil((offset + days) / 7) * 7;
+  const canGoBack = month > minimum;
+  const canGoForward = month < new Date(today.getFullYear(), today.getMonth(), 1);
+  return (
+    <View style={styles.calendarOverlay} accessibilityViewIsModal>
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityLabel="Takvimi kapat" />
+      <Animated.View style={[styles.calendarSheet, {transform: [{translateY: slide}]}]}>
+        <View style={styles.sheetHandle} />
+        <View style={styles.sheetHeader}>
+          <View style={styles.addSheetTitleArea}>
+            <Text style={styles.sheetTitle}>Tarih Seç</Text>
+            <Text style={styles.sheetSubtitle}>Sağlık işleminin yapıldığı günü seç</Text>
+          </View>
+          <Pressable style={styles.closeButton} onPress={() => close()} accessibilityRole="button" accessibilityLabel="Takvimi kapat">
+            <X size={20} color="#6D7184" />
+          </Pressable>
+        </View>
+        <View style={styles.calendarNavigation}>
+          <Pressable style={styles.closeButton} disabled={!canGoBack || choosingYear}
+            accessibilityLabel="Önceki ay" accessibilityRole="button"
+            onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
+            <ChevronLeft size={20} color={canGoBack && !choosingYear ? '#7457E8' : '#CCC7DA'} />
+          </Pressable>
+          <Pressable onPress={() => setChoosingYear(!choosingYear)} accessibilityRole="button" accessibilityLabel="Yıl seç">
+            <Text style={styles.calendarMonth}>{CALENDAR_MONTHS[month.getMonth()]} {month.getFullYear()}</Text>
+            <Text style={styles.calendarHint}>{choosingYear ? 'Takvime dön' : 'Yılı değiştirmek için dokun'}</Text>
+          </Pressable>
+          <Pressable style={styles.closeButton} disabled={!canGoForward || choosingYear}
+            accessibilityLabel="Sonraki ay" accessibilityRole="button"
+            onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
+            <ChevronRight size={20} color={canGoForward && !choosingYear ? '#7457E8' : '#CCC7DA'} />
+          </Pressable>
+        </View>
+        {choosingYear ? (
+          <ScrollView style={styles.calendarYearScroll} contentContainerStyle={styles.calendarGrid}>
+            {Array.from({length: today.getFullYear() - 1999}, (_, i) => today.getFullYear() - i).map(year => (
+              <Pressable key={year} style={styles.calendarYearCell} accessibilityRole="button"
+                onPress={() => {
+                  setMonth(new Date(year, year === today.getFullYear() ? Math.min(month.getMonth(), today.getMonth()) : month.getMonth(), 1));
+                  setChoosingYear(false);
+                }}>
+                <Text style={[styles.calendarDayText, year === month.getFullYear() && styles.calendarTodayText]}>{year}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : (
+          <>
+            <View style={styles.calendarGrid}>
+              {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(day => (
+                <View key={day} style={styles.calendarCell}><Text style={styles.calendarWeekday}>{day}</Text></View>
+              ))}
+            </View>
+            <View style={styles.calendarGrid}>
+              {Array.from({length: cells}, (_, index) => {
+                const day = index - offset + 1;
+                if (day < 1 || day > days) return <View key={index} style={styles.calendarCell} />;
+                const date = new Date(month.getFullYear(), month.getMonth(), day);
+                const disabled = date > today || date < minimum;
+                const active = selected?.getTime() === date.getTime();
+                const isToday = date.getTime() === today.getTime();
+                return (
+                  <Pressable key={index} style={styles.calendarCell} disabled={disabled}
+                    accessibilityRole="button" accessibilityLabel={formatHealthDate(date)}
+                    accessibilityState={{disabled, selected: active}} onPress={() => setSelected(date)}>
+                    <View style={[styles.calendarDay, isToday && styles.calendarToday, active && styles.calendarSelected]}>
+                      <Text style={[styles.calendarDayText, isToday && styles.calendarTodayText,
+                        disabled && styles.calendarDisabledText, active && styles.calendarSelectedText]}>{day}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+        <View style={styles.calendarFooter}>
+          <Pressable onPress={() => {
+            setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+            setSelected(today);
+            setChoosingYear(false);
+          }} accessibilityRole="button"><Text style={styles.calendarTodayText}>Bugün</Text></Pressable>
+          <Text style={styles.calendarHint}>{selected ? formatHealthDate(selected) : 'Bir gün seç'}</Text>
+        </View>
+        <Pressable disabled={!selected} style={[styles.applyButton, !selected && styles.saveRecordButtonDisabled]}
+          accessibilityRole="button" onPress={() => close(true)}>
+          <Text style={styles.applyButtonText}>Tarihi Seç</Text>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function HealthHistoryScreen({route}: Props) {
   const {pet} = route.params;
   const navigation = useNavigation<NavigationProp>();
@@ -318,6 +445,7 @@ export default function HealthHistoryScreen({route}: Props) {
     useState<HealthCategory>('checkup');
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [newClinic, setNewClinic] = useState('');
   const [newDoctor, setNewDoctor] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -422,11 +550,6 @@ export default function HealthHistoryScreen({route}: Props) {
                   ? 'Ameliyat / Kısırlaştırma'
                   : record.categoryLabel ||
                     categoryLabel(resolvedCategory),
-              categoryLabel:
-                record.categoryLabel ||
-                categoryLabel(
-                  record.category as HealthCategory,
-                ),
               date:
                 formatHealthDate(
                   dateValue,
@@ -580,6 +703,7 @@ export default function HealthHistoryScreen({route}: Props) {
   };
 
   const resetNewRecordForm = () => {
+    setCalendarVisible(false);
     setEditingRecordId(null);
     setNewCategory('checkup');
     setNewTitle('');
@@ -1279,7 +1403,7 @@ export default function HealthHistoryScreen({route}: Props) {
         visible={addRecordVisible}
         transparent
         animationType="slide"
-        onRequestClose={closeAddRecord}>
+        onRequestClose={() => calendarVisible ? setCalendarVisible(false) : closeAddRecord()}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1288,7 +1412,8 @@ export default function HealthHistoryScreen({route}: Props) {
             onPress={closeAddRecord}
           />
 
-          <View style={styles.addSheet}>
+          <View style={styles.addSheet} accessibilityElementsHidden={calendarVisible}
+            importantForAccessibility={calendarVisible ? 'no-hide-descendants' : 'auto'}>
             <View style={styles.sheetHandle} />
 
             <View style={styles.sheetHeader}>
@@ -1403,13 +1528,17 @@ export default function HealthHistoryScreen({route}: Props) {
                   keyboardType="numbers-and-punctuation"
                   maxLength={10}
                 />
-                <View style={styles.dateInputIcon}>
+                <Pressable style={styles.dateInputIcon} accessibilityRole="button"
+                  accessibilityLabel="Takvimden tarih seç" onPress={() => {
+                    Keyboard.dismiss();
+                    setCalendarVisible(true);
+                  }}>
                   <CalendarDays
                     size={18}
                     color="#7457E8"
                     strokeWidth={1.9}
                   />
-                </View>
+                </Pressable>
               </View>
 
               <Text style={styles.inputLabel}>Klinik</Text>
@@ -1514,6 +1643,10 @@ export default function HealthHistoryScreen({route}: Props) {
               </Text>
             </ScrollView>
           </View>
+          {calendarVisible && (
+            <HealthDateSheet value={newDate} onSelect={setNewDate}
+              onClose={() => setCalendarVisible(false)} />
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1754,6 +1887,34 @@ export default function HealthHistoryScreen({route}: Props) {
 }
 
 const styles = StyleSheet.create({
+  calendarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(31, 27, 49, 0.38)',
+    justifyContent: 'flex-end',
+    zIndex: 10,
+  },
+  calendarSheet: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 36 : 28,
+  },
+  calendarNavigation: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12},
+  calendarMonth: {fontFamily: 'Quicksand-Bold', fontSize: 17, color: '#302C43', textAlign: 'center'},
+  calendarHint: {fontFamily: 'Quicksand-Medium', fontSize: 10.5, color: '#9295A6', textAlign: 'center', marginTop: 4},
+  calendarGrid: {flexDirection: 'row', flexWrap: 'wrap'},
+  calendarCell: {width: '14.285714%', height: 44, alignItems: 'center', justifyContent: 'center'},
+  calendarWeekday: {fontFamily: 'Quicksand-SemiBold', fontSize: 10.5, color: '#9295A6'},
+  calendarDay: {width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center'},
+  calendarDayText: {fontFamily: 'Quicksand-SemiBold', fontSize: 13, color: '#302C43'},
+  calendarToday: {borderWidth: 1, borderColor: '#DDD4FF', backgroundColor: '#F4F0FF'},
+  calendarTodayText: {fontFamily: 'Quicksand-Bold', fontSize: 12, color: '#7457E8'},
+  calendarSelected: {backgroundColor: '#7457E8', borderColor: '#7457E8'},
+  calendarSelectedText: {color: '#FFFFFF'},
+  calendarDisabledText: {color: '#D4D0DD'},
+  calendarFooter: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14},
+  calendarYearScroll: {maxHeight: 264},
+  calendarYearCell: {width: '25%', height: 44, alignItems: 'center', justifyContent: 'center'},
+
+
   container: {
     flex: 1,
     backgroundColor: '#FAF9FE',

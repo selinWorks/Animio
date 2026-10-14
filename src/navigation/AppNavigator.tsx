@@ -42,7 +42,6 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import AboutAppScreen from '../screens/AboutAppScreen';
 import UpcomingFeaturesScreen from '../screens/UpcomingFeaturesScreen';
 
-import PetInviteScreen from '../screens/PetInviteScreen';
 import PetJoinScreen from '../screens/PetJoinScreen';
 
 import FamilyManagementScreen from '../screens/FamilyManagementScreen';
@@ -118,10 +117,6 @@ export type RootStackParamList = {
     pet: Pet;
   };
 
-  PetInvite: {
-    pet: Pet;
-  };
-
   PetSummary: {
     pet: Pet;
   };
@@ -138,7 +133,7 @@ export type RootStackParamList = {
 
   FirestoreTest: undefined;
 
-  FamilyManagement: undefined;
+  FamilyManagement: {petId?: string} | undefined;
 };
 
 
@@ -905,20 +900,6 @@ function MainAppNavigator() {
       />
 
 
-      {/* =====================================================
-          PET INVITE
-      ===================================================== */}
-
-      <Stack.Screen
-        name="PetInvite"
-        component={
-          PetInviteScreen
-        }
-        options={{
-          headerShown:
-            false,
-        }}
-      />
 
 
       {/* =====================================================
