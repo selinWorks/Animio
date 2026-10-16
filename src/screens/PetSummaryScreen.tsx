@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 import {
   ArrowLeft,
   Download,
+  Share2,
   PawPrint,
   Weight,
   HeartPulse,
@@ -204,6 +206,93 @@ const getHealthCategoryIcon = (record: HealthRecord) => {
 };
 
 
+const getDefaultPetImage = (type?: string) => {
+  const normalizedType = (type ?? '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  // Kedi
+  if (
+    ['kedi', 'cat'].includes(normalizedType) ||
+    normalizedType.includes('kedi')
+  ) {
+    return require('../assets/images/pets/default-cat-pixel.png');
+  }
+
+  // Köpek
+  if (
+    ['kopek', 'dog'].includes(normalizedType) ||
+    normalizedType.includes('retriever') ||
+    normalizedType.includes('bulldog')
+  ) {
+    return require('../assets/images/pets/default-dog-pixel.png');
+  }
+
+  // Kuş ve tüm kuş alt türleri
+  const birdTypes = [
+    'kus',
+    'bird',
+    'muhabbet kusu',
+    'papagan',
+    'kanarya',
+    'sultan papagani',
+    'sevda papagani',
+    'ispinoz',
+    'guvercin',
+    'serce',
+    'bulbul',
+    'hint bulbulu',
+  ];
+
+  if (
+    birdTypes.includes(normalizedType) ||
+    normalizedType.includes('bulbul') ||
+    normalizedType.includes('kusu')
+  ) {
+    return require('../assets/images/pets/default-bird-pixel.png');
+  }
+
+  // Kemirgen
+  if (
+    ['kemirgen', 'hamster', 'kobay', 'fare', 'sican', 'gerbil', 'sincap']
+      .includes(normalizedType)
+  ) {
+    if (normalizedType === 'hamster') {
+      return require('../assets/images/pets/default-hamster-pixel.png');
+    }
+
+    return require('../assets/images/pets/default-other-pixel.png');
+  }
+
+  // Tavşan
+  if (['tavsan', 'rabbit'].includes(normalizedType)) {
+    return require('../assets/images/pets/default-rabbit-pixel.png');
+  }
+
+  // Balık
+  if (
+    ['balik', 'japon baligi', 'beta', 'lepistes', 'koi', 'fish']
+      .includes(normalizedType) ||
+    normalizedType.includes('baligi')
+  ) {
+    return require('../assets/images/pets/default-fish-pixel.png');
+  }
+
+  // Sürüngen
+  if (
+    ['surungen', 'kaplumbaga', 'yilan', 'kertenkele', 'iguana', 'geko',
+      'bukalemun', 'reptile'].includes(normalizedType)
+  ) {
+    return require('../assets/images/pets/default-reptile-pixel.png');
+  }
+
+  return require('../assets/images/pets/default-other-pixel.png');
+};
+
+
+
 const displayValue = (value: unknown) => {
   if (value === undefined || value === null || value === '') {
     return 'Belirtilmemiş';
@@ -214,11 +303,12 @@ const displayValue = (value: unknown) => {
 
 export default function PetSummaryScreen({route, navigation}: Props) {
   const {pet} = route.params;
+  console.log('PET ÖZETİ HAYVAN VERİSİ:', JSON.stringify(pet, null, 2));
   const {user} = useAuth();
 
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creatingPdf, setCreatingPdf] = useState(false);
+  const [pdfAction, setPdfAction] = useState<'save' | 'share' | null>(null);
 
   type PopupType =
     | 'error'
@@ -334,7 +424,7 @@ export default function PetSummaryScreen({route, navigation}: Props) {
 
   const handleCreatePdf = async () => {
     try {
-      setCreatingPdf(true);
+      setPdfAction('save');
 
       const filePath = await createPetSummaryPdf({
         name: pet.name,
@@ -352,24 +442,57 @@ export default function PetSummaryScreen({route, navigation}: Props) {
 
       if (saved) {
         showPopup(
-          'PDF hazırlandı',
-          'PDF seçtiğin klasöre başarıyla kaydedildi.',
+          'PDF kaydedildi!',
+          `${pet.name} için hazırlanan PDF dosyalara başarıyla kaydedildi.`,
           'success',
+        );
+      } else {
+        showPopup(
+          'Kaydedilemedi',
+          'PDF hazırlandı ancak dosyalara kaydedilemedi. Lütfen tekrar dene.',
+          'warning',
         );
       }
     } catch (error: any) {
-      const message =
-        error?.message ??
-        error?.localizedDescription ??
-        String(error);
+      console.error('PDF kaydetme hatası:', error);
 
       showPopup(
-        'PDF oluşturulamadı',
-        message,
+        'PDF kaydedilemedi',
+        error?.message ?? 'PDF oluşturulurken veya kaydedilirken bir hata oluştu.',
         'warning',
       );
     } finally {
-      setCreatingPdf(false);
+      setPdfAction(null);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    try {
+      setPdfAction('share');
+
+      const filePath = await createPetSummaryPdf({
+        name: pet.name,
+        type: pet.type,
+        gender: pet.gender,
+        birthYear: pet.birthYear,
+        age: (pet as any).age,
+        weight: pet.weight,
+        notes: pet.notes,
+        weightHistory,
+        healthRecords: sortedHealthRecords,
+      });
+
+      await sharePetSummaryPdf(filePath, pet.name);
+    } catch (error: any) {
+      console.error('PDF paylaşma hatası:', error);
+
+      showPopup(
+        'Paylaşım başlatılamadı',
+        error?.message ?? 'PDF paylaşılırken bir hata oluştu. Lütfen tekrar dene.',
+        'warning',
+      );
+    } finally {
+      setPdfAction(null);
     }
   };
 
@@ -395,7 +518,15 @@ export default function PetSummaryScreen({route, navigation}: Props) {
 
         <View style={styles.profileCard}>
           <View style={styles.profileIcon}>
-            <PawPrint size={27} color="#7457E8" />
+            <Image
+              source={
+                pet.photoUri
+                  ? {uri: pet.photoUri}
+                  : getDefaultPetImage(pet.type)
+              }
+              style={styles.profilePetImage}
+              resizeMode="contain"
+            />
           </View>
 
           <Text style={styles.petName}>{pet.name}</Text>
@@ -556,22 +687,44 @@ export default function PetSummaryScreen({route, navigation}: Props) {
           </Text>
         </View>
 
-        <Pressable
-          style={({pressed}) => [
-            styles.pdfButton,
-            pressed && styles.pressed,
-          ]}
-          disabled={creatingPdf || loading}
-          onPress={handleCreatePdf}>
-          {creatingPdf ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Download size={19} color="#FFFFFF" />
-          )}
-          <Text style={styles.pdfButtonText}>
-            {creatingPdf ? 'PDF hazırlanıyor...' : 'PDF Oluştur ve Paylaş'}
-          </Text>
-        </Pressable>
+        <View style={styles.pdfActions}>
+          <Pressable
+            style={({pressed}) => [
+              styles.pdfButton,
+              styles.savePdfButton,
+              pressed && styles.pressed,
+            ]}
+            disabled={pdfAction !== null || loading}
+            onPress={handleCreatePdf}>
+            {pdfAction === 'save' ? (
+              <ActivityIndicator color="#7457E8" />
+            ) : (
+              <Download size={19} color="#7457E8" />
+            )}
+
+            <Text style={styles.savePdfButtonText}>
+              {pdfAction === 'save' ? 'Kaydediliyor...' : 'Dosyalara Kaydet'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={({pressed}) => [
+              styles.pdfButton,
+              pressed && styles.pressed,
+            ]}
+            disabled={pdfAction !== null || loading}
+            onPress={handleSharePdf}>
+            {pdfAction === 'share' ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Share2 size={19} color="#FFFFFF" />
+            )}
+
+            <Text style={styles.pdfButtonText}>
+              {pdfAction === 'share' ? 'Hazırlanıyor...' : 'Paylaş'}
+            </Text>
+          </Pressable>
+        </View>
 
 
 
@@ -845,6 +998,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: '#68647A',
   },
+
   pdfButton: {
     minHeight: 52,
     borderRadius: 17,
@@ -958,6 +1112,11 @@ const styles = StyleSheet.create({
       color: '#FFFFFF',
     },
 
+  pdfActions: {
+    gap: 10,
+    marginTop: 5,
+  },
+
   savePdfButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -970,5 +1129,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Quicksand-Bold',
     fontSize: 12,
     color: '#7457E8',
+  },
+
+  profilePetImage: {
+    width: 54,
+    height: 54,
   },
 });

@@ -6,7 +6,9 @@ import React, {
 } from 'react';
 
 import {
+  Alert,
   Animated,
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -17,9 +19,11 @@ import {
 } from 'react-native';
 
 import {
+  AlertTriangle,
   Bell,
   CalendarDays,
   ChevronRight,
+  Download,
   FileText,
   PawPrint,
   X,
@@ -39,7 +43,15 @@ import notifee, {EventType} from '@notifee/react-native';
 
 import {usePets} from '../data/PetContext';
 import {useAuth} from '../data/AuthContext';
-import {getCareEventsFromFirestore} from '../services/firestore';
+import {
+  getCareEventsFromFirestore,
+  getHealthHistoryFromFirestore,
+} from '../services/firestore';
+
+import {
+  createPetSummaryPdf,
+  savePetSummaryPdf,
+} from '../services/petSummaryPdf';
 
 const garden = require('../assets/images/home/animio-garden.png');
 const logo = require('../assets/images/home/animio-logo.png');
@@ -65,6 +77,67 @@ type ButtonPosition = {
   height: number;
 };
 
+function getDefaultPetImage(type?: string) {
+  const value = (type || '')
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+
+  if (value.includes('kedi') || value.includes('cat')) {
+    return require('../assets/images/pets/default-cat-pixel.png');
+  }
+
+  if (value.includes('köpek') || value.includes('kopek') || value.includes('dog')) {
+    return require('../assets/images/pets/default-dog-pixel.png');
+  }
+
+  if (value.includes('kuş') || value.includes('kus') || value.includes('bird')) {
+    return require('../assets/images/pets/default-bird-pixel.png');
+  }
+
+  if (value.includes('tavşan') || value.includes('tavsan') || value.includes('rabbit')) {
+    return require('../assets/images/pets/default-rabbit-pixel.png');
+  }
+
+  if (value.includes('hamster')) {
+    return require('../assets/images/pets/default-hamster-pixel.png');
+  }
+
+  if (value.includes('balık') || value.includes('balik') || value.includes('fish')) {
+    return require('../assets/images/pets/default-fish-pixel.png');
+  }
+
+  if (
+    value.includes('amfibi') ||
+    value.includes('kurbağa') ||
+    value.includes('kurbaga') ||
+    value.includes('semender') ||
+    value.includes('aksolotl')
+  ) {
+    return require('../assets/images/pets/default-amfibi-pixel-head.png');
+  }
+
+  if (
+    value.includes('sürüngen') ||
+    value.includes('surungen') ||
+    value.includes('kaplumbağa') ||
+    value.includes('kaplumbaga') ||
+    value.includes('yılan') ||
+    value.includes('yilan') ||
+    value.includes('kertenkele') ||
+    value.includes('iguana') ||
+    value.includes('geko') ||
+    value.includes('bukalemun')
+  ) {
+    return require('../assets/images/pets/default-reptile-pixel.png');
+  }
+
+  if (value.includes('inek') || value.includes('cow')) {
+    return require('../assets/images/pets/default-cow-pixel.png');
+  }
+
+  return require('../assets/images/pets/default-other-pixel.png');
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -76,6 +149,13 @@ export default function HomeScreen() {
     width: 0,
     height: 0,
   });
+
+  const [downloadingPetId, setDownloadingPetId] = useState<string | null>(
+    null,
+  );
+
+  const [pdfSaveWarningVisible, setPdfSaveWarningVisible] =
+    useState(false);
 
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] =
@@ -89,6 +169,78 @@ export default function HomeScreen() {
   >(null);
 
   const petList = pets ?? [];
+
+  const handleDownloadPetPdf = async (pet: any) => {
+    if (!user?.uid) {
+      Alert.alert(
+        'Oturum gerekli',
+        'PDF oluşturmak için hesabına giriş yapmalısın.',
+      );
+      return;
+    }
+
+    if (downloadingPetId) {
+      return;
+    }
+
+    setDownloadingPetId(pet.id);
+
+    try {
+      // Dostun sağlık kayıtlarını getir.
+      const healthRecords = await getHealthHistoryFromFirestore(
+        pet.id,
+        user.uid,
+      );
+
+      const sortedHealthRecords = [...(healthRecords ?? [])].sort(
+        (a: any, b: any) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+
+      // Kilo geçmişini mevcut pet verisinden al.
+      const weightHistory = Array.isArray(pet.weightHistory)
+        ? pet.weightHistory
+        : [];
+
+      // PDF dosyasını oluştur.
+      const filePath = await createPetSummaryPdf({
+        name: pet.name,
+        type: pet.type,
+        gender: pet.gender,
+        birthYear: pet.birthYear,
+        age: pet.age,
+        weight: pet.weight,
+        notes: pet.notes,
+        weightHistory,
+        healthRecords: sortedHealthRecords,
+      });
+
+      // Paylaşım ekranını açmadan kaydet.
+      const saved = await savePetSummaryPdf(filePath, pet.name);
+
+      if (saved) {
+        setPdfModalVisible(false);
+
+        Alert.alert(
+          'PDF hazır! 🎉',
+          `${pet.name} için oluşturulan PDF başarıyla kaydedildi.`,
+        );
+      } else {
+        setPdfModalVisible(false);
+        setPdfSaveWarningVisible(true);
+      }
+    } catch (error) {
+      console.error('PDF oluşturma hatası:', error);
+
+      Alert.alert(
+        'PDF oluşturulamadı',
+        'Belge hazırlanırken veya kaydedilirken bir hata oluştu. Lütfen tekrar dene.',
+      );
+    } finally {
+      setDownloadingPetId(null);
+    }
+  };
+
   const totalPets = petList.length;
 
   const petsWithVaccines = petList.filter(
@@ -543,43 +695,127 @@ export default function HomeScreen() {
               <ScrollView
                 style={styles.petList}
                 showsVerticalScrollIndicator={false}>
-                {petList.map(pet => (
-                  <Pressable
-                    key={pet.id}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setPdfModalVisible(false);
-                      navigation.navigate('PetSummary', {pet});
-                    }}
-                    style={({pressed}) => [
-                      styles.petRow,
-                      pressed && styles.pressed,
-                    ]}>
-                    <View style={styles.petIcon}>
-                      <PawPrint
-                        size={22}
-                        color={COLORS.purple}
-                      />
+                {petList.map(pet => {
+                  const isDownloading = downloadingPetId === pet.id;
+
+                  return (
+                    <View key={pet.id} style={styles.petRow}>
+                      {/* Dostun fotoğrafı veya varsayılan simgesi */}
+                      <View style={styles.petIcon}>
+                        <Image
+                          source={
+                            pet.photoUri
+                              ? {uri: pet.photoUri}
+                              : getDefaultPetImage(pet.type)
+                          }
+                          style={styles.petPhoto}
+                          resizeMode="contain"
+                        />
+                      </View>
+
+                      {/* Dost adına basınca Pet Özeti ekranı açılır */}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${pet.name} özetini görüntüle`}
+                        disabled={Boolean(downloadingPetId)}
+                        onPress={() => {
+                          setPdfModalVisible(false);
+                          navigation.navigate('PetSummary', {pet});
+                        }}
+                        style={({pressed}) => [
+                          styles.petInfo,
+                          pressed && styles.pressed,
+                        ]}>
+                        <Text style={styles.petName}>
+                          {pet.name}
+                        </Text>
+
+                        <Text style={styles.petType}>
+                          {pet.type}
+                        </Text>
+                      </Pressable>
+
+                      {/* PDF'yi doğrudan oluşturup kaydeder */}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${pet.name} için PDF indir`}
+                        disabled={Boolean(downloadingPetId)}
+                        onPress={() => handleDownloadPetPdf(pet)}
+                        hitSlop={8}
+                        style={({pressed}) => [
+                          styles.downloadButton,
+                          pressed && styles.pressed,
+                          Boolean(downloadingPetId) &&
+                            !isDownloading &&
+                            styles.disabledDownloadButton,
+                        ]}>
+                        {isDownloading ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={COLORS.purple}
+                          />
+                        ) : (
+                          <Download
+                            size={21}
+                            color={COLORS.purple}
+                            strokeWidth={2.2}
+                          />
+                        )}
+                      </Pressable>
                     </View>
-
-                    <View style={styles.petInfo}>
-                      <Text style={styles.petName}>
-                        {pet.name}
-                      </Text>
-
-                      <Text style={styles.petType}>
-                        {pet.type}
-                      </Text>
-                    </View>
-
-                    <ChevronRight
-                      size={19}
-                      color={COLORS.purple}
-                    />
-                  </Pressable>
-                ))}
+                  );
+                })}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={pdfSaveWarningVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPdfSaveWarningVisible(false)}>
+        <View style={styles.warningOverlay}>
+          <View style={styles.warningCard}>
+            <View style={styles.warningIconCircle}>
+              <FileText
+                size={32}
+                color="#6942C8"
+                strokeWidth={1.8}
+              />
+
+              <View style={styles.warningBadge}>
+                <AlertTriangle
+                  size={17}
+                  color="#FFFFFF"
+                  strokeWidth={2.5}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.warningTitle}>
+              PDF hazır, ancak kaydedilemedi
+            </Text>
+
+            <Text style={styles.warningMessage}>
+              Belgen oluşturuldu fakat cihazına kaydedilemedi.
+              Tekrar deneyebilir veya PDF kaydetme izinlerini
+              kontrol edebilirsin.
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPdfSaveWarningVisible(false)}
+              style={({pressed}) => [
+                styles.warningButton,
+                pressed && styles.pressed,
+              ]}>
+              <Text style={styles.warningButtonText}>
+                Tamam
+              </Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -886,6 +1122,28 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
+  petPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
+  },
+
+  downloadButton: {
+    width: 42,
+    height: 42,
+    marginLeft: 8,
+    borderRadius: 14,
+    backgroundColor: '#FFFCF8',
+    borderWidth: 1,
+    borderColor: '#E2D5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  disabledDownloadButton: {
+    opacity: 0.45,
+  },
+
   petName: {
     fontFamily: 'Quicksand-Bold',
     fontSize: 15,
@@ -922,6 +1180,89 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     fontFamily: 'Quicksand-Bold',
     fontSize: 13,
+    color: '#FFFFFF',
+  },
+
+  warningOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28,18,45,0.48)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 26,
+  },
+
+  warningCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: '#FFFCF8',
+    borderRadius: 26,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E9DDF8',
+    elevation: 12,
+    shadowColor: '#49366E',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+
+  warningIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 26,
+    backgroundColor: '#EEE6FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+
+  warningBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 29,
+    height: 29,
+    borderRadius: 15,
+    backgroundColor: '#E5A044',
+    borderWidth: 3,
+    borderColor: '#FFFCF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  warningTitle: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 18,
+    lineHeight: 25,
+    textAlign: 'center',
+    color: '#422A73',
+  },
+
+  warningMessage: {
+    fontFamily: 'Quicksand-Medium',
+    fontSize: 13,
+    lineHeight: 21,
+    textAlign: 'center',
+    color: '#82718E',
+    marginTop: 10,
+  },
+
+  warningButton: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 16,
+    backgroundColor: '#6942C8',
+    marginTop: 22,
+  },
+
+  warningButtonText: {
+    fontFamily: 'Quicksand-Bold',
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });
