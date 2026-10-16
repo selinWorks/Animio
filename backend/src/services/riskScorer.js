@@ -28,6 +28,29 @@ function calculateRisk(
       ? [data.problemType]
       : [];
 
+  const rawPetType =
+    typeof data.petType === 'string'
+      ? data.petType.trim()
+      : '';
+
+  const knownPetTypes = [
+    'Kedi',
+    'Köpek',
+    'Kuş',
+    'Kemirgen',
+    'Tavşan',
+    'Balık',
+    'Sürüngen',
+  ];
+
+  const petType =
+    knownPetTypes.find(type =>
+      rawPetType === type ||
+      rawPetType.startsWith(`${type} -`) ||
+      rawPetType.startsWith(`${type} –`) ||
+      rawPetType.startsWith(`${type}:`)
+    ) || rawPetType;
+
   // =====================================================
   // 2. DİĞER AÇIKLAMASI
   // =====================================================
@@ -108,13 +131,8 @@ function calculateRisk(
     Balık: 2,
     Kemirgen: 2,
     Sürüngen: 2,
-    'Çiftlik Hayvanı': 2,
-    Amfibi: 2,
-    Omurgasız: 1,
-    'Diğer Memeliler': 2,
+    Tavşan: 2,
 
-    'Küçük Hayvan': 2,
-    Diğer: 0,
   };
 
   // =====================================================
@@ -157,42 +175,6 @@ function calculateRisk(
       Halsizlik: 2,
       İştahsızlık: 2,
       Beslenme: 2,
-      'Aşı / Bakım': 0,
-      Diğer: 2,
-    },
-
-    'Çiftlik Hayvanı': {
-      Kusma: 0,
-      Halsizlik: 2,
-      İştahsızlık: 2,
-      Beslenme: 2,
-      'Aşı / Bakım': 0,
-      Diğer: 2,
-    },
-
-    Amfibi: {
-      Kusma: 0,
-      Halsizlik: 2,
-      İştahsızlık: 2,
-      Beslenme: 1,
-      'Aşı / Bakım': 0,
-      Diğer: 2,
-    },
-
-    Omurgasız: {
-      Kusma: 0,
-      Halsizlik: 1,
-      İştahsızlık: 1,
-      Beslenme: 1,
-      'Aşı / Bakım': 0,
-      Diğer: 1,
-    },
-
-    'Diğer Memeliler': {
-      Kusma: 1,
-      Halsizlik: 2,
-      İştahsızlık: 2,
-      Beslenme: 1,
       'Aşı / Bakım': 0,
       Diğer: 2,
     },
@@ -301,14 +283,14 @@ function calculateRisk(
   // =====================================================
 
   score +=
-    petTypeBaseScores[data.petType] || 0;
+    petTypeBaseScores[petType] || 0;
 
   // =====================================================
   // 12. HAYVAN TÜRÜ + SEMPTOM ETKİSİ
   // =====================================================
 
   const speciesModifiers =
-    speciesProblemModifiers[data.petType] || {};
+    speciesProblemModifiers[petType] || {};
 
   problemTypes.forEach((problemType, index) => {
     const modifier =

@@ -64,147 +64,120 @@ const petcareWarningGroup = require('../assets/popup-icons/my-custom-icon.png');
    TYPES
    ========================================================= */
 
+
 type PetType =
   | 'Kedi'
   | 'Köpek'
   | 'Kuş'
-  | 'Balık'
   | 'Kemirgen'
+  | 'Tavşan'
+  | 'Balık'
   | 'Sürüngen'
-  | 'Çiftlik Hayvanı'
-  | 'Amfibi'
-  | 'Omurgasız'
-  | 'Diğer Memeliler'
   | '';
+
 
   /* =========================================================
      HAYVAN TÜRLERİ
      AddPetScreen ile aynı yapı
   ========================================================= */
 
-  const ANIMAL_SUBTYPES: Record<string, string[]> = {
-    Kedi: [
-      'British Shorthair',
-      'Scottish Fold',
-      'Siyam',
-      'İran Kedisi',
-      'Maine Coon',
-      'Ragdoll',
-      'Van Kedisi',
-      'Tekir',
-      'Sfenks',
-      'Bengal',
-      'Birman',
-      'Abyssinian',
-      'Diğer',
-    ],
 
-    Köpek: [
-      'Golden Retriever',
-      'Labrador Retriever',
-      'Alman Kurdu',
-      'French Bulldog',
-      'Poodle',
-      'Chihuahua',
-      'Beagle',
-      'Husky',
-      'Pomeranian',
-      'Rottweiler',
-      'Cocker Spaniel',
-      'Dachshund',
-      'Maltese',
-      'Shih Tzu',
-      'Border Collie',
-      'Diğer',
-    ],
+const ANIMAL_SUBTYPES: Record<string, string[]> = {
+  Kedi: [
+    'British Shorthair',
+    'Scottish Fold',
+    'Siyam',
+    'İran Kedisi',
+    'Maine Coon',
+    'Ragdoll',
+    'Van Kedisi',
+    'Tekir',
+    'Sfenks',
+    'Bengal',
+    'Birman',
+    'Abyssinian',
+    'Diğer',
+  ],
 
-    Kuş: [
-      'Muhabbet Kuşu',
-      'Papağan',
-      'Kanarya',
-      'Sultan Papağanı',
-      'Sevda Papağanı',
-      'İspinoz',
-      'Güvercin',
-      'Serçe',
-      'Bülbül',
-      'Hint Bülbülü',
-      'Diğer',
-    ],
+  Köpek: [
+    'Golden Retriever',
+    'Labrador Retriever',
+    'Alman Kurdu',
+    'French Bulldog',
+    'Poodle',
+    'Chihuahua',
+    'Beagle',
+    'Husky',
+    'Pomeranian',
+    'Rottweiler',
+    'Cocker Spaniel',
+    'Dachshund',
+    'Maltese',
+    'Shih Tzu',
+    'Border Collie',
+    'Diğer',
+  ],
 
-    Balık: [
-      'Japon Balığı',
-      'Beta',
-      'Lepistes',
-      'Melek Balığı',
-      'Koi',
-      'Çöpçü Balığı',
-      'Neon Tetra',
-      'Moli',
-      'Plati',
-    ],
+  Kuş: [
+    'Muhabbet Kuşu',
+    'Papağan',
+    'Kanarya',
+    'Sultan Papağanı',
+    'Sevda Papağanı',
+    'İspinoz',
+    'Güvercin',
+    'Serçe',
+    'Bülbül',
+    'Hint Bülbülü',
+    'Diğer',
+  ],
 
-    Kemirgen: [
-      'Hamster',
-      'Kobay',
-      'Çinçilla',
-      'Fare',
-      'Sıçan',
-      'Gerbil',
-      'Sincap',
-    ],
+  Kemirgen: [
+    'Hamster',
+    'Kobay',
+    'Çinçilla',
+    'Fare',
+    'Sıçan',
+    'Gerbil',
+    'Sincap',
+    'Diğer',
+  ],
 
-    Sürüngen: [
-      'Kaplumbağa',
-      'Yılan',
-      'Kertenkele',
-      'İguana',
-      'Geko',
-      'Sakallı Ejder',
-      'Bukalemun',
-    ],
+  Tavşan: [
+    'Tavşan',
+  ],
 
-    'Çiftlik Hayvanı': [
-      'At',
-      'İnek',
-      'Koyun',
-      'Keçi',
-      'Ördek',
-      'Tavuk',
-      'Kaz',
-      'Manda',
-      'Eşek',
-      'Deve',
-    ],
+  Balık: [
+    'Japon Balığı',
+    'Beta',
+    'Lepistes',
+    'Melek Balığı',
+    'Koi',
+    'Çöpçü Balığı',
+    'Neon Tetra',
+    'Moli',
+    'Plati',
+    'Diğer',
+  ],
 
-    Amfibi: [
-      'Kurbağa',
-      'Semender',
-      'Aksolotl',
-    ],
+  Sürüngen: [
+    'Kaplumbağa',
+    'Yılan',
+    'Kertenkele',
+    'İguana',
+    'Geko',
+    'Sakallı Ejder',
+    'Bukalemun',
+    'Diğer',
+  ],
+};
 
-    Omurgasız: [
-      'Örümcek',
-      'Akrep',
-      'Salyangoz',
-      'Yengeç',
-    ],
-
-    'Diğer Memeliler': [
-      'Tavşan',
-      'Kirpi',
-      'Gelincik',
-    ],
-  };
 
   const GENERAL_ANIMAL_TYPES = [
-    'Balık',
     'Kemirgen',
+    'Tavşan',
+    'Balık',
     'Sürüngen',
-    'Çiftlik Hayvanı',
-    'Amfibi',
-    'Omurgasız',
-    'Diğer Memeliler',
   ];
 
 type ProblemType =
@@ -490,15 +463,14 @@ const URGENCIES: UrgencyType[] = [
 /* =========================================================
    SCREEN
    ========================================================= */
+
 const OTHER_ANIMAL_TYPES = [
-  'Balık',
   'Kemirgen',
+  'Tavşan',
+  'Balık',
   'Sürüngen',
-  'Çiftlik Hayvanı',
-  'Amfibi',
-  'Omurgasız',
-  'Diğer Memeliler',
 ];
+
 
 const AssistantScreen = () => {
   const tabBarHeight = 80;
@@ -895,9 +867,7 @@ const AssistantScreen = () => {
           },
 
           body: JSON.stringify({
-            petType,
-
-            // Çoklu semptom sistemi
+            petType: getAssistantPetType(),
             problemTypes,
 
             // Eski backend kayıtları için

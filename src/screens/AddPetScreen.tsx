@@ -44,27 +44,45 @@ import {addPetToFirestore} from '../services/firestore';
 const PET_TYPES = [
   {
     name: 'Kedi',
-    image: require('../assets/images/pets/cat-side-pose.png'),
+    image: require('../assets/images/pets/default-cat-pixel.png'),
     bgGradient: ['#E6E0FF', '#D6CBFF'],
     badgeColor: '#7C3AED',
   },
   {
     name: 'Köpek',
-    image: require('../assets/images/pets/dog-open-eyes.png'),
+    image: require('../assets/images/pets/default-dog-pixel.png'),
     bgGradient: ['#FFE4E6', '#FECDD3'],
     badgeColor: '#FF7675',
   },
   {
     name: 'Kuş',
-    image: require('../assets/images/pets/bird-soft.png'),
+    image: require('../assets/images/pets/default-bird-pixel.png'),
     bgGradient: ['#FEF3C7', '#FDE68A'],
     badgeColor: '#FDCB6E',
   },
   {
-    name: 'Diğer',
-    image: null,
-    bgGradient: ['#D1FAE5', '#A7F3D0'],
-    badgeColor: '#00B894',
+    name: 'Kemirgen',
+    image: require('../assets/images/pets/default-hamster-pixel.png'),
+    bgGradient: ['#FDEBD0', '#F8D9B0'],
+    badgeColor: '#C98A4B',
+  },
+  {
+    name: 'Tavşan',
+    image: require('../assets/images/pets/default-rabbit-pixel.png'),
+    bgGradient: ['#F3E8FF', '#E9D5FF'],
+    badgeColor: '#A855F7',
+  },
+  {
+    name: 'Balık',
+    image: require('../assets/images/pets/default-fish-pixel.png'),
+    bgGradient: ['#DBEAFE', '#BFDBFE'],
+    badgeColor: '#3B82F6',
+  },
+  {
+    name: 'Sürüngen',
+    image: require('../assets/images/pets/default-reptile-pixel.png'),
+    bgGradient: ['#DCFCE7', '#BBF7D0'],
+    badgeColor: '#22C55E',
   },
 ];
 
@@ -84,6 +102,7 @@ const ANIMAL_SUBTYPES: Record<string, string[]> = {
     'Abyssinian',
     'Diğer',
   ],
+
   Köpek: [
     'Golden Retriever',
     'Labrador Retriever',
@@ -102,6 +121,7 @@ const ANIMAL_SUBTYPES: Record<string, string[]> = {
     'Border Collie',
     'Diğer',
   ],
+
   Kuş: [
     'Muhabbet Kuşu',
     'Papağan',
@@ -115,6 +135,22 @@ const ANIMAL_SUBTYPES: Record<string, string[]> = {
     'Hint Bülbülü',
     'Diğer',
   ],
+
+  Kemirgen: [
+    'Hamster',
+    'Kobay',
+    'Çinçilla',
+    'Fare',
+    'Sıçan',
+    'Gerbil',
+    'Sincap',
+    'Diğer',
+  ],
+
+  Tavşan: [
+    'Tavşan',
+  ],
+
   Balık: [
     'Japon Balığı',
     'Beta',
@@ -125,16 +161,9 @@ const ANIMAL_SUBTYPES: Record<string, string[]> = {
     'Neon Tetra',
     'Moli',
     'Plati',
+    'Diğer',
   ],
-  Kemirgen: [
-    'Hamster',
-    'Kobay',
-    'Çinçilla',
-    'Fare',
-    'Sıçan',
-    'Gerbil',
-    'Sincap',
-  ],
+
   Sürüngen: [
     'Kaplumbağa',
     'Yılan',
@@ -143,40 +172,9 @@ const ANIMAL_SUBTYPES: Record<string, string[]> = {
     'Geko',
     'Sakallı Ejder',
     'Bukalemun',
-  ],
-  'Çiftlik Hayvanı': [
-    'At',
-    'İnek',
-    'Koyun',
-    'Keçi',
-    'Ördek',
-    'Tavuk',
-    'Kaz',
-    'Manda',
-    'Eşek',
-    'Deve',
-  ],
-  Amfibi: [
-    'Kurbağa',
-    'Semender',
-    'Aksolotl',
-  ],
-  Omurgasız: [
-    'Örümcek',
-    'Akrep',
-    'Salyangoz',
-    'Yengeç',
-  ],
-  'Diğer Memeliler': [
-    'Tavşan',
-    'Kirpi',
-    'Gelincik',
+    'Diğer',
   ],
 };
-
-const GENERAL_ANIMAL_TYPES = Object.keys(ANIMAL_SUBTYPES).filter(
-  item => !['Kedi', 'Köpek', 'Kuş'].includes(item),
-);
 
 const GENDERS = [
   {label: 'Dişi'},
@@ -259,7 +257,6 @@ export default function AddPetScreen({navigation}: any) {
   const [customType, setCustomType] = useState('');
   const [typePickerVisible, setTypePickerVisible] = useState(false);
   const [typePickerCategory, setTypePickerCategory] = useState<string | null>(null);
-  const [selectedOtherCategory, setSelectedOtherCategory] = useState<string | null>(null);
 
   // Doğum tarihi bilgisi ne kadar biliniyor?
   // day   = tam tarih (GG.AA.YYYY)
@@ -343,7 +340,6 @@ export default function AddPetScreen({navigation}: any) {
     setCustomType('');
     setTypePickerVisible(false);
     setTypePickerCategory(null);
-    setSelectedOtherCategory(null);
     setBirthDatePrecision('year');
     setBirthDate('');
     setBirthYear('');
@@ -1351,7 +1347,9 @@ export default function AddPetScreen({navigation}: any) {
             </Text>
 
             <View style={styles.typeGrid}>
-              {PET_TYPES.map(item => {
+              {PET_TYPES
+                .filter(item => item.name !== 'Diğer')
+                .map(item => {
                 const selected = type === item.name;
 
                 return (
@@ -1360,14 +1358,7 @@ export default function AddPetScreen({navigation}: any) {
                     onPress={() => {
                       setType(item.name);
                       setCustomType('');
-                      setTypePickerCategory(
-                        item.name === 'Diğer'
-                          ? null
-                          : item.name,
-                      );
-                      if (item.name === 'Diğer') {
-                        setSelectedOtherCategory(null);
-                      }
+                      setTypePickerCategory(item.name);
                       setTypePickerVisible(true);
                     }}
                     style={styles.typeCardWrapper}>
@@ -1421,11 +1412,7 @@ export default function AddPetScreen({navigation}: any) {
             {type && customType ? (
               <Pressable
                 onPress={() => {
-                  setTypePickerCategory(
-                    type === 'Diğer'
-                      ? selectedOtherCategory
-                      : type,
-                  );
+                  setTypePickerCategory(type);
                   setTypePickerVisible(true);
                 }}
                 style={styles.selectedSubtypeCard}>
@@ -1489,7 +1476,7 @@ export default function AddPetScreen({navigation}: any) {
                   <Text style={styles.chooseSubtypeDescription}>
                     {type
                       ? 'Listeden sana uygun türü seçmek için dokun'
-                      : 'Kedi, köpek, kuş veya diğer seçimini yap'}
+                      : 'Önce dostunun genel türünü seç'}
                   </Text>
                 </View>
 
@@ -1575,9 +1562,7 @@ export default function AddPetScreen({navigation}: any) {
                 </Text>
 
                 <Text style={styles.previewType}>
-                  {type === 'Diğer'
-                    ? customType || 'Kedi'
-                    : type}
+                  {customType || type}
                 </Text>
 
               </View>
@@ -2654,24 +2639,14 @@ export default function AddPetScreen({navigation}: any) {
               style={styles.typePickerScroll}
               contentContainerStyle={styles.typePickerList}
               showsVerticalScrollIndicator={false}>
-              {(typePickerCategory
-                ? ANIMAL_SUBTYPES[typePickerCategory] || []
-                : GENERAL_ANIMAL_TYPES
+              {(
+                typePickerCategory
+                  ? ANIMAL_SUBTYPES[typePickerCategory] || []
+                  : []
               ).map(item => (
                 <Pressable
                   key={item}
                   onPress={() => {
-                    if (
-                      !typePickerCategory &&
-                      GENERAL_ANIMAL_TYPES.includes(item)
-                    ) {
-                      setType('Diğer');
-                      setCustomType('');
-                      setSelectedOtherCategory(item);
-                      setTypePickerCategory(item);
-                      return;
-                    }
-
                     setCustomType(item);
                     setTypePickerVisible(false);
                     setTypePickerCategory(null);
@@ -2711,11 +2686,7 @@ export default function AddPetScreen({navigation}: any) {
                     color="#6C5CE7"
                   />
                   <Text style={styles.typePickerBackText}>
-                    {['Kedi', 'Köpek', 'Kuş'].includes(
-                      typePickerCategory,
-                    )
-                      ? 'Kapat'
-                      : 'Genel türlere dön'}
+                    Kapat
                   </Text>
                 </Pressable>
               ) : (
@@ -3588,12 +3559,12 @@ const styles = StyleSheet.create({
     height: 82,
     borderRadius: 22,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingHorizontal: 12,
+    paddingBottom: 0,
     position: 'relative',
     borderWidth: 1.5,
-    borderColor:
-      'rgba(255, 255, 255, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
 
     shadowColor: '#6C5CE7',
     shadowOffset: {
@@ -3842,15 +3813,21 @@ const styles = StyleSheet.create({
   },
 
   petCharacter: {
-    width: 46,
-    height: 46,
+    width: 56,
+    height: 56,
+    alignSelf: 'flex-end',
+    marginBottom: 0,
   },
 
   typeText: {
     color: '#2D3436',
     fontSize: 15,
     fontFamily: 'Quicksand-Bold',
-    marginLeft: 8,
+    marginLeft: 0,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    alignSelf: 'center',
+    flex: 1,
   },
 
   checkBadgeUnselected: {
