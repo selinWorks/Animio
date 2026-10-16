@@ -86,7 +86,7 @@ const PET_TYPES = [
   },
 ];
 
-const ANIMAL_SUBTYPES: Record<string, string[]> = {
+export const ANIMAL_SUBTYPES: Record<string, string[]> = {
   Kedi: [
     'British Shorthair',
     'Scottish Fold',

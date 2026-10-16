@@ -28,12 +28,18 @@ import {
 
 import notifee, {
   AndroidImportance,
+  AndroidNotificationSetting,
+  AuthorizationStatus,
   TriggerType,
 } from '@notifee/react-native';
+
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useNavigation} from '@react-navigation/native';
 import {useAuth} from '../data/AuthContext';
 import {usePets} from '../data/PetContext';
+
+import {ANIMAL_SUBTYPES} from './AddPetScreen';
 
 import {
   FileText,
@@ -107,70 +113,107 @@ const PASTEL_COLORS = [
 ];
 
 
-function getDefaultPetImage(type?: string) {
-  const value = (type || '')
-    .toLocaleLowerCase('tr-TR')
-    .trim();
+const normalize = (text: string) =>
+   text.toLocaleLowerCase('tr-TR').trim();
 
-  if (value.includes('kedi') || value.includes('cat')) {
-    return require('../assets/images/pets/default-cat-pixel.png');
-  }
+ function getMainAnimalType(type?: string): string {
+   const value = normalize(type || '');
 
-  if (value.includes('köpek') || value.includes('kopek') || value.includes('dog')) {
-    return require('../assets/images/pets/default-dog-pixel.png');
-  }
+   for (const [mainType, subtypes] of Object.entries(ANIMAL_SUBTYPES)) {
+     if (normalize(mainType) === value) {
+       return mainType;
+     }
+     if (subtypes.some(sub => normalize(sub) === value)) {
+       return mainType;
+     }
+   }
 
-  if (value.includes('kuş') || value.includes('kus') || value.includes('bird')) {
-    return require('../assets/images/pets/default-bird-pixel.png');
-  }
+   return '';
+ }
 
-  if (value.includes('tavşan') || value.includes('tavsan') || value.includes('rabbit')) {
-    return require('../assets/images/pets/default-rabbit-pixel.png');
-  }
+ function getDefaultPetImage(type?: string) {
+   const value = normalize(type || '');
+   const mainType = getMainAnimalType(type);
 
-  if (value.includes('hamster')) {
-    return require('../assets/images/pets/default-hamster-pixel.png');
-  }
+   if (mainType === 'Kedi' || value.includes('kedi') || value.includes('cat')) {
+     return require('../assets/images/pets/default-cat-pixel.png');
+   }
 
-  if (value.includes('balık') || value.includes('balik') || value.includes('fish')) {
-    return require('../assets/images/pets/default-fish-pixel.png');
-  }
+   if (mainType === 'Köpek' || value.includes('köpek') || value.includes('kopek') || value.includes('dog')) {
+     return require('../assets/images/pets/default-dog-pixel.png');
+   }
 
-  if (
-    value.includes('amfibi') ||
-    value.includes('kurbağa') ||
-    value.includes('kurbaga') ||
-    value.includes('semender') ||
-    value.includes('aksolotl')
-  ) {
-    return require('../assets/images/pets/default-amfibi-pixel-head.png');
-  }
+   if (
+     mainType === 'Kuş' ||
+     value.includes('kuş') ||
+     value.includes('kus') ||
+     value.includes('bird') ||
+     value.includes('tavuk') ||
+     value.includes('horoz')
+   ) {
+     return require('../assets/images/pets/default-bird-pixel.png');
+   }
 
-  if (
-    value.includes('sürüngen') ||
-    value.includes('surungen') ||
-    value.includes('kaplumbağa') ||
-    value.includes('kaplumbaga') ||
-    value.includes('yılan') ||
-    value.includes('yilan') ||
-    value.includes('kertenkele') ||
-    value.includes('iguana') ||
-    value.includes('geko') ||
-    value.includes('bukalemun')
-  ) {
-    return require('../assets/images/pets/default-reptile-pixel.png');
-  }
+   if (mainType === 'Tavşan' || value.includes('tavşan') || value.includes('tavsan') || value.includes('rabbit')) {
+     return require('../assets/images/pets/default-rabbit-pixel.png');
+   }
 
-  if (value.includes('inek') || value.includes('cow')) {
-    return require('../assets/images/pets/default-cow-pixel.png');
-  }
+   if (mainType === 'Kemirgen' || value.includes('hamster')) {
+     return require('../assets/images/pets/default-hamster-pixel.png');
+   }
 
-  return require('../assets/images/pets/default-other-pixel.png');
-}
+   if (mainType === 'Balık' || value.includes('balık') || value.includes('balik') || value.includes('fish')) {
+     return require('../assets/images/pets/default-fish-pixel.png');
+   }
 
+   if (
+     value.includes('amfibi') ||
+     value.includes('kurbağa') ||
+     value.includes('kurbaga') ||
+     value.includes('semender') ||
+     value.includes('aksolotl')
+   ) {
+     return require('../assets/images/pets/default-amfibi-pixel-head.png');
+   }
+
+   if (
+     mainType === 'Sürüngen' ||
+     value.includes('sürüngen') ||
+     value.includes('surungen') ||
+     value.includes('kaplumbağa') ||
+     value.includes('kaplumbaga') ||
+     value.includes('yılan') ||
+     value.includes('yilan') ||
+     value.includes('kertenkele') ||
+     value.includes('iguana') ||
+     value.includes('geko') ||
+     value.includes('bukalemun')
+   ) {
+     return require('../assets/images/pets/default-reptile-pixel.png');
+   }
+
+   if (value.includes('inek') || value.includes('cow')) {
+     return require('../assets/images/pets/default-cow-pixel.png');
+   }
+
+   return require('../assets/images/pets/default-other-pixel.png');
+ }
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı`)), ms),
+    ),
+  ]);
 
 export default function CalendarScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   useLayoutEffect(() => {
     navigation.setOptions({headerShown: false});
@@ -313,9 +356,9 @@ export default function CalendarScreen() {
      LOAD EVENTS
   ========================================================= */
 
-  const loadEvents = async () => {
+  const loadEvents = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       if (!user?.uid) {
         setEvents([]);
@@ -415,13 +458,31 @@ export default function CalendarScreen() {
   ========================================================= */
 
   const requestNotificationPermission = async () => {
-    await notifee.requestPermission();
+    try {
+      const settings = await notifee.requestPermission();
 
-    await notifee.createChannel({
-      id: 'care-reminders',
-      name: 'Care Reminders',
-      importance: AndroidImportance.HIGH,
-    });
+      if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
+        await notifee.openNotificationSettings();
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        const s = await notifee.getNotificationSettings();
+        if (s.android.alarm !== AndroidNotificationSetting.ENABLED) {
+          await notifee.openAlarmPermissionSettings();
+        }
+      }
+
+      await notifee.createChannel({
+        id: 'care-reminders-v2',
+        name: 'PetCare Hatırlatıcıları',
+        importance: AndroidImportance.HIGH,
+        sound: 'default',
+        vibration: true,
+      });
+    } catch (error) {
+      console.log('Bildirim izni hatası:', error);
+    }
   };
 
   const getNotificationDate = (
@@ -512,13 +573,22 @@ export default function CalendarScreen() {
     timeString: string;
   }) => {
     try {
-      const notificationDate =
-        getNotificationDate(
-          dateString,
-          timeString,
-        );
+      console.log('====================================');
+      console.log('🔔 BİLDİRİM PLANLAMA BAŞLADI');
+      console.log('EVENT ID:', eventId);
+      console.log('DATE:', dateString);
+      console.log('TIME:', timeString);
 
-      if (!notificationDate) throw new Error('Geçersiz bildirim tarihi.');
+      const notificationDate = getNotificationDate(
+        dateString,
+        timeString,
+      );
+
+      if (!notificationDate) {
+        throw new Error(
+          'Geçersiz bildirim tarihi veya saati.',
+        );
+      }
 
       console.log(
         'PLANLANAN BİLDİRİM:',
@@ -539,68 +609,108 @@ export default function CalendarScreen() {
         notificationDate.getTime() <=
         Date.now()
       ) {
-        console.log(
+        throw new Error(
           'Bildirim zamanı geçmiş.',
         );
-
-        return;
       }
 
+      /*
+       * Android bildirim kanalı
+       */
       const channelId =
         await notifee.createChannel({
-          id: 'care-reminders',
+          id: 'care-reminders-v2',
           name: 'PetCare Hatırlatıcıları',
           importance:
             AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
         });
 
-      await notifee.createTriggerNotification(
-        {
-          id: `care-${eventId}`,
+      console.log(
+        'NOTIFICATION CHANNEL:',
+        channelId,
+      );
 
-          title: 'Bakım zamanı geldi ✨',
+      /*
+       * Aynı event daha önce planlandıysa
+       * eski bildirimi temizle.
+       */
+      try {
+        await notifee.cancelNotification(
+          `care-${eventId}`,
+        );
+      } catch (cancelError) {
+        console.log(
+          'Eski bildirim temizlenemedi:',
+          cancelError,
+        );
+      }
 
-          body: petNameText
-            ? `${petNameText} · ${eventTitle}`
-            : eventTitle,
+      /*
+       * Yeni bildirimi planla
+       */
+       await notifee.createTriggerNotification(
+      {
+        id: `care-${eventId}`,
 
-          data: {
-            eventId: String(eventId),
-            title: eventTitle || '',
-            note: '',
-            petName: petNameText || '',
-            type: 'Custom',
-            date: dateString,
-            time: timeString,
-          },
+        title: `🐾 ${petNameText || 'Dostun'} seni bekliyor`,
 
-          android: {
-            channelId,
+        body: `${eventTitle} zamanı geldi. Hadi küçük bir bakım molası! 💜`,
 
-            smallIcon: 'ic_launcher',
-
-            pressAction: {
-              id: 'default',
-            },
-          },
+        data: {
+          eventId: String(eventId),
+          title: eventTitle || '',
+          note: '',
+          petName: petNameText || '',
+          type: 'Custom',
+          date: dateString,
+          time: timeString,
+          color: '#C4B5FD',
         },
+
+        android: {
+          channelId,
+          smallIcon: 'ic_notification',
+          largeIcon: 'ic_notification',   // pet foto URL'si yerine direkt drawable
+          color: '#7954EF',
+          pressAction: {id: 'default'},
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [300, 500],
+        },
+      },
 
         {
           type: TriggerType.TIMESTAMP,
 
           timestamp:
             notificationDate.getTime(),
+
+          alarmManager: {
+            allowWhileIdle: true,
+          },
         },
       );
 
       console.log(
-        'NOTİFİKASYON BAŞARIYLA PLANLANDI',
+        '✅ NOTİFİKASYON BAŞARIYLA PLANLANDI',
       );
+
+      console.log(
+        'Bildirim zamanı:',
+        notificationDate.toLocaleString(
+          'tr-TR',
+        ),
+      );
+
+      console.log('====================================');
     } catch (error) {
       console.log(
-        'Bildirim planlama hatası:',
+        '❌ BİLDİRİM PLANLAMA HATASI:',
         error,
       );
+
       throw error;
     }
   };
@@ -880,25 +990,51 @@ export default function CalendarScreen() {
         color: selectedColor,
         reminderEnabled,
       };
+
+      console.log('1 - Firestore kaydı başlıyor');
+
       const eventId = editingEvent
         ? editingEvent.id
-        : await addCareEventToFirestore(payload, user.uid);
+        : await withTimeout(
+            addCareEventToFirestore(payload, user.uid),
+            15000,
+            'Firestore kaydı',
+          );
+
+      console.log('2 - Firestore kaydı bitti, id:', eventId);
+
       if (editingEvent) {
-        await updateCareEventInFirestore({...payload, id: eventId}, user.uid);
+        await withTimeout(
+          updateCareEventInFirestore({...payload, id: eventId}, user.uid),
+          15000,
+          'Firestore güncelleme',
+        );
       }
 
       let reminderFailed = false;
       try {
-        await cancelCareNotification(eventId);
-        if (reminderEnabled && !editingEvent?.completed && selectedDateTime.getTime() > Date.now()) {
-          await scheduleCareNotification({
-            eventId,
-            eventTitle,
-            petNameText: eventPetName,
-            dateString: eventDate,
-            timeString: selectedTime,
-          });
+        console.log('3 - Eski bildirim iptal ediliyor');
+        await withTimeout(cancelCareNotification(eventId), 8000, 'Bildirim iptali');
+
+        if (
+          reminderEnabled &&
+          !editingEvent?.completed &&
+          selectedDateTime.getTime() > Date.now()
+        ) {
+          console.log('4 - Bildirim planlanıyor');
+          await withTimeout(
+            scheduleCareNotification({
+              eventId,
+              eventTitle,
+              petNameText: eventPetName,
+              dateString: eventDate,
+              timeString: selectedTime,
+            }),
+            8000,
+            'Bildirim planlama',
+          );
         }
+        console.log('5 - Bildirim işlemi tamam');
       } catch (notificationError) {
         reminderFailed = true;
         console.log('Bildirim güncellenemedi:', notificationError);
@@ -913,7 +1049,7 @@ export default function CalendarScreen() {
       setModalVisible(false);
 
       // Etkinlikleri yeniden yükle
-      await loadEvents();
+      loadEvents(true);
 
       // Başarılı mesajı
       showToast(
@@ -970,7 +1106,7 @@ export default function CalendarScreen() {
       setDeleteModalVisible(false);
       setSelectedEventId(null);
 
-      await loadEvents();
+      await loadEvents(true);
 
       showToast(
         'Silindi',
@@ -1021,7 +1157,7 @@ export default function CalendarScreen() {
         await cancelCareNotification(event.id);
       }
 
-      await loadEvents();
+      await loadEvents(true);
 
       showToast(
         nextCompleted ? 'Tamamlandı' : 'Geri alındı',
@@ -1229,8 +1365,22 @@ export default function CalendarScreen() {
   }, [events, upcomingNow]);
   const upcomingEvents = upcomingMonthEvents.slice(0, 3);
 
-  const getPetForEvent = (event: CareEvent) =>
-    pets.find(pet => pet.name === event.petName);
+    const getPetForEvent = (event: CareEvent) => {
+      if (event.petId) {
+        const byId = pets.find(
+          pet => String(pet.id) === String(event.petId),
+        );
+
+        if (byId) {
+          return byId;
+        }
+      }
+
+      // Eski kayıtlar için geriye dönük destek
+      return pets.find(
+        pet => pet.name === event.petName,
+      );
+    };
 
   const getTypeLabel = (type: CareEventType) => {
     if (type === 'Vaccination') return 'Aşı';
@@ -1277,10 +1427,17 @@ export default function CalendarScreen() {
         contentContainerStyle={styles.plannerContent}
         showsVerticalScrollIndicator={false}>
 
-        <View style={styles.calendarArea}>
+        <View style={[styles.calendarArea, {paddingTop: insets.top + 12}]}>
           <View style={styles.calendarBackRow}>
             <Pressable
-              onPress={() => navigation.goBack()}
+              hitSlop={10}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.navigate('Home');
+                }
+              }}
               style={({pressed}) => [
                 styles.calendarBackButton,
                 pressed && styles.buttonPressed,
@@ -1470,6 +1627,7 @@ export default function CalendarScreen() {
           ) : eventsForSelectedDay.length > 0 ? (
             eventsForSelectedDay.map(event => {
               const eventColor = event.color || '#A78BFA';
+
               const pet = getPetForEvent(event);
               const petPhoto = pet?.photoUrl || pet?.photoUri;
 
