@@ -7,6 +7,10 @@ const router = express.Router();
 router.post('/evaluate', async (req, res) => {
   try {
     const data = req.body;
+    const {
+      urgency,
+      ...evaluationData
+    } = data || {};
 
     // ------------------------------------------------
     // 1. RİSKİ HAZIRLA
@@ -16,7 +20,9 @@ router.post('/evaluate', async (req, res) => {
     // kullanıcıya gönderilmeyecek.
     // ------------------------------------------------
 
-    const riskResult = calculateRisk(data, true);
+
+    const riskResult = calculateRisk(data);
+
 
     // ------------------------------------------------
     // 2. AI DEĞERLENDİRMESİ
@@ -26,7 +32,7 @@ router.post('/evaluate', async (req, res) => {
 
     try {
       aiResult = await generatePetAdvice(
-        data,
+        evaluationData,
         riskResult,
       );
     } catch (aiError) {
@@ -46,6 +52,10 @@ router.post('/evaluate', async (req, res) => {
           action: null,
           canEvaluate: false,
           reason: 'AI_EVALUATION_UNAVAILABLE',
+          emergency: riskResult?.emergency === true,
+          emergencyReasons: Array.isArray(riskResult?.emergencyReasons)
+            ? riskResult.emergencyReasons
+            : [],
         },
 
         aiMessage: null,
@@ -74,6 +84,10 @@ router.post('/evaluate', async (req, res) => {
             aiResult?.evaluated === false
               ? 'AI_EVALUATION_NOT_POSSIBLE'
               : 'AI_EVALUATION_UNAVAILABLE',
+          emergency: riskResult?.emergency === true,
+          emergencyReasons: Array.isArray(riskResult?.emergencyReasons)
+            ? riskResult.emergencyReasons
+            : [],
         },
 
         aiMessage:
@@ -89,8 +103,14 @@ router.post('/evaluate', async (req, res) => {
 
     return res.json({
       success: true,
-      input: data,
-      risk: riskResult,
+      input: evaluationData,
+      risk: {
+        ...riskResult,
+        emergency: riskResult?.emergency === true,
+        emergencyReasons: Array.isArray(riskResult?.emergencyReasons)
+          ? riskResult.emergencyReasons
+          : [],
+      },
       aiMessage: aiResult.message,
     });
 
@@ -111,6 +131,8 @@ router.post('/evaluate', async (req, res) => {
         action: null,
         canEvaluate: false,
         reason: 'AI_EVALUATION_UNAVAILABLE',
+        emergency: false,
+        emergencyReasons: [],
       },
 
       aiMessage: null,

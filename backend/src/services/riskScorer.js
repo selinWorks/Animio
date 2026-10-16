@@ -11,6 +11,8 @@ function calculateRisk(
       riskScore: null,
       riskLevel: null,
       action: null,
+      emergency: false,
+      emergencyReasons: [],
       canEvaluate: false,
       reason: 'AI_EVALUATION_UNAVAILABLE',
     };
@@ -73,6 +75,8 @@ function calculateRisk(
       riskScore: null,
       riskLevel: null,
       action: null,
+      emergency: false,
+      emergencyReasons: [],
       canEvaluate: false,
       reason: 'OTHER_DETAILS_REQUIRED',
     };
@@ -94,26 +98,7 @@ function calculateRisk(
     'Diğer': 10,
   };
 
-  // =====================================================
-  // 5. SÜRE PUANLARI
-  // =====================================================
 
-  const durationScores = {
-    bugun: 0,
-    '1-2_gundur': 7,
-    '1_hafta': 14,
-    uzun: 18,
-  };
-
-  // =====================================================
-  // 6. KULLANICININ ACİLİYET BEYANI
-  // =====================================================
-
-  const urgencyScores = {
-    Evet: 15,
-    'Emin değilim': 7,
-    Hayır: 0,
-  };
 
   // =====================================================
   // 7. HAYVAN TÜRÜ
@@ -313,19 +298,6 @@ function calculateRisk(
     );
   });
 
-  // =====================================================
-  // 13. SÜRE
-  // =====================================================
-
-  score +=
-    durationScores[data.duration] || 0;
-
-  // =====================================================
-  // 14. ACİLİYET
-  // =====================================================
-
-  score +=
-    urgencyScores[data.urgency] || 0;
 
   // =====================================================
   // 15. TAKİP CEVAPLARI
@@ -336,6 +308,77 @@ function calculateRisk(
 
   const followUp =
     data.followUpAnswers || {};
+
+  // Acil uyarı işaretleri risk puanından bağımsız değerlendirilir.
+  // Kullanıcının eski urgency alanı hiçbir şekilde puanlamaya katılmaz.
+  const normalize = value =>
+    String(value || '').trim().toLocaleLowerCase('tr-TR');
+
+  const vomitingFrequency = normalize(followUp.vomitingFrequency);
+  const vomitAppearance = normalize(followUp.vomitAppearance);
+  const canKeepWaterAnswer = normalize(followUp.canKeepWater);
+  const abdominalPainAnswer = normalize(followUp.abdominalPain);
+  const energyLevelAnswer = normalize(followUp.energyLevel);
+  const canWalkAnswer = normalize(followUp.canWalkNormally);
+  const foreignBodyAnswer = normalize(followUp.foreignBodyRisk);
+  const waterIntakeAnswer = normalize(followUp.waterIntake);
+
+  const emergencyReasons = [];
+
+  if (
+    vomitAppearance.includes('kan') ||
+    vomitAppearance.includes('kahve telvesi') ||
+    vomitAppearance.includes('yabancı madde')
+  ) {
+    emergencyReasons.push('Kusmukta kan, koyu içerik veya yabancı madde bildirilmesi');
+  }
+
+  if (
+    vomitingFrequency.includes('4+') ||
+    vomitingFrequency.includes('4 kez') ||
+    vomitingFrequency.includes('5')
+  ) {
+    emergencyReasons.push('Tekrarlayan/çok sık kusma');
+  }
+
+  if (canKeepWaterAnswer === 'hayır' || canKeepWaterAnswer.includes('tutam')) {
+    emergencyReasons.push('Suyu tutamama');
+  }
+
+  if (
+    abdominalPainAnswer === 'evet' ||
+    abdominalPainAnswer.includes('şiddetli') ||
+    abdominalPainAnswer.includes('var')
+  ) {
+    emergencyReasons.push('Karın ağrısı veya şişlik belirtisi');
+  }
+
+  if (
+    energyLevelAnswer.includes('çok halsiz') ||
+    energyLevelAnswer.includes('belirgin şekilde azaldı')
+  ) {
+    emergencyReasons.push('Belirgin halsizlik');
+  }
+
+  if (
+    canWalkAnswer === 'hayır' ||
+    canWalkAnswer.includes('yürüyem')
+  ) {
+    emergencyReasons.push('Normal yürüyememe');
+  }
+
+  if (
+    foreignBodyAnswer === 'evet' ||
+    foreignBodyAnswer.includes('yabancı cisim')
+  ) {
+    emergencyReasons.push('Yabancı cisim yutma ihtimali');
+  }
+
+  if (
+    waterIntakeAnswer.includes('hiç içmiyor')
+  ) {
+    emergencyReasons.push('Su içmeme');
+  }
 
   // -----------------------------------------------------
   // Kusma sıklığı
@@ -469,21 +512,23 @@ function calculateRisk(
 
   let riskLevel = 'Düşük';
   let action =
-    'Evcil hayvanını gözlemlemeye devam edebilirsin.';
+    'Evcil hayvanını gözlemle; belirtiler devam eder veya kötüleşirse veteriner hekime danış.';
 
-  if (score >= 80) {
+  // Acil uyarı işaretleri puandan bağımsız önceliklidir.
+  if (emergencyReasons.length > 0) {
     riskLevel = 'Acil';
-
     action =
-      'Belirtiler ciddi olabileceğinden gecikmeden veteriner hekime başvurman önerilir.';
+      'Ciddi bir uyarı işareti bildirdin. Risk puanı düşük olsa bile vakit kaybetmeden acil veteriner hizmetiyle iletişime geç.';
+  } else if (score >= 80) {
+    riskLevel = 'Yüksek';
+    action =
+      'Belirtiler önemli olabilir; gecikmeden veteriner hekimle görüşmen önerilir.';
   } else if (score >= 60) {
     riskLevel = 'Yüksek';
-
     action =
       'Durumun kısa süre içinde veteriner hekim tarafından değerlendirilmesi önerilir.';
   } else if (score >= 35) {
     riskLevel = 'Orta';
-
     action =
       'Evcil hayvanını yakından takip et. Belirtiler devam eder veya kötüleşirse veteriner hekime danış.';
   }
@@ -496,6 +541,8 @@ function calculateRisk(
     riskScore: score,
     riskLevel,
     action,
+    emergency: emergencyReasons.length > 0,
+    emergencyReasons,
     canEvaluate: true,
   };
 }

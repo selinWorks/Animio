@@ -30,7 +30,6 @@ import {
   MoreHorizontal,
   PawPrint,
   Rabbit,
-  Siren,
   Stethoscope,
   Syringe,
   Trash2,
@@ -222,11 +221,6 @@ type DurationType =
   | 'uzun'
   | '';
 
-type UrgencyType =
-  | 'Evet'
-  | 'Hayır'
-  | 'Emin değilim'
-  | '';
 
 type RiskResult = {
   riskScore: number;
@@ -244,7 +238,6 @@ type AssistantChat = {
   problemType?: ProblemType;
 
   duration: DurationType;
-  urgency: UrgencyType;
 
   followUpAnswers?: FollowUpAnswers;
 
@@ -454,11 +447,6 @@ const DURATIONS: {key: DurationType; label: string}[] = [
   },
 ];
 
-const URGENCIES: UrgencyType[] = [
-  'Evet',
-  'Hayır',
-  'Emin değilim',
-];
 
 /* =========================================================
    SCREEN
@@ -502,8 +490,6 @@ const AssistantScreen = () => {
   const [duration, setDuration] =
     useState<DurationType>('');
 
-  const [urgency, setUrgency] =
-    useState<UrgencyType>('');
 
   const [result, setResult] =
     useState<RiskResult | null>(null);
@@ -542,8 +528,7 @@ const AssistantScreen = () => {
   const canShowSummary =
     petType !== '' &&
     problemTypes.length > 0 &&
-    duration !== '' &&
-    urgency !== '';
+    duration !== '';
 
   const hasFollowUpQuestions =
     problemTypes.includes('Kusma') ||
@@ -605,7 +590,6 @@ const AssistantScreen = () => {
     setProblemTypes([]);
     setFollowUpAnswers({});
     setDuration('');
-    setUrgency('');
 
     setResult(null);
     setAiMessage('');
@@ -874,7 +858,6 @@ const AssistantScreen = () => {
             problemType: problemTypes.join(', '),
 
             duration,
-            urgency,
 
             // SADECE AKTİF SEMPTOM CEVAPLARI
             followUpAnswers: activeFollowUpAnswers,
@@ -914,7 +897,6 @@ const AssistantScreen = () => {
               problemTypes[0] || '',
 
             duration,
-            urgency,
 
             // API'ye gönderdiğimiz temizlenmiş cevapları kaydet
             followUpAnswers:
@@ -952,7 +934,6 @@ const AssistantScreen = () => {
     setProblemTypes([]);
     setFollowUpAnswers({});
     setDuration('');
-    setUrgency('');
     setResult(null);
     setAiMessage('');
     setLoading(false);
@@ -1079,7 +1060,6 @@ const AssistantScreen = () => {
     );
 
     setDuration(chat.duration);
-    setUrgency(chat.urgency);
     setResult(chat.result);
     setAiMessage(
       chat.aiMessage || '',
@@ -2156,7 +2136,7 @@ const AssistantScreen = () => {
                 )}
 
             {/* =================================================
-                DURATION + URGENCY
+                DURATION
                 ================================================= */}
 
             <View
@@ -2242,133 +2222,6 @@ const AssistantScreen = () => {
                           ]}>
                           {item.label}
                         </Text>
-
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                </View>
-
-              </View>
-
-              {/* URGENCY */}
-
-              <View
-                style={[
-                  styles.smallCard,
-                  styles.urgencyCard,
-                ]}>
-
-                <View
-                  style={
-                    styles.smallCardHeader
-                  }>
-
-                  <Siren
-                    size={24}
-                    color={COLORS.red}
-                    strokeWidth={2.4}
-                  />
-
-                  <View
-                    style={
-                      styles.smallHeaderTextBox
-                    }>
-
-                    <Text
-                      style={
-                        styles.smallCardTitle
-                      }>
-                      Aciliyet
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.smallCardSubtitle
-                      }>
-                      Acil bir durum olduğunu
-                      düşünüyor musun?
-                    </Text>
-
-                  </View>
-
-                </View>
-
-                <View
-                  style={
-                    styles.urgencyGrid
-                  }>
-
-                  {URGENCIES.map(item => {
-                    const selected =
-                      urgency === item;
-
-                    return (
-                      <TouchableOpacity
-                        key={item}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          setUrgency(
-                            item,
-                          );
-                          setResult(null);
-                          setAiMessage('');
-                        }}
-                        style={[
-                          styles.urgencyOption,
-                          item ===
-                            'Emin değilim' &&
-                            styles.urgencyWide,
-                        ]}>
-
-                        {selected ? (
-                          <LinearGradient
-                            colors={[
-                              '#F6B89F',
-                              '#EE9F86',
-                            ]}
-                            start={{
-                              x: 0,
-                              y: 0,
-                            }}
-                            end={{
-                              x: 1,
-                              y: 1,
-                            }}
-                            style={[
-                              styles.urgencyGradient,
-                              item ===
-                                'Emin değilim' &&
-                                styles.urgencyWide,
-                            ]}>
-
-                            <Text
-                              style={
-                                styles.urgencySelectedText
-                              }>
-                              {item}
-                            </Text>
-
-                          </LinearGradient>
-                        ) : (
-                          <View
-                            style={[
-                              styles.urgencyDefault,
-                              item ===
-                                'Emin değilim' &&
-                                styles.urgencyWide,
-                            ]}>
-
-                            <Text
-                              numberOfLines={1}
-                              style={
-                                styles.urgencyText
-                              }>
-                              {item}
-                            </Text>
-
-                          </View>
-                        )}
 
                       </TouchableOpacity>
                     );
@@ -2519,29 +2372,6 @@ const AssistantScreen = () => {
                             duration
                           ]
                         : 'Seçilmedi'}
-                    </Text>
-
-                  </View>
-
-                  <View
-                    style={
-                      styles.summaryLine
-                    }>
-
-                    <Text
-                      style={
-                        styles.summaryLabel
-                      }>
-                      Aciliyet:
-                    </Text>
-
-                    <Text
-                      numberOfLines={1}
-                      style={
-                        styles.summaryValue
-                      }>
-                      {urgency ||
-                        'Seçilmedi'}
                     </Text>
 
                   </View>
@@ -3238,8 +3068,7 @@ const AssistantScreen = () => {
               style={
                 styles.modalMessage
               }>
-              Evcil hayvan türü, semptom,
-              süre ve aciliyet bilgilerini
+              Evcil hayvan türü, semptom ve süre bilgilerini
               doldurman gerekiyor.
             </Text>
 
@@ -4198,7 +4027,7 @@ const styles = StyleSheet.create({
   },
 
   /* =======================================================
-     DURATION / URGENCY
+     DURATION
      ======================================================= */
 
   doubleCardRow: {
@@ -4227,12 +4056,9 @@ const styles = StyleSheet.create({
   },
 
   durationCard: {
-    flex: 1.25,
+    flex: 1,
   },
 
-  urgencyCard: {
-    flex: 0.9,
-  },
 
   smallCardHeader: {
     flexDirection: 'row',
@@ -4308,65 +4134,6 @@ const styles = StyleSheet.create({
     color: '#3D28D9',
   },
 
-  urgencyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -3,
-    rowGap: 7,
-  },
-
-  urgencyOption: {
-    width: '50%',
-    height: 43,
-    paddingHorizontal: 3,
-  },
-
-  urgencyWide: {
-    width: '100%',
-  },
-
-  urgencyDefault: {
-    flex: 1,
-    borderRadius: 16,
-
-    backgroundColor: '#FBFCFF',
-
-    borderWidth: 1,
-    borderColor: '#E2E6F0',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  urgencyGradient: {
-    flex: 1,
-    borderRadius: 16,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    elevation: 4,
-
-    shadowColor: '#7257FF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.23,
-    shadowRadius: 8,
-  },
-
-  urgencyText: {
-    color: '#263452',
-    fontSize: 11.5,
-    fontFamily: 'Quicksand-Bold',
-  },
-
-  urgencySelectedText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
-    fontFamily: 'Quicksand-Bold',
-  },
 
   /* =======================================================
      SUMMARY

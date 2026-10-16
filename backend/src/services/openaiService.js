@@ -500,7 +500,6 @@ const generatePetAdvice = async (
       problemTypes,
       problemType,
       duration,
-      urgency,
       followUpAnswers,
     } = data || {};
 
@@ -632,6 +631,14 @@ const generatePetAdvice = async (
     const riskLevel =
       riskResult?.riskLevel || null;
 
+    const emergency = riskResult?.emergency === true;
+
+    const emergencyReasons = Array.isArray(
+      riskResult?.emergencyReasons
+    )
+      ? riskResult.emergencyReasons
+      : [];
+
     // ===================================================
     // ANA PROMPT
     // ===================================================
@@ -692,9 +699,6 @@ Süre:
 
 ${duration || 'Belirtilmedi'}
 
-Kullanıcının belirttiği aciliyet:
-
-${urgency || 'Belirtilmedi'}
 
 Takip cevapları:
 
@@ -746,6 +750,35 @@ ${
 Sistem tarafından hesaplanan risk seviyesi:
 
 ${riskLevel || 'Belirtilmedi'}
+
+Sistem tarafından belirlenen acil durum işareti:
+
+${emergency ? 'ACİL DURUM İŞARETİ VAR' : 'Sistem tarafından acil durum işareti belirlenmedi'}
+
+Acil durum nedenleri:
+
+${
+  emergencyReasons.length > 0
+    ? emergencyReasons.join(', ')
+    : 'Belirtilmedi'
+}
+
+GÜVENLİK KURALI:
+
+${
+  emergency
+    ? `Sistem acil durum işareti belirledi. Sayısal risk skoru
+düşük olsa bile bu işareti göz ardı etme. Kullanıcıyı
+gecikmeden veteriner değerlendirmesine yönlendir.
+Evde beklemesini veya belirtileri uzun süre izlemesini
+önerme. Acil durum nedenlerini yalnızca verilen bilgilerle
+destekleniyorsa açıkla.`
+    : `Acil durum işareti belirlenmemiş olması, acil bir
+durumun kesinlikle bulunmadığı anlamına gelmez. Kullanıcının
+bildirdiği belirtileri ayrıca değerlendir. Acil uyarı
+işaretleri varsa sayısal puandan bağımsız olarak uygun
+veteriner desteğine yönlendir.`
+}
 
 Bu bilgiler yalnızca iç değerlendirme bağlamıdır.
 
@@ -823,14 +856,24 @@ bir evde tedavi planı oluşturma.
 Risk seviyesini yalnızca sayısal skora göre belirleme.
 Bildirilen belirtilerin niteliğini, süresini ve
 takip cevaplarını birlikte değerlendir.
-
-İdrar yapamama, ciddi solunum güçlüğü, çökme,
-yoğun kanama veya olası zehirlenme gibi acil
-işaretler bildirilmişse bekleme süresi önerme;
-acil veteriner desteğine yönlendir.
-
-Kullanıcının bildirmediği acil belirtileri varmış
-gibi anlatma.
+Sistem tarafından acil durum işareti belirlenmişse,
+sayısal risk skoru ne olursa olsun acil veteriner
+değerlendirmesini açıkça öner.
+Sistem işareti bulunmasa bile kullanıcının bildirdiği
+belirtiler arasında ciddi solunum güçlüğü, çökme,
+yoğun kanama, idrar yapamama veya olası zehirlenme
+gibi acil işaretler varsa gecikmeden veteriner desteğine
+yönlendir.
+Acil durumda evde bekleme süresi önerme; takip sorusu
+sormak için acil yönlendirmeyi geciktirme.
+Kullanıcının bildirmediği belirtileri varmış gibi
+anlatma. Acil durumun kesin nedenini veya tanısını
+bildiğini iddia etme.
+Acil işaret yoksa önerilerin ne zaman veteriner
+başvurusu gerektirdiğini somut biçimde açıkla.
+Risk skoru yalnızca belirtilere dayalı otomatik bir
+ön değerlendirmedir; veteriner muayenesinin yerine
+geçmez.
 
 9. BİLGİ EKSİKLİĞİ
 
