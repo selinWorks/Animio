@@ -1,4 +1,6 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
+
 import {
   View,
   Text,
@@ -53,6 +55,11 @@ const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Tamamlanmamış bildirimlerin sayısı
+  const pendingNotificationCount = notifications.filter(
+    (item: any) => !item.completed,
+  ).length;
+
   /* BİLDİRİMLERİ OKUNDU OLARAK İŞARETLE */
 
   useEffect(() => {
@@ -72,71 +79,73 @@ const NotificationsScreen = () => {
 
   /* FIRESTORE VERİLERİNİ GETİR */
 
-  useEffect(() => {
-    let isMounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-    const fetchEvents = async () => {
-      if (!user?.uid) {
-        setNotifications([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const events = await getCareEventsFromFirestore(user.uid);
-        const now = new Date();
-
-        const activeNotifications = events
-          .filter((item: any) => {
-            if (!item.date) {
-              return false;
-            }
-
-            const eventDate = new Date(
-              `${item.date}T${item.time || '00:00'}:00`,
-            );
-
-            return (
-              !Number.isNaN(eventDate.getTime()) &&
-              eventDate.getTime() <= now.getTime()
-            );
-          })
-          .sort((a: any, b: any) => {
-            const dateA = new Date(
-              `${a.date}T${a.time || '00:00'}:00`,
-            ).getTime();
-
-            const dateB = new Date(
-              `${b.date}T${b.time || '00:00'}:00`,
-            ).getTime();
-
-            return dateB - dateA;
-          });
-
-        if (isMounted) {
-          setNotifications(activeNotifications);
-        }
-      } catch (error) {
-        console.log('Bildirimler yüklenirken hata:', error);
-
-        if (isMounted) {
+      const fetchEvents = async () => {
+        if (!user?.uid) {
           setNotifications([]);
-        }
-      } finally {
-        if (isMounted) {
           setLoading(false);
+          return;
         }
-      }
-    };
 
-    fetchEvents();
+        try {
+          setLoading(true);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.uid]);
+          const events = await getCareEventsFromFirestore(user.uid);
+          const now = new Date();
+
+          const activeNotifications = events
+            .filter((item: any) => {
+              if (!item.date) {
+                return false;
+              }
+
+              const eventDate = new Date(
+                `${item.date}T${item.time || '00:00'}:00`,
+              );
+
+              return (
+                !Number.isNaN(eventDate.getTime()) &&
+                eventDate.getTime() <= now.getTime()
+              );
+            })
+            .sort((a: any, b: any) => {
+              const dateA = new Date(
+                `${a.date}T${a.time || '00:00'}:00`,
+              ).getTime();
+
+              const dateB = new Date(
+                `${b.date}T${b.time || '00:00'}:00`,
+              ).getTime();
+
+              return dateB - dateA;
+            });
+
+          if (isMounted) {
+            setNotifications(activeNotifications);
+          }
+        } catch (error) {
+          console.log('Bildirimler yüklenirken hata:', error);
+
+          if (isMounted) {
+            setNotifications([]);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchEvents();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [user?.uid]),
+  );
 
   /* TARİH FORMATLAMA */
 
@@ -187,9 +196,21 @@ const NotificationsScreen = () => {
             </View>
           ) : null}
 
-          <Text style={styles.notifTitle}>
+          <Text
+            style={[
+              styles.notifTitle,
+              item.completed && styles.completedTitle,
+            ]}>
             {item.title || 'Bakım etkinliği'}
           </Text>
+
+          {item.completed && (
+            <View style={styles.completedBadge}>
+              <Text style={styles.completedBadgeText}>
+                ✓ Tamamlandı
+              </Text>
+            </View>
+          )}
 
           {item.note ? (
             <Text style={styles.notifMessage}>
@@ -235,10 +256,10 @@ const NotificationsScreen = () => {
           </Text>
         </View>
 
-        {notifications.length > 0 && !loading ? (
+        {pendingNotificationCount > 0 && !loading ? (
           <View style={styles.countBadge}>
             <Text style={styles.countText}>
-              {notifications.length}
+              {pendingNotificationCount}
             </Text>
           </View>
         ) : null}
@@ -318,8 +339,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 22,
+    paddingTop: 0,
+    paddingBottom: 14,
   },
 
   headerIcon: {
@@ -494,6 +515,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: C.text,
     marginBottom: 4,
+  },
+
+  completedTitle: {
+    textDecorationLine: 'line-through',
+    color: C.muted,
+  },
+
+  completedBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F8EE',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 3,
+    marginBottom: 5,
+  },
+
+  completedBadgeText: {
+    fontFamily: F.semiBold,
+    fontSize: 10,
+    color: '#27834D',
   },
 
   notifMessage: {
