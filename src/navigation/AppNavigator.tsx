@@ -118,7 +118,7 @@ function BarIcon({
     : color;
 
   return (
-    <Svg width={28} height={28} viewBox="0 0 28 28">
+    <Svg width={24} height={24} viewBox="0 0 28 28">
       <Defs>
         <LinearGradient
           id={gradientId}
@@ -437,7 +437,7 @@ function FloatingTabBar({
       pointerEvents="box-none"
       style={[
         barStyles.wrapper,
-        {bottom: Math.max(insets.bottom, 12) + 8},
+        {bottom: Math.max(insets.bottom, 12) + 2},,
       ]}>
       <View style={barStyles.shadow}>
         <View style={barStyles.dock}>
@@ -666,7 +666,7 @@ const barStyles = StyleSheet.create({
   },
 
   shadow: {
-    borderRadius: 32,
+    borderRadius: 28,
     backgroundColor: '#FCFAFF',
     shadowColor: '#49366E',
     shadowOffset: {width: 0, height: 6},
@@ -676,11 +676,11 @@ const barStyles = StyleSheet.create({
   },
 
   dock: {
-    height: 82,
+    height: 68,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 6,
-    borderRadius: 32,
+    borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: '#FCFAFF',
     borderWidth: 1.5,
@@ -689,7 +689,7 @@ const barStyles = StyleSheet.create({
 
   item: {
     flex: 1,
-    height: 78,
+    height: 64,
     paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -698,8 +698,8 @@ const barStyles = StyleSheet.create({
   capsule: {
     width: '100%',
     maxWidth: 96,
-    height: 64,
-    borderRadius: 32,
+    height: 52,
+    borderRadius: 26,
     overflow: 'hidden',
     position: 'relative',
     alignItems: 'center',
@@ -708,13 +708,13 @@ const barStyles = StyleSheet.create({
 
   activeBackground: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
+    borderRadius: 26,
     backgroundColor: '#EFE6FD',
   },
 
   label: {
-    marginTop: 6,
-    fontSize: 11,
+    marginTop: 2,
+    fontSize: 10.5,
     fontFamily: 'Quicksand-Bold',
     color: '#928BAA',
   },

@@ -535,7 +535,7 @@ export default function HomeScreen() {
         <>
           <GardenButton
             title="Takvim"
-            angle="-5deg"
+            angle="0deg"
             icon={
               <CalendarDays
                 size={18}
@@ -545,7 +545,7 @@ export default function HomeScreen() {
             }
             position={positionAt(
               0.14,
-              0.480,
+              0.52,
               calendarWidth,
             )}
             onPress={() => navigation.navigate('Calendar')}
@@ -553,7 +553,7 @@ export default function HomeScreen() {
 
           <GardenButton
             title="Dostlarım"
-            angle="4deg"
+            angle="0deg"
             icon={
               <PawPrint
                 size={18}
@@ -564,7 +564,7 @@ export default function HomeScreen() {
             }
             position={positionAt(
               0.84,
-              0.405,
+              0.475,
               petsWidth,
             )}
             onPress={() => navigation.navigate('Pets')}
@@ -572,7 +572,7 @@ export default function HomeScreen() {
 
           <GardenButton
             title={'PDF Belge\nOluştur'}
-            angle="6deg"
+            angle="0deg"
             icon={
               <FileText
                 size={20}
@@ -582,7 +582,7 @@ export default function HomeScreen() {
             }
             position={positionAt(
               0.80,
-              0.66,
+              0.69,
               pdfWidth,
               48,
             )}
